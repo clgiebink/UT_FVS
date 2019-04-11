@@ -28,6 +28,7 @@ colnames(covariates)[colnames(covariates)=="DIA"] <- "DIA_t"
 covariates$ASPECT <- conds$ASPECT[match(covariates$PLT_CN, conds$PLT_CN)]
 covariates$SLOPE <- conds$SLOPE[match(covariates$PLT_CN, conds$PLT_CN)]
 covariates$SDI <- conds$SDI_RMRS[match(covariates$PLT_CN, conds$PLT_CN)]
+covariates$SICOND <- conds$SICOND[match(covariates$PLT_CN, conds$PLT_CN)]
 
 covariates$BALIVE <- conds$BALIVE[match(covariates$PLT_CN, conds$PLT_CN)]
 #grData_remeas$BALIVE <- apply(X = grData_remeas[, c("PREV_PLT_CN", "PREV_CONDID")], 
@@ -63,5 +64,105 @@ hist((glmm.data$DIA - glmm.data$DIA_t),breaks=50) #remove outliers?
 start.year <- glmm.data[glmm.data$MEASYEAR.x==glmm.data$Year,] #373
 
 #Max year by CN - is it within 1 year of Measure year?
+yr_cored <- aggregate(glmm.data$Year, by = list(glmm.data$TRE_CN), max)
+colnames(yr_cored) <- c("TRE_CN","Year")
+yr_cored$MEASYEAR <- UT_per$MEASYEAR[match(yr_cored$TRE_CN, UT_per$TRE_CN)]
+yr_cored$diff <- yr_cored$Year - yr_cored$MEASYEAR
+sum(yr_cored$diff < -1) #96; what???
+
+#Margaret's method of comma delimited ring width values
+library(plyr)
+UT_RWcd <- as.data.frame(ddply(UT_rw, .(CN), summarize, 
+                               RW=paste(RW, collapse=","),
+                               DateFirst=min(Year),
+                               DateEnd=max(Year)))
+glmm.data.cd <- merge(per_cov,UT_RWcd, by= "CN", all=TRUE, sort = FALSE)
+save(glmm.data.cd,file = "FIA_RW.data")
+
+temp1 <- glmm.data.cd[glmm.data.cd$MEASYEAR.y-glmm.data.cd$DateEnd<2,]
+#temp2 <- temp1[temp1$MEASYEAR.y-temp1$DateEnd>-1,]
+
+temp1$RW <- as.character(temp1$RW)
+first.start.yr <- min(temp1$DateFirst, na.rm=T)
+last.DBH.yr.1 <- max(temp1$MEASYEAR.y, na.rm=T)#1995
+last.DBH.yr.2 <- max(temp1$DateEnd, na.rm = T) #1997
+last.meas.yr <- max(last.DBH.yr.1, last.DBH.yr.2)
+years <- seq(first.start.yr, last.meas.yr)
+y.matrix <- matrix(data=NA, nrow=nrow(temp1), ncol=length(years))
+colnames(y.matrix) <- years
+for (t in 1:nrow(temp1)) {
+  width.string <- temp1$RW[t]
+  width.vector <- as.numeric(unlist(strsplit(x = width.string, split = ",")))
+  start.column <- which(years == temp1$DateFirst[t])
+  end.column <- which(years == temp1$DateEnd[t])
+  width.subset <- (end.column - start.column) + 1
+  if(length(width.subset)==0){
+    cat("row=",t,"\n")
+    cat("\tend.column=",end.column,", start.column=", start.column,"\n")
+    cat("\tdate.end=",temp1$DateEnd[t],", date.first=",temp1$DateFirst[t],"\n")
+  }
+  width.vector <- width.vector[1:width.subset] 
+  width.vector <- width.vector*0.1*2*(1/2.54) # convert to cm, then to inches
+  #and multiply by 2 to turn radial increment into diameter increment
+  y.matrix[t, c(start.column:end.column)] <- width.vector 
+  # put vector in y.matrix at the right start year:end year
+}
+
+
+
+
+trunc.yr = 1954
+index.last.start <- which(years==trunc.yr) 
+y.small <- y.matrix[,index.last.start:ncol(y.matrix)]
+years.small <- years[index.last.start:ncol(y.matrix)]
+z0 <- matrix(data=NA, nrow=nrow(y.small), ncol=ncol(y.small))
+
+DIA.T1 <- vector(mode="numeric", length=nrow(temp1))
+#ave.ring <- vector(mode="numeric", length=nrow(temp1))
+for (t in 1:nrow(temp1)) {
+  ### shrink tree backward: subtract the cumulative tree-ring-derived diameter increments (in y.matrix) from DIA
+  ifelse(!is.na(temp1$DIA_t[t]), DIA.T1[t]<-temp1$DIA_t[t], DIA.T1[t]<-NA) # extract time 1 DBH (in some cases, the only DBH measurement)
+  # extract tree-ring data from trunc.yr:end series
+  end.col <- which(years== min(temp1$MEASYEAR.y[t],temp1$DateEnd[t]))
+  temp.growth <- y.matrix[t,(index.last.start+1):end.col] # which(years==1966) # returns 248
+  # add rep(ave.ring) to any NA's at the beginning of the tree-ring time series
+  #ave.ring[t] <- mean(temp.growth, na.rm=T)
+  #temp.growth[is.na(temp.growth)]<-ave.ring[t]
+  temp.growth2 <- c(-rev(cumsum(rev(temp.growth))),0) # add a zero at the end of this so that z0 in MEASYR = DIA
+  z0[t,1:length(temp.growth2)] <- DIA.T1[t] + temp.growth2 # note that this is one year off where DateEnd = MEASYEAR-1
+  
+  ### grow tree forward: find short-term average ring-width per tree and add cumulative from DIA to year 2010
+  end.rw <- which(years==temp1$DateEnd[t]) #year of last ring width value
+  #only want trees that have more ring width values after the plot was inventoried
+  if(end.col < end.rw){
+    growth.for <- y.matrix[t, end.col:end.rw]
+    growth.for2 <- c(0,cumsum(temp.growth))
+    z0[t, length(temp.growth2):length(years.small)] <- DIA.T1[t] + cumsum(growth.for2)
+  }
+}
+
+
+#just start with douglas fir
+save(glmm.data,file = "glmm.data")
+DF <- glmm.data[glmm.data$SPCD == 202,]
+
+#annualized DBH
+#DBH0 = DBH - k * DG , where k = 1/BRATIO and DG = 2 * RW
+#DF BRATIO = 0.867
+
+#for(i in unique(a))
+#find row # 
+#if measure year is equal to rw year, then DBH is equal to DIA_t in that row
+#if measure year is equal 
+
+#use dbh to compute crown competition factor (ccf)
+#for (i in length(dbh))
+#if(dbh > 1.0)
+#equation 1
+#else (if(1.0 > dbh > 0.1)
+#equation 2
+#else ##(dbh<0.1)
+#constant
+
 
 
