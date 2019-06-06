@@ -1,4 +1,66 @@
-#Climate
+#Original code by Michiel Pillet
+#mdpillet@gmail.com
+#Updated by Courtney Giebink
+#clgiebink@email.arizona.edu
+
+library(raster)
+
+### PRISM download April, 2019
+### http://www.prism.oregonstate.edu/
+### January 1895 through September 2018
+### (123*12) + 9 = 1485 files
+
+# Search for PRISM files
+PRISM.path <-  "./data/raw/climate/PRISM/"
+pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+tminFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmin*.bil"), full.names = TRUE)
+tmaxFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmax*.bil"), full.names = TRUE)
+
+# Stack monthly data
+pptStack <- stack()
+for (i in pptFiles) {
+  print(i)
+  pptStack <- stack(pptStack, raster(i))
+}
+
+tminStack <- stack()
+for (i in tminFiles) {
+  print(i)
+  tminStack <- stack(tminStack, raster(i))
+}
+
+tmaxStack <- stack()
+for (i in tmaxFiles) {
+  print(i)
+  tmaxStack <- stack(tmaxStack, raster(i))
+}
+
+
+#"UT":
+#{
+#  "name": "Utah",
+#  "min_lat": 36.9982,
+#  "max_lat": 41.9993,
+#  "min_lng": -114.0504,
+#  "max_lng": -109.0462
+#}
+
+# Crop to extent of tree data in Utah
+ut_tree_spat <- SpatialPointsDataFrame(coords = cbind(glmm.data.cd$LON, glmm.data.cd$LAT), 
+                                 data = glmm.data.cd, 
+                                 proj4string = CRS("+proj=longlat +datum=NAD83"))
+cropExtent <- extent(ut_tree_spat)
+pptStackCropped <- crop(pptStack, cropExtent)
+tminStackCropped <- crop(tminStack, cropExtent)
+tmaxStackCropped <- crop(tmaxStack, cropExtent)
+
+# Export rasters
+clim.path <-  "./data/formatted/"
+writeRaster(pptStackCropped, paste0(clim.path, "pptStack.tif"), overwrite = T)
+writeRaster(tminStackCropped, paste0(clim.path, "tminStack.tif"), overwrite = T)
+writeRaster(tmaxStackCropped, paste0(clim.path, "tmaxStack.tif"), overwrite = T)
+
+
 #original code from Margaret Evans
 #margaret.ekevans@gmail.com
 
@@ -6,38 +68,38 @@
 #wide format
 
 # Make lat, lon data spatial
-grSpat <- SpatialPointsDataFrame(coords = cbind(grData_remeas$LON, grData_remeas$LAT), 
-                                 data = grData_remeas, 
-                                 proj4string = CRS("+proj=longlat +datum=NAD83"))
+ut_tree_spat <- SpatialPointsDataFrame(coords = cbind(glmm.data.cd$LON, glmm.data.cd$LAT), 
+                                       data = glmm.data.cd, 
+                                       proj4string = CRS("+proj=longlat +datum=NAD83"))
 
 # THE FOLLOWING LINES CAN BE SKIPPED if you've already generated the "ppt_extr.csv" etc. files
 ### should be moved to historic.R
 ### should be done once for both the survival and growth data, and dead trees subsetted out (one line) for growth analysis
 # Read in PRISM climate stacks
-clim.path <-  ".data/raw/recent/"
+clim.path <-  "./data/formatted/"
 ppt <- stack(paste(clim.path,"pptStack.tif",sep=''))
 tmax <- stack(paste(clim.path,"tmaxStack.tif",sep=''))
 tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
 
 # raster::extract PRISM data
-ppt.extr <- raster::extract(ppt, grSpat) # this step takes about 8 minutes each (laptop)
-tmin.extr <- raster::extract(tmin, grSpat)
-tmax.extr <- raster::extract(tmax, grSpat)
+ppt.extr <- raster::extract(ppt, ut_tree_spat) # this step takes about 8 minutes each (laptop)
+tmin.extr <- raster::extract(tmin, ut_tree_spat)
+tmax.extr <- raster::extract(tmax, ut_tree_spat)
 
 # Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
 # note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
 # crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
-ppt.extr <- ppt.extr[, 1:430] 
-tmin.extr <- tmin.extr[, 1:430]
-tmax.extr <- tmax.extr[, 1:430]
+ppt.extr <- ppt.extr[, 1:1272] 
+tmin.extr <- tmin.extr[, 1:1272]
+tmax.extr <- tmax.extr[, 1:1272]
 
 # Add sensible column names for raster::extracted climate data
 ppt.extr <- as.data.frame(ppt.extr)
 tmin.extr <- as.data.frame(tmin.extr)
 tmax.extr <- as.data.frame(tmax.extr)
-PRISM.path <-  "./ClimateData/PRISM/"
+PRISM.path <-  "./data/raw/climate/PRISM/"
 pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
-pptFiles <- pptFiles[1:430] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
+pptFiles <- pptFiles[1:1272] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
 #tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
 #vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
 colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
@@ -49,10 +111,10 @@ colnames(tmin.extr) <- paste0("tmin_", colNames)
 colnames(tmax.extr) <- paste0("tmax_", colNames)
 
 # Export climate data
-processed.path <- "./Processed/Growth/"
+processed.path <- "./data/formatted/"
 write.csv(ppt.extr, paste0(processed.path,"ppt_extr.csv"), row.names = F)
-write.csv(tmp.extr, paste0(processed.path,"tmin_extr.csv"), row.names = F)
-write.csv(vpd.extr, paste0(processed.path,"tamx_extr.csv"), row.names = F)
+write.csv(tmin.extr, paste0(processed.path,"tmin_extr.csv"), row.names = F)
+write.csv(tmax.extr, paste0(processed.path,"tamx_extr.csv"), row.names = F)
 
 ### CONTINUE HERE IF YOU ALREADY HAVE GENERATED THE ABOVE csv files
 
@@ -241,76 +303,3 @@ grData_remeas$Tex_yr <- apply(tmp.extr[, paste0("T_yr_", (grData_remeas[i, "PREV
 grData_remeas$VPDex_yr <- apply(vpd.extr[, paste0("VPD_yr_", (grData_remeas[i, "PREV_MEASYEAR"]+1):(grData_remeas[i, "MEASYEAR"]))], 1, max)
 
 
-# create and add anomalies to growth data frame
-# monsoon and warm dry season precip anomalies are positive
-# cool season and water year anomalies are left-skewed (heavy tail in negative values)
-# temperature anomalies are positive (no surprise)
-
-
-##### plotting climate and growth data
-plot(grData_remeas$LAT, grData_remeas$PPT_m, xlab = "latitude", ylab = "precipitation Jul-Aug")
-
-
-howmanymatchs <- vector(mode="numeric", length=nrow(grData_remeas))
-# Look up previous AGB
-for (i in 1:nrow(grData_remeas)) {
-  print(i)
-  tmpCN <- grData_remeas[i, "PREV_TRE_CN"]
-  tmpSubset <- subset(grData, CN == tmpCN) #this should only work if the TRE_CN changed from time 1 to time 2
-  #  howmanymatchs[i] <- nrow(tmpSubset) #sum(howmanymatchs) = 15740
-  if (nrow(tmpSubset) == 1) {
-    grData_remeas[i, "PREV_DRYBIO_AG1"] <- tmpSubset$DRYBIO_AG
-    grData_remeas[i, "PREV_PLT_CN1"] <- tmpSubset$PLT_CN
-    grData_remeas[i, "PREV_CONDID1"] <- tmpSubset$CONDID
-  }
-  else { # throws away any tree with more (or less) than 2 measurements
-    grData_remeas[i, "PREV_DRYBIO_AG1"] <- NA
-    grData_remeas[i, "PREV_PLT_CN1"] <- NA
-    grData_remeas[i, "PREV_CONDID1"] <- NA
-  }
-}
-
-# look up coordinates and previous measurement year
-for (i in 1:nrow(grData_remeas)) {
-  print(i)
-  # Get latitude, longitude, and elevation
-  tmpPlot <- grData_remeas[i, "PLT_CN"]
-  tmpSubset <- subset(plots, CN == tmpPlot)
-  grData_remeas[i, "LAT1"] <- tmpSubset$LAT
-  grData_remeas[i, "LON1"] <- tmpSubset$LON
-  grData_remeas[i, "ELEV1"] <- tmpSubset$ELEV
-  grData_remeas[i, "MEASYEAR1"] <- tmpSubset$MEASYEAR
-  # Get previous measurement year
-  tmpPlot <- grData_remeas[i, "PREV_PLT_CN"]
-  tmpSubset <- subset(plots, CN == tmpPlot)
-  grData_remeas[i, "PREV_MEASYEAR1"] <- tmpSubset$MEASYEAR
-}
-
-### look up basal area of live trees
-for (i in 1:nrow(grData_remeas)) {
-  print(i)
-  tmpPlot <- grData_remeas[i, "PREV_PLT_CN"]
-  tmpCondID <- grData_remeas[i, "PREV_CONDID"]
-  condsMatch <- subset(conds, PLT_CN == tmpPlot & CONDID == tmpCondID)
-  balive <- condsMatch$BALIVE
-  #props <- condsMatch$CONDPROP_UNADJ
-  #wmean <- weighted.mean(balive, props, na.rm = T)
-  if (length(balive) == 0) grData_remeas[i, "baLive1"] <- NA
-  else grData_remeas[i, "baLive1"] <- balive
-}
-
-
-for (i in 1:nrow(grData_remeas)) {
-  print(i)
-  tmpPlot <- grData_remeas[i, "PLT_CN"]
-  condsMatch <- subset(conds, PLT_CN == tmpPlot)
-  balive <- condsMatch$BALIVE
-  props <- condsMatch$CONDPROP_UNADJ
-  howmanymatchs[i] <- length(props) 
-  wmean <- weighted.mean(balive, props, na.rm = T)
-  if (length(balive) == 0) grData_remeas[i, "baLive2"] <- NA
-  else grData_remeas[i, "baLive2"] <- wmean
-}
-
-plot(grData_remeas$BALIVE, grData_remeas$baLive1) # exactly on the one:one line
-plot(grData_remeas$BALIVE, grData_remeas$baLive2) # scatter...biased below the one:one line (makes sense)
