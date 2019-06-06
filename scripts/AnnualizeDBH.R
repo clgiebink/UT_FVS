@@ -1,7 +1,7 @@
 #Annualization of DBH
-#Courtney Giebink
+#Courtney Giebink: clgiebink@email.arizona.edu
 #4-17-19
-#with Jeff Oliver
+#with Jeff Oliver: jcoliver@email.arizona.edu 
 
 
 #load the data, long format with trees stacked
@@ -9,10 +9,13 @@ load(file = "./data/formatted/glmm.data")
 
 #dataframe of coefficients for bark ratio calculation
 #from Utah variant guide
-bratio_df <- data.frame(species=c(93,202,122),
-                        b1 = c(0.9502,0.867,0.8967),
-                        b2 = c(-0.2528, 0, -0.4448)) #can add more species later 
-  
+bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
+                        #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,96=BS,106=PI,108=LP,133=PM,321=OH
+                        b1 = c(0.9502,0.867,0.8967,0.890,0.890,0.9002,0.9502,0.9002,0.9625,0.9002,0.93789),
+                        b2 = c(-0.2528, 0, -0.4448,0,0,-0.3089,-0.2528,-0.3089,-0.1141,-0.3089,-0.24096)) #can add more species later 
+
+#annualized DBH
+#DBH0 = DBH - k * DG , where k = 1/BRATIO and DG = 2 * RW  
 #function to annualize, or back calculate dbh using diameter increment data (2*RW)
 library(tidyverse)
 calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
@@ -20,6 +23,9 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
   tree_df <- data.frame(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD,DIA_C = NA)
   #N is the row where measure year and ring width year are the same
   N <- which(tree_df$Year == tree_df$MEASYEAR.y[1]) #next step is to allow N to be ring width year -1
+  if(length(N) == 0){
+    N <- which(tree_df$Year + 1 == tree_df$MEASYEAR.y[1])
+  }
   Species <- tree_df$SPCD[1]
   if(length(N) > 0 & Species %in% bratio_df$species){
     Curr_row <- N-1 #each time through subtract 1 and move down one row
@@ -41,4 +47,12 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
 
 glmm.data.imputed <- glmm.data %>%
   group_by(TRE_CN) %>% #for each tree calculate dbh
-  mutate(DIA_C = calculateDIA(TRE_CN = treeID,DIA_t,MEASYEAR.y,Year,RW,SPCD))
+  arrange(Year) %>%
+  mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD))
+
+#check
+check_data <- glmm.data.imputed[which(glmm.data.imputed$Year + 1 == glmm.data.imputed$MEASYEAR.y),]
+check_data <- check_data[check_data$SPCD == 202,]
+
+#save dataframe
+save(glmm.data.imputed,file = "./data/formatted/glmm.data.imputed")
