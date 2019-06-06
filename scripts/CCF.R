@@ -15,13 +15,13 @@ load(file = "./data/formatted/glmm.data.imputed")
 
 
 #dataframe of species specific coefficients for ccf calculation
-ccf_df <- data.frame(species=c(93,202,122),
-                     #93=ES, 202=DF, 122=PP
-                     r1 = c(0.03,0.11,0.03),
-                     r2 = c(0.0173,0.0333,0.0180),
-                     r3 = c(0.00259,0.00259,0.00281),
-                     r4 = c(0.007875,0.017299,0.007813),
-                     r5 = c(1.7360,1.5571,1.7680)) #can add more species later 
+ccf_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
+                     #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,96=BS,106=PI,108=LP,133=PM,321=OH
+                     r1 = c(0.03,0.11,0.03,0.04,0.03,0.01925,0.03,0.01925,0.01925,0.01925,0.03),
+                     r2 = c(0.0173,0.0333,0.0180,0.0270,0.0216,0.01676,0.0173,0.01676,0.01676,0.01676,0.0215),
+                     r3 = c(0.00259,0.00259,0.00281,0.00405,0.00405,0.00365,0.00259,0.00365,0.00365,0.00365,0.00363),
+                     r4 = c(0.007875,0.017299,0.007813,0.015248,0.011402,0.009187,0.007875,0.009187,0.009187,0.009187,0.011109),
+                     r5 = c(1.7360,1.5571,1.7680,1.7333,1.7560,1.76,1.736,1.76,1.76,1.76,1.7250)) #can add more species later 
 
 #empty vector to hold calculated crown competition factor
 CCF_t <- vector(mode="numeric", length=nrow(glmm.data.imputed))
@@ -53,8 +53,10 @@ for(i in 1:nrow(glmm.data.imputed)){
   pccf_df <- glmm.data.imputed[glmm.data.imputed$Year == year & glmm.data.imputed$PLT_CN.y == plot_cn,]
   glmm.data.imputed$CCF[i] <- sum(pccf_df$PCCF)
 }
-#above will not include other species on the plot besides ES, DF, and PP
-#in AnnualizeDBH.R
-#might have to include other species
+
+#some of the CCF values are NA while PCCF is >0
+#error will have to be checked
+#for a lot of trees stand CCF == PCCF
+#need to get more trees
 
 save(glmm.data.imputed,file = "./data/formatted/glmm.data.imputed")
