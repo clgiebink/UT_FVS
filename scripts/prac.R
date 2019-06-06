@@ -1,5 +1,7 @@
 ##Making Utah data frame
 ##Tables from Justing DeRose and FIA database
+#original code from Margaret Evans
+#margaret.ekevans@gmail.com
 
 
 UT_per <- read.csv("T_Utah_periodic_metadata.csv", header = T)
@@ -27,9 +29,12 @@ colnames(covariates)[colnames(covariates)=="DIA"] <- "DIA_t"
 
 covariates$ASPECT <- conds$ASPECT[match(covariates$PLT_CN, conds$PLT_CN)]
 covariates$SLOPE <- conds$SLOPE[match(covariates$PLT_CN, conds$PLT_CN)]
-covariates$SDI <- conds$SDI_RMRS[match(covariates$PLT_CN, conds$PLT_CN)]
+#covariates$SDI <- conds$SDI_RMRS[match(covariates$PLT_CN, conds$PLT_CN)]
+#all SDI are NA, need to calculate SDI
+covariates$SDImax <- conds$SDIMAX_RMRS[match(covariates$PLT_CN, conds$PLT_CN)]
 covariates$SICOND <- conds$SICOND[match(covariates$PLT_CN, conds$PLT_CN)]
 
+#BALIVE 
 covariates$BALIVE <- conds$BALIVE[match(covariates$PLT_CN, conds$PLT_CN)]
 #grData_remeas$BALIVE <- apply(X = grData_remeas[, c("PREV_PLT_CN", "PREV_CONDID")], 
 # MARGIN = 1, # applies function to each row in grData_remeas
@@ -47,7 +52,6 @@ covariates$ELEV <- plots$ELEV[match(covariates$PLT_CN, plots$CN)]
 covariates$MEASYEAR <- plots$MEASYEAR[match(covariates$PLT_CN, plots$CN)]
 #covariates$PREV_MEASYEAR <- plots$MEASYEAR[match(covariates$PREV_PLT_CN, plots$CN)]
 #?per_cov$PREV_PLT_CN <- per_cov$PLT_CN[match($PREV_TRE_CN, grData$CN)]
-covariates$PRECIP <- plots$PRECIPITATION[match(covariates$PLT_CN, plots$CN)]
 
 #data for glmm - ring widths
 per_cov <- merge(UT_per,covariates,by = "TRE_CN",all.x = TRUE,sort = FALSE)
@@ -59,8 +63,7 @@ sum(is.na(glmm.data$RW)) #0
 sum(is.na(UT_rw$RW)) #0
 hist((glmm.data$DIA - glmm.data$DIA_t),breaks=50) #remove outliers?
 
-#back calculating dbh
-#need to find rows where measure year matches year of rw value
+#find rows where measure/inventory year matches year of ring
 start.year <- glmm.data[glmm.data$MEASYEAR.x==glmm.data$Year,] #373
 
 #Max year by CN - is it within 1 year of Measure year?
@@ -71,6 +74,11 @@ yr_cored$diff <- yr_cored$Year - yr_cored$MEASYEAR
 sum(yr_cored$diff < -1) #96; what???
 
 #Margaret's method of comma delimited ring width values
+#can easily create wide dataframe
+#annualized calculation too hard
+#long format preferred
+#refer to annualizeDBH.R script
+
 library(plyr)
 UT_RWcd <- as.data.frame(ddply(UT_rw, .(CN), summarize, 
                                RW=paste(RW, collapse=","),
@@ -109,8 +117,6 @@ for (t in 1:nrow(temp1)) {
 }
 
 
-
-
 trunc.yr = 1954
 index.last.start <- which(years==trunc.yr) 
 y.small <- y.matrix[,index.last.start:ncol(y.matrix)]
@@ -140,29 +146,6 @@ for (t in 1:nrow(temp1)) {
     z0[t, length(temp.growth2):length(years.small)] <- DIA.T1[t] + cumsum(growth.for2)
   }
 }
-
-
-#just start with douglas fir
-save(glmm.data,file = "glmm.data")
-DF <- glmm.data[glmm.data$SPCD == 202,]
-
-#annualized DBH
-#DBH0 = DBH - k * DG , where k = 1/BRATIO and DG = 2 * RW
-#DF BRATIO = 0.867
-
-#for(i in unique(a))
-#find row # 
-#if measure year is equal to rw year, then DBH is equal to DIA_t in that row
-#if measure year is equal 
-
-#use dbh to compute crown competition factor (ccf)
-#for (i in length(dbh))
-#if(dbh > 1.0)
-#equation 1
-#else (if(1.0 > dbh > 0.1)
-#equation 2
-#else ##(dbh<0.1)
-#constant
 
 
 
