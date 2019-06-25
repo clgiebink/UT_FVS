@@ -12,32 +12,19 @@ load(file = "./data/formatted/glmm.data.imputed")
 #basal area per acre
 #BA*tpa
 
-glmm.data.imputed %>%
+glmm.data.imputed <- glmm.data.imputed %>%
   mutate(BA_pa = (DIA_C^2 * 0.0005454) * TPA_UNADJ)
 
-#or
-
-for(i in 1:nrow(glmm.data.imputed)){
-  glmm.data.imputed$BA_pa[i] <- 
-    ((glmm.data.imputed$DIA_C[i]^2)*0.0005454) * glmm.data.imputed$TPA_UNADJ[i]
-}
 
 #rank trees per year per plot
 #BAL
 #sum BApa of trees larger on the same plot in same year
 
-rank_pltyr <- vector(mode="numeric", length=nrow(glmm.data.imputed))
-BAL <- vector(mode="numeric", length=nrow(glmm.data.imputed))
-for(i in 1:nrow(glmm.data.imputed)){
-  plot_cn <- glmm.data.imputed$PLT_CN.y[i]
-  year <- glmm.data.imputed$Year[i]
-  rank_df <- glmm.data.imputed[glmm.data.imputed$Year == year 
-                               & glmm.data.imputed$PLT_CN.y == plot_cn,]
-  rank_df %>%
-    mutate(rank = dense_rank(DIA_C))
-  glmm.data.imputed$rank_pltyr[i] <- rank_df$rank[i]
-  rank_t <- rank_df$rank[i]
-  glmm.data.imputed$BAL[i] <- sum(rank_df$BA_pa[rank_df$rank > rank_t])
-}
+glmm.data.imputed <- glmm.data.imputed %>%
+  group_by(PLT_CN.y,Year) %>%
+  mutate(rank_pltyr = rank(DIA_C, na.last = TRUE, ties.method = "min")) %>%
+  mutate(BAL = map_dbl(BA_pa,~sum(BA_pa[BA_pa>.x],na.rm = TRUE)))
 
+#check to make sure dense rank is okay
 
+save(glmm.data.imputed,file = "./data/formatted/glmm.data.imputed")
