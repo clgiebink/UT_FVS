@@ -43,20 +43,16 @@ for(i in 1:nrow(glmm.data.imputed)){
 }
 
 #PCCF is the crown competition factor on the inventory point where the tree is established
-glmm.data.imputed$PCCF <- glmm.data.imputed$CCF_t*glmm.data.imputed$TPA_UNADJ
+#dplyr
+
+glmm.data.imputed <- glmm.data.imputed %>%
+  mutate(PCCF = CCF_t * TPA_UNADJ)
 
 #stand CCF = sum(CCFt on a plot)
-CCF <- vector(mode="numeric", length=nrow(glmm.data.imputed))
-for(i in 1:nrow(glmm.data.imputed)){
-  plot_cn <- glmm.data.imputed$PLT_CN.y[i]
-  year <- glmm.data.imputed$Year[i]
-  pccf_df <- glmm.data.imputed[glmm.data.imputed$Year == year & glmm.data.imputed$PLT_CN.y == plot_cn,]
-  glmm.data.imputed$CCF[i] <- sum(pccf_df$PCCF)
-}
+glmm.data.imputed <- glmm.data.imputed %>%
+  group_by(PLT_CN.y,Year) %>%
+  mutate(CCF = sum(PCCF,na.rm = TRUE)) %>%
+  mutate(CCF = ifelse(CCF == 0, NA, CCF))
 
-#some of the CCF values are NA while PCCF is >0
-#error will have to be checked
-#for a lot of trees stand CCF == PCCF
-#need to get more trees
 
 save(glmm.data.imputed,file = "./data/formatted/glmm.data.imputed")
