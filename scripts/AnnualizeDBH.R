@@ -5,7 +5,7 @@
 
 
 #load the data, long format with trees stacked
-load(file = "./data/formatted/glmm.data")
+load(file = "./data/formatted/incr_percov")
 
 #dataframe of coefficients for bark ratio calculation
 #from Utah variant guide
@@ -30,7 +30,7 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
   if(length(N) > 0 & Species %in% bratio_df$species){
     Curr_row <- N-1 #each time through subtract 1 and move down one row
     tree_df$DIA_C[N] <- tree_df$DIA_t[N] #dbh when year of ring width and measure year are equal
-    while (Curr_row > 0) { #loop will stop when it gets to the end of data for that tree
+    while (Curr_row > 0 & !is.na(tree_df$DIA_C[Curr_row + 1])) { #loop will stop when it gets to the end of data for that tree
       DIA_1 <- tree_df$DIA_C[Curr_row+1] #or DIA_t[N] for the first round
       RW1 <- tree_df$RW[Curr_row+1] 
       #TODO convert ring width from mm to inches
@@ -38,6 +38,9 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
       b1 <- bratio_df$b1[bratio_df$species == Species]
       b2 <- bratio_df$b2[bratio_df$species == Species]
       tree_df$DIA_C[Curr_row] <- DIA_1 - ((2*RW1)/(b1+b2/DIA_1))
+      if(tree_df$DIA_C[Curr_row] < 1){
+        tree_df$DIA_C <- NA
+      }
       #continue loop for next row until curr_row>0
       Curr_row = Curr_row - 1 
     }
@@ -45,14 +48,22 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
   return(tree_df$DIA_C)
 }
 
-glmm.data.imputed <- glmm.data %>%
+incr_imputed <- incr_percov %>%
   group_by(TRE_CN) %>% #for each tree calculate dbh
   arrange(Year) %>%
   mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD))
 
 #check
-check_data <- glmm.data.imputed[which(glmm.data.imputed$Year + 1 == glmm.data.imputed$MEASYEAR.y),]
+#stop when DIA is less than 1
+min(incr_imputed$DIA_C,na.rm = T) #1.005443
+
+#did DIA_C = DIA_t when last RW year was 1 year less than MEASYEAR
+check_data <- incr_imputed[which(incr_imputed$Year + 1 == incr_imputed$MEASYEAR.y),]
 check_data <- check_data[check_data$SPCD == 202,]
 
+#filter for trees with back calculated DBH
+incr_imputed <- incr_imputed %>%
+  filter(!is.na(DIA_C))
+
 #save dataframe
-save(glmm.data.imputed,file = "./data/formatted/glmm.data.imputed")
+save(incr_imputed,file = "./data/formatted/incr_imputed")
