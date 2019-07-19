@@ -60,7 +60,6 @@ writeRaster(pptStackCropped, paste0(clim.path, "pptStack.tif"), overwrite = T)
 writeRaster(tminStackCropped, paste0(clim.path, "tminStack.tif"), overwrite = T)
 writeRaster(tmaxStackCropped, paste0(clim.path, "tmaxStack.tif"), overwrite = T)
 
-
 #original code from Margaret Evans
 #margaret.ekevans@gmail.com
 
@@ -115,6 +114,151 @@ processed.path <- "./data/formatted/"
 write.csv(ppt.extr, paste0(processed.path,"ppt_extr.csv"), row.names = F)
 write.csv(tmin.extr, paste0(processed.path,"tmin_extr.csv"), row.names = F)
 write.csv(tmax.extr, paste0(processed.path,"tamx_extr.csv"), row.names = F)
+
+
+#subset for DF to obtain specific climate growth relationships
+
+#load data
+#wide format: glmm.data.cd
+data_DF <- glmm.data.cd %>%
+  filter(SPCD == 202)
+
+# Make lat, lon data spatial
+ut_DF_spat <- SpatialPointsDataFrame(coords = cbind(data_DF$LON, data_DF$LAT), 
+                                       data = data_DF, 
+                                       proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# raster::extract PRISM data
+ppt.extr_DF <- raster::extract(ppt, ut_DF_spat) # this step takes about 8 minutes each (laptop)
+tmin.extr_DF <- raster::extract(tmin, ut_DF_spat)
+tmax.extr_DF <- raster::extract(tmax, ut_DF_spat)
+
+# Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
+# note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
+# crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
+ppt.extr_DF <- ppt.extr_DF[, 1:1272] 
+tmin.extr_DF <- tmin.extr_DF[, 1:1272]
+tmax.extr_DF <- tmax.extr_DF[, 1:1272]
+
+# Add sensible column names for raster::extracted climate data
+ppt.extr_DF <- as.data.frame(ppt.extr_DF)
+tmin.extr_DF <- as.data.frame(tmin.extr_DF)
+tmax.extr_DF <- as.data.frame(tmax.extr_DF)
+#PRISM.path <-  "./data/raw/climate/PRISM/"
+#pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+#pptFiles <- pptFiles[1:1272] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
+#tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
+#vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
+#colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
+#colNames <- unlist(colNames)
+#colNames <- lapply(strsplit(colNames, "_"), function (x) x[1])
+#colNames <- unlist(colNames)
+colnames(ppt.extr_DF) <- paste0("ppt_", colNames)
+colnames(tmin.extr_DF) <- paste0("tmin_", colNames)
+colnames(tmax.extr_DF) <- paste0("tmax_", colNames)
+
+# Export climate data
+#processed.path <- "./data/formatted/"
+write.csv(ppt.extr_DF, paste0(processed.path,"ppt_extr_DF.csv"), row.names = F)
+write.csv(tmin.extr_DF, paste0(processed.path,"tmin_extr_DF.csv"), row.names = F)
+write.csv(tmax.extr_DF, paste0(processed.path,"tamx_extr_DF.csv"), row.names = F)
+
+
+#subset for PP to obtain specific climate growth relationships
+
+#load data
+#wide format: glmm.data.cd
+data_PP <- glmm.data.cd %>%
+  filter(SPCD == 122)
+
+# Make lat, lon data spatial
+ut_PP_spat <- SpatialPointsDataFrame(coords = cbind(data_PP$LON, data_PP$LAT), 
+                                     data = data_PP, 
+                                     proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# raster::extract PRISM data
+ppt.extr_PP <- raster::extract(ppt, ut_PP_spat) # this step takes about 8 minutes each (laptop)
+tmin.extr_PP <- raster::extract(tmin, ut_PP_spat)
+tmax.extr_PP <- raster::extract(tmax, ut_PP_spat)
+
+# Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
+# note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
+# crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
+ppt.extr_PP <- ppt.extr_PP[, 1:1272] 
+tmin.extr_PP <- tmin.extr_PP[, 1:1272]
+tmax.extr_PP <- tmax.extr_PP[, 1:1272]
+
+# Add sensible column names for raster::extracted climate data
+ppt.extr_PP <- as.data.frame(ppt.extr_PP)
+tmin.extr_PP <- as.data.frame(tmin.extr_PP)
+tmax.extr_PP <- as.data.frame(tmax.extr_PP)
+#PRISM.path <-  "./data/raw/climate/PRISM/"
+#pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+#pptFiles <- pptFiles[1:1272] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
+#tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
+#vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
+#colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
+#colNames <- unlist(colNames)
+#colNames <- lapply(strsplit(colNames, "_"), function (x) x[1])
+#colNames <- unlist(colNames)
+colnames(ppt.extr_PP) <- paste0("ppt_", colNames)
+colnames(tmin.extr_PP) <- paste0("tmin_", colNames)
+colnames(tmax.extr_PP) <- paste0("tmax_", colNames)
+
+# Export climate data
+#processed.path <- "./data/formatted/"
+write.csv(ppt.extr_PP, paste0(processed.path,"ppt_extr_PP.csv"), row.names = F)
+write.csv(tmin.extr_PP, paste0(processed.path,"tmin_extr_PP.csv"), row.names = F)
+write.csv(tmax.extr_PP, paste0(processed.path,"tamx_extr_PP.csv"), row.names = F)
+
+
+#subset for ES to obtain specific climate growth relationships
+
+#load data
+#wide format: glmm.data.cd
+data_ES <- glmm.data.cd %>%
+  filter(SPCD == 93)
+
+# Make lat, lon data spatial
+ut_ES_spat <- SpatialPointsDataFrame(coords = cbind(data_ES$LON, data_ES$LAT), 
+                                     data = data_ES, 
+                                     proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# raster::extract PRISM data
+ppt.extr_ES <- raster::extract(ppt, ut_ES_spat) # this step takes about 8 minutes each (laptop)
+tmin.extr_ES <- raster::extract(tmin, ut_ES_spat)
+tmax.extr_ES <- raster::extract(tmax, ut_ES_spat)
+
+# Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
+# note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
+# crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
+ppt.extr_ES <- ppt.extr_ES[, 1:1272] 
+tmin.extr_ES <- tmin.extr_ES[, 1:1272]
+tmax.extr_ES <- tmax.extr_ES[, 1:1272]
+
+# Add sensible column names for raster::extracted climate data
+ppt.extr_ES <- as.data.frame(ppt.extr_ES)
+tmin.extr_ES <- as.data.frame(tmin.extr_ES)
+tmax.extr_ES <- as.data.frame(tmax.extr_ES)
+#PRISM.path <-  "./data/raw/climate/PRISM/"
+#pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+#pptFiles <- pptFiles[1:1272] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
+#tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
+#vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
+#colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
+#colNames <- unlist(colNames)
+#colNames <- lapply(strsplit(colNames, "_"), function (x) x[1])
+#colNames <- unlist(colNames)
+colnames(ppt.extr_ES) <- paste0("ppt_", colNames)
+colnames(tmin.extr_ES) <- paste0("tmin_", colNames)
+colnames(tmax.extr_ES) <- paste0("tmax_", colNames)
+
+# Export climate data
+#processed.path <- "./data/formatted/"
+write.csv(ppt.extr_ES, paste0(processed.path,"ppt_extr_ES.csv"), row.names = F)
+write.csv(tmin.extr_ES, paste0(processed.path,"tmin_extr_ES.csv"), row.names = F)
+write.csv(tmax.extr_ES, paste0(processed.path,"tamx_extr_ES.csv"), row.names = F)
+
 
 ### CONTINUE HERE IF YOU ALREADY HAVE GENERATED THE ABOVE csv files
 
