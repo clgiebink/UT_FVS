@@ -74,7 +74,6 @@ all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 
 
-
 #make seasonal climate variables
 #refer to climate-growth analysis
 #first filter by species
