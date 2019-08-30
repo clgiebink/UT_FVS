@@ -22,10 +22,11 @@ cond <- UT_cond
 ##FLDTYPCD_30, Site index for the condition, SIBASE Site index base age, SISP Site index species code
 
 #grab covariates for model
-covariates <- UT_tree[,c("CN","PLT_CN","PREV_TRE_CN","DIA","CR","SITREE","TPA_UNADJ")]
+covariates <- UT_tree[,c("CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","CR","UNCRCD","SITREE","TPA_UNADJ")]
 
 colnames(covariates)[colnames(covariates)=="CN"] <- "TRE_CN"
 colnames(covariates)[colnames(covariates)=="DIA"] <- "DIA_t"
+colnames(covariates)[colnames(covariates)=="SUBP"] <- "SUBP_t"
 
 covariates$CONDID <- cond$CONDID[match(covariates$PLT_CN, cond$PLT_CN)]
 covariates$ASPECT <- cond$ASPECT[match(covariates$PLT_CN, cond$PLT_CN)]
@@ -51,30 +52,42 @@ covariates$LON <- plot$LON[match(covariates$PLT_CN, plot$CN)]
 covariates$ELEV <- plot$ELEV[match(covariates$PLT_CN, plot$CN)]
 covariates$MEASYEAR <- plot$MEASYEAR[match(covariates$PLT_CN, plot$CN)]
 covariates$DESIGNCD <- plot$DESIGNCD[match(covariates$PLT_CN, plot$CN)]
+covariates$SUBP_EXAM <- plot$SUBP_EXAMINE_CD[match(covariates$PLT_CN, plot$CN)]
 #covariates$PREV_MEASYEAR <- plots$MEASYEAR[match(covariates$PREV_PLT_CN, plots$CN)]
 
 #data for glmm - ring widths
-per_cov <- merge(UT_per,covariates,by = "TRE_CN",all.x = TRUE,sort = FALSE)
+per_cov <- left_join(UT_per,covariates)
+per_cov[duplicated(per_cov$TRE_CN),] #are there any dublicated trees?
+#0
 
-incr_percov <- merge(per_cov,UT_rw, by= "CN", all=TRUE, sort = FALSE)
+incr_percov <- left_join(UT_rw,per_cov) #by CN
+
+
+#check species
+length(per_cov$TRE_CN[per_cov$SPCD == 202]) #166
+length(per_cov$TRE_CN[per_cov$SPCD == 122]) #80
+length(per_cov$TRE_CN[per_cov$SPCD == 93])  #52
 
 #is the dataset correct?
 sum(is.na(incr_percov$RW)) #0
 sum(is.na(UT_rw$RW)) #0
-hist((incr_percov$DIA - incr_percov$DIA_t),breaks=50) #remove outliers?
+hist((incr_percov$DIA - incr_percov$DIA_t),breaks=50,
+     main = "Histogram of core DIA - FIADB DIA") #remove outliers?
 length(unique(incr_percov$TRE_CN[incr_percov$DIA == incr_percov$DIA_t]))
-#[1] 575
+#[1] 572
 
 #filter large differences in FIADB DIA and core mount DIA
 incr_percov <- incr_percov[abs(incr_percov$DIA - incr_percov$DIA_t) <= 0.5,] #half an inch margin of error
 hist((incr_percov$DIA - incr_percov$DIA_t),breaks=50) #check
 length(unique(incr_percov$TRE_CN))
-#[1] 582
-
-save(incr_percov,file = "./data/formatted/incr_percov")
+#[1] 579
+length(unique(incr_percov$CN))
+#[1] 579
 
 #find rows where measure/inventory year matches year of ring
-start.year <- incr_percov[incr_percov$MEASYEAR.x==incr_percov$Year,] #373
+start.year <- incr_percov[incr_percov$MEASYEAR==incr_percov$Year,] #373
+duplicated(start.year$TRE_CN) #FALSE
+length(unique(start.year$TRE_CN)) #373
 
 #Max year by CN - is it within 1 year of Measure year?
 yr_cored <- aggregate(incr_percov$Year, by = list(incr_percov$TRE_CN), max)
@@ -82,4 +95,7 @@ colnames(yr_cored) <- c("TRE_CN","Year")
 yr_cored$MEASYEAR <- UT_per$MEASYEAR[match(yr_cored$TRE_CN, UT_per$TRE_CN)]
 yr_cored$diff <- yr_cored$Year - yr_cored$MEASYEAR
 sum(yr_cored$diff < -1) #96; what???
+
+save(per_cov,file = "./data/formatted/per_cov")
+save(incr_percov,file = "./data/formatted/incr_percov")
 
