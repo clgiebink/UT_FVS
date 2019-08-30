@@ -76,14 +76,6 @@ hist((incr_percov$DIA - incr_percov$DIA_t),breaks=50,
 length(unique(incr_percov$TRE_CN[incr_percov$DIA == incr_percov$DIA_t]))
 #[1] 572
 
-#filter large differences in FIADB DIA and core mount DIA
-incr_percov <- incr_percov[abs(incr_percov$DIA - incr_percov$DIA_t) <= 0.5,] #half an inch margin of error
-hist((incr_percov$DIA - incr_percov$DIA_t),breaks=50) #check
-length(unique(incr_percov$TRE_CN))
-#[1] 579
-length(unique(incr_percov$CN))
-#[1] 579
-
 #find rows where measure/inventory year matches year of ring
 start.year <- incr_percov[incr_percov$MEASYEAR==incr_percov$Year,] #373
 duplicated(start.year$TRE_CN) #FALSE
