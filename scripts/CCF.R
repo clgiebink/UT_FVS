@@ -6,6 +6,24 @@
 #load data
 load(file = "./data/formatted/density_data")
 
+#trees w/o increments on plots have same DESIGNCD
+unique(miss_data$DESIGNCD)
+#410 424 423 425
+
+subp_exam <- density_data %>%
+  group_by(PLT_CN,DESIGNCD) %>%
+  summarise(subp_des <- length(unique(SUBP_t)))
+
+#expansion factor (TPA) is based on DIA in variale radius plots
+#410 is 40 BAF variable radius
+#TPA = (BAF/0.005454*DIA^2)/N
+#constant if fixed radius plot (423,424,425)
+
+density_data <- density_data %>%
+  mutate(TPA_C = ifelse(DESIGNCD == 410, 
+                        (40/(0.005454*(DIA_C^2)))/5,
+                        TPA_UNADJ))
+
 #Crown Competition Factor
 #measure of stand density
 #equations taken from Utah variant guide
@@ -21,7 +39,7 @@ ccf_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321,66,475,113
                      r2 = c(0.0173,0.0333,0.0180,0.0270,0.0216,0.01676,0.0173,0.01676,0.01676,0.01676,0.0215,0.01676,0.0246,0.01676,0.0238,0.0215,0.01676),
                      r3 = c(0.00259,0.00259,0.00281,0.00405,0.00405,0.00365,0.00259,0.00365,0.00365,0.00365,0.00363,0.00365,0.0074,0.00365,0.00490,0.00363,0.00365),
                      r4 = c(0.007875,0.017299,0.007813,0.015248,0.011402,0.009187,0.007875,0.009187,0.009187,0.009187,0.011109,0.009187,0,0.009187,0.008915,0.011109,0.009187),
-                     r5 = c(1.7360,1.5571,1.7680,1.7333,1.7560,1.76,1.736,1.76,1.76,1.76,1.7250,1.76,0,1.76,1.78,1.725,1.76)
+                     r5 = c(1.7360,1.5571,1.7680,1.7333,1.7560,1.76,1.736,1.76,1.76,1.76,1.7250,1.76,0,1.76,1.78,1.725,1.76),
                      dbrk = c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10)) #can add more species later 
 
 #empty vector to hold calculated crown competition factor
@@ -36,33 +54,43 @@ for(i in 1:nrow(density_data)){
   dbrk <- ccf_df$dbrk[ccf_df$species == Species]
   if(Species == 475){
     ifelse(density_data$DIA_C[i] < dbrk,
-           CCF_t[i] <- density_data$DIA_C[i]*(r1+r2+r3),
-           CCF_t[i] <- r1 + (r2 * density_data$DIA_C[i]) + (r3 * density_data$DIA_C[i]^2))
+           CCF_t <- density_data$DIA_C[i]*(r1+r2+r3),
+           CCF_t <- r1 + (r2 * density_data$DIA_C[i]) + (r3 * density_data$DIA_C[i]^2))
   }
   if(Species != 475){
     ifelse(is.na(density_data$DIA_C[i]), 
-           CCF_t[i] <- NA,
+           CCF_t <- NA,
            ifelse(density_data$DIA_C[i] <= 0.1, 
-                  CCF_t[i] <- 0.0001,
+                  CCF_t <- 0.0001,
                   ifelse(density_data$DIA_C[i] < dbrk, 
-                         CCF_t[i] <- r4 * (density_data$DIA_C[i]^r5),
-                         CCF_t[i] <- r1 + (r2 * density_data$DIA_C[i]) + (r3 * density_data$DIA_C[i]^2))))
+                         CCF_t <- r4 * (density_data$DIA_C[i]^r5),
+                         CCF_t <- r1 + (r2 * density_data$DIA_C[i]) + (r3 * density_data$DIA_C[i]^2))))
   }
-  density_data$CCF_t[i] <- CCF_t[i]
+  density_data$CCF_t[i] <- CCF_t
 }
 
 #PCCF is the crown competition factor on the inventory point where the tree is established
-#dplyr
+#pCCF = the sum of CCF_t on a subplot on a per acre basis
+#subplot given by SUBP
+#TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
+#4 subplots for DESIGNCD 423, 424, 425
+#5 subplots for DESIGNCD 410
+density_data <- density_data %>%
+  group_by(DESIGNCD) %>%
+  mutate(SUBP_N = max(SUBP_t))
 
 density_data <- density_data %>%
-  mutate(PCCF = CCF_t * TPA_UNADJ)
+  group_by(PLT_CN,SUBP,Year) %>%
+  mutate(PCCF = sum(CCF_t * (TPA_C * SUBP_N), na.rm = TRUE))
 
-length(unique(density_data$PLT_CN)) #238
+length(unique(density_data$PLT_CN)) #435
 
-#stand CCF = sum(CCFt on a plot)
+#stand CCF = sum(CCFt on a plot) on a per acre basis
+#plot given by PLT_CN
+#TPA measured on a plot/stand level
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
-  mutate(CCF = sum(PCCF,na.rm = TRUE)) #%>%
+  mutate(CCF = sum(CCF_t * TPA_C,na.rm = TRUE)) #%>%
   #mutate(CCF = ifelse(CCF == 0, NA, CCF))
 
 
