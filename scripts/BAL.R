@@ -24,7 +24,7 @@ density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
   mutate(rank_pltyr = rank(DIA_C, na.last = TRUE, ties.method = "min")) %>%
   #min assigns lowest value to ties (1,2,3,3,5,6)
-  mutate(BAL = map_dbl(BA_pa,~sum(BA_pa[BA_pa>.x],na.rm = TRUE)))
+  mutate(BAL = map_dbl(DIA_C,~sum(BA_pa[DIA_C>.x],na.rm = TRUE)))
 
 #check to make sure dense rank is okay
 max(density_data$rank_pltyr)
