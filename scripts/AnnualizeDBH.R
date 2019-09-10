@@ -7,6 +7,8 @@
 #load the data, long format with trees stacked
 load(file = "./data/formatted/incr_percov")
 
+#explore
+
 #dataframe of coefficients for bark ratio calculation
 #from Utah variant guide
 bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
@@ -18,13 +20,13 @@ bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
 #DBH0 = DBH - k * DG , where k = 1/BRATIO and DG = 2 * RW  
 #function to annualize, or back calculate dbh using diameter increment data (2*RW)
 library(tidyverse)
-calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
+calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
   #create data frame with empty column for annualized dbh
-  tree_df <- data.frame(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD,DIA_C = NA)
+  tree_df <- data.frame(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD,DIA_C = NA)
   #N is the row where measure year and ring width year are the same
-  N <- which(tree_df$Year == tree_df$MEASYEAR.y[1]) #next step is to allow N to be ring width year -1
+  N <- which(tree_df$Year == tree_df$MEASYEAR[1]) #next step is to allow N to be ring width year -1
   if(length(N) == 0){
-    N <- which(tree_df$Year + 1 == tree_df$MEASYEAR.y[1])
+    N <- which(tree_df$Year + 1 == tree_df$MEASYEAR[1])
   }
   Species <- tree_df$SPCD[1]
   if(length(N) > 0 & Species %in% bratio_df$species){
@@ -39,7 +41,7 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
       b2 <- bratio_df$b2[bratio_df$species == Species]
       tree_df$DIA_C[Curr_row] <- DIA_1 - ((2*RW1)/(b1+b2/DIA_1))
       if(tree_df$DIA_C[Curr_row] < 1){
-        tree_df$DIA_C <- NA
+        tree_df$DIA_C[Curr_row] <- NA
       }
       #continue loop for next row until curr_row>0
       Curr_row = Curr_row - 1 
@@ -51,19 +53,25 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD){
 incr_imputed <- incr_percov %>%
   group_by(TRE_CN) %>% #for each tree calculate dbh
   arrange(Year) %>%
-  mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR.y,Year,RW,SPCD))
+  mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD))
 
 #check
 #stop when DIA is less than 1
-min(incr_imputed$DIA_C,na.rm = T) #1.005443
+min(incr_imputed$DIA_C,na.rm = T) #1.000038
 
 #did DIA_C = DIA_t when last RW year was 1 year less than MEASYEAR
-check_data <- incr_imputed[which(incr_imputed$Year + 1 == incr_imputed$MEASYEAR.y),]
+check_data <- incr_imputed[which(incr_imputed$Year + 1 == incr_imputed$MEASYEAR),]
 check_data <- check_data[check_data$SPCD == 202,]
 
 #filter for trees with back calculated DBH
+length(unique(incr_imputed$TRE_CN)) #603
 incr_imputed <- incr_imputed %>%
-  filter(!is.na(DIA_C))
+  filter(!is.na(DIA_C)) #filter for >5" later
+length(unique(incr_imputed$TRE_CN)) #504
+
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 202])) #131
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 122])) #73, but 71 with <5"
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 93]))  #50
 
 #save dataframe
 save(incr_imputed,file = "./data/formatted/incr_imputed")
