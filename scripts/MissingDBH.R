@@ -21,31 +21,28 @@ incr_imputed <- incr_imputed %>%
   group_by(TRE_CN) %>%
   mutate(BAR = (lag(DIA_C)^2)/DIA_C^2)
 
-#remove trees that haven't been back calculate
-
-incr_data <- incr_imputed[!is.na(incr_imputed$BAR), c("TRE_CN","PLT_CN.y","SPCD","DIA_t","TPA_UNADJ","Year","MEASYEAR.y","BAR","DIA_C")]
+#species
 unique(incr_imputed$SPCD) #Values of BAR can be used for other species
-#[1] 106 202 122  93  15  65  19  96
-colnames(incr_data)[colnames(incr_data)=="PLT_CN.y"] <- "PLT_CN"
-colnames(incr_data)[colnames(incr_data)=="MEASYEAR.y"] <- "MEASYEAR"
-
+#[1] 106 202 122  93  15  65 108  19  96 133 321
 
 #create dataframe of trees without increment cores in plots with trees that have increment cores
-plot_rw <- unique(incr_data$PLT_CN.y)
-tree_rw <- unique(incr_data$TRE_CN)
-miss_data <- UT_tree[(UT_tree$PLT_CN %in% plot_rw) & !(UT_tree$CN %in% tree_rw),c("CN","PLT_CN","SPCD","DIA","TPA_UNADJ")]
+plot_rw <- unique(incr_imputed$PLT_CN) #435
+tree_rw <- unique(incr_imputed$TRE_CN) #504
+miss_data <- UT_tree[(UT_tree$PLT_CN %in% plot_rw) & !(UT_tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ")]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including trees with increment data; 508
 colnames(miss_data)[colnames(miss_data)=="CN"] <- "TRE_CN"
 colnames(miss_data)[colnames(miss_data)=="DIA"] <- "DIA_t"
+colnames(miss_data)[colnames(miss_data)=="SUBP"] <- "SUBP_t"
 miss_data$MEASYEAR <- plot$MEASYEAR[match(miss_data$PLT_CN, plot$CN)]
+miss_data$DESIGNCD <- plot$DESIGNCD[match(miss_data$PLT_CN, plot$CN)]
 miss_data$Year <- NA #important for mutate(Year) to work
 miss_data$BAR_av <- NA
 miss_data$DIA_C <- NA
 
 #check
-length(plot_rw) #238
-length(unique(miss_data$PLT_CN)) #238
+length(plot_rw) #435
+length(unique(miss_data$PLT_CN)) #435
 
 #empty (year&DIA_C) dataframe?
 miss_data <- miss_data %>% 
@@ -55,24 +52,25 @@ miss_data <- miss_data %>%
   ungroup()
 
 
-#match BAR_av from incr_data to miss_data using plot, species and year information
+#match BAR_av from incr_imputed to miss_data using plot, species and year information
 #match function does not work..why? NA values?
 #for loop works but takes a long time
 for(i in 1:nrow(miss_data)){ #miss_data includes all trees without increment data
   species <- miss_data$SPCD[i]
   if(species %in% c(106,202,122,93)){ #focal species
-    BAR <- incr_data$BAR[incr_data$PLT_CN.y == miss_data$PLT_CN[i] &
-                           incr_data$SPCD == miss_data$SPCD[i]]
+    BAR <- incr_imputed$BAR[incr_imputed$PLT_CN == miss_data$PLT_CN[i] &
+                           incr_imputed$SPCD == miss_data$SPCD[i]]
     #first average within a plot for a specific species (over years)
+    if(length(BAR) == 0){
+      BAR <- incr_imputed$BAR[incr_imputed$SPCD == miss_data$SPCD[i]]
+      #if no species on the plot, then just average species across plots
+    }
   }
-  if(length(BAR) == 0){
-    BAR <- incr_data$BAR[incr_data$SPCD == miss_data$SPCD[i]]
-    #if no species on the plot, then just average species across plots
+  if(!(species %in% c(106,122,202,93))){ #all other, non-focal species 
+    #includes 15, 19, 65, 66, 96, 108, 102, 113, 322, 475, 746, 749, & 814
+    BAR <- incr_imputed$BAR[!(species %in% c(106,122,202,93))]
   }
-  if(!(species %in% c(106,122,202,93))){ #all other, non-focal species, includes 15, 19, 65, 66, 96, 108, 102, 113, 322, 475, 746, 749, & 814
-    BAR <- incr_data$BAR[!(species %in% c(106,122,202,93))]
-  }
-  miss_data$BAR[i] <- mean(BAR, na.rm = TRUE)
+  miss_data$BAR_av[i] <- mean(BAR, na.rm = TRUE)
 }
 
 #check how many trees there is no BAR for
@@ -80,8 +78,7 @@ length(unique(miss_data$TRE_CN[is.na(miss_data$BAR_av)]))
 #0
 #BAR = 1: 2970 for just plot, species, year
 length(unique(miss_data$TRE_CN))
-#4611
-#4611
+#4589
 
 #unique(miss_data$SPCD[miss_data$BAR_av == 1])
 #[1]  66 321 202 746  65 475  15 814 113  19 108  93  96 122 106 102
@@ -116,8 +113,9 @@ miss_data_imputed <- miss_data %>%
 #check
 unique(incr_imputed$TRE_CN[incr_imputed$BAR > abs(1)])
 #NA
+min(miss_data$DIA_C,na.rm = T) #Inf
 length(which(miss_data_imputed$DIA_C <= 1))
-#4254; get rid of these?
+#12179; get rid of these?
 length(which(miss_data_imputed$DIA_C <= 0))
 #0
 unique(incr_percov$CONDID)
@@ -125,53 +123,43 @@ unique(incr_percov$CONDID)
 miss_data$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
 unique(miss_data$CONDID)
 #[1] 1
-trees_plot <- density_data %>%
-  group_by(PLT_CN) %>%
-  summarise(trees_plot <- length(unique(TRE_CN))) %>%
-  View
-# A tibble: 238 x 2
-#PLT_CN `trees_plot <- length(unique(TRE_CN))`
-#<dbl>                                  <int>
-#1 2848805010690                                     32
-#2 2849106010690                                     14
-#3 2849130010690                                     31
-#4 2849662010690                                     26
-#5 2853808010690                                     16
-#6 2854161010690                                     15
-#7 2854243010690                                     17
-#8 2854375010690                                     11
-#9 2855092010690                                      6
-#10 2855482010690                                    21
-# ... with 228 more rows
+
 
 save(miss_data_imputed,file = "./data/formatted/miss_data_imputed")
 
 #join two dataframes to compute stand variables
 #first - trees back calculated with tree rings
-##incr_data
+##incr_imputed
 #second - trees back calculated with BAR
 ##miss_data_imputed
-#colnames(miss_data_imputed)[colnames(miss_data_imputed)=="BAR_av"] <- "BAR"
-density_data <- rbind(incr_data,miss_data_imputed)
+density_data <- bind_rows(incr_imputed,miss_data_imputed)
 
 save(density_data,file = "./data/formatted/density_data")
 
+trees_plot <- density_data %>%
+  group_by(PLT_CN) %>%
+  summarise(trees_plot <- length(unique(TRE_CN)))
+
+min(trees_plot[,2])
+# 2
+max(trees_plot[,2])
+# 66
 
 ##what about the species (SPCD) that don't have increment data to calculate BAR?
 #can we use an average BAR accross species?
-hist(incr_data$BAR, breaks = 50) #also per species
+hist(incr_imputed$BAR, breaks = 50) #also per species
 #anova across species to determine difference
 
 #Specify the order of factor levels
 #library(dplyr)
-incr_data_aov <- incr_data %>% 
+incr_imputed_aov <- incr_imputed %>% 
   ungroup() %>%
   mutate(SPCD = factor(SPCD, levels=unique(SPCD)))
 
 #Produce summary statistics
 library(FSA)   
 Summarize(BAR ~ SPCD,
-          data=incr_data_aov,
+          data=incr_imputed_aov,
           digits=3)
 #SPCD     n  mean    sd   min    Q1 median    Q3   max
 #1  106 12651 0.977 0.023 0.734 0.971  0.985 0.992 1.000
@@ -185,10 +173,10 @@ Summarize(BAR ~ SPCD,
 
 #Fit the linear model and conduct ANOVA
 model = lm(BAR ~ SPCD, 
-           data=incr_data_aov)
+           data=incr_imputed_aov)
 #or
 #model2 = aov(BAR ~ SPCD, 
-           #data=incr_data_aov)
+           #data=incr_imputed_aov)
 
 library(car)
 Anova(model, type="II")                    # Can use type="III"
@@ -221,7 +209,7 @@ library(agricolae)
 
 #Unbalanced mixed effect ANOVA for repeated measures
 library(lme4)
-test_fit <- lmer(BAR ~ SPCD + (1|TRE_CN), data = incr_data_aov)
+test_fit <- lmer(BAR ~ SPCD + (1|TRE_CN), data = incr_imputed_aov)
 anova(test_fit)
 
 library(lmerTest)
