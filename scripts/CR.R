@@ -6,16 +6,33 @@
 #Calculations modified from Mark Castle
 #email: markcastle@fs.fed.us
 
+#load
+load('./data/formatted/density_data')
+
 #First need to calcuate SDI
 #Calculations from John Shaw (2000; Stage 1968)
-#SDI = sum((DIA_t/10)^2)
+#SDI = sum((DIA_t/10)^1.6)
 
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
-  mutate(DIA_tpa_cal = ((DIA_C * TPA_UNADJ)/10)^2) %>%
-  mutate(SDI = sum(DIA_tpa_cal,na.rm = TRUE))
+  mutate(SDI = sum((DIA_C/10)^1.6)) 
+
 #mutate(SDI = ifelse(SDI == 0, NA, SDI))
 #ungroup?
+
+save(density_data, file = "./data/formatted/density_data")
+
+#done with density
+#CR computationally expensive so fitler out trees i don't need (miss_data)
+length(unique(incr_imputed$TRE_CN))
+#[1] 504
+incr_tre <- unique(incr_imputed$TRE_CN)
+incr_calcov <- density_data %>%
+  filter(TRE_CN %in% incr_tre)
+length(unique(incr_calcov$TRE_CN))
+#504
+
+save(incr_calcov,file = "./data/formatted/incr_calcov")
 
 ##UT variant guide instructions below:
 
@@ -38,7 +55,7 @@ density_data <- density_data %>%
 #Refer to UT variant overview as you go through the steps in this script
 
 #Read in data
-load('./data/formatted/density_data')
+load('./data/formatted/incr_calcov')
 
 #####################################
 #Step 1:
@@ -48,7 +65,7 @@ load('./data/formatted/density_data')
 
 #Instead of Reineke SDI (for stand) use
 #Calculations from John Shaw (2000; Stage 1968)
-#SDI = sum((DIA_t/10)^2)
+#SDI = sum((DIA_t/10)^1.6)
 
 
 #Crown Competition Factor (CCF - for stand)
@@ -94,17 +111,17 @@ CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
 #CL = lm(HT)
 #CR = CL/HT
 
-CR_weib <- vector(mode="numeric", length=nrow(density_data))
-for(i in 1:nrow(density_data)){
+CR_weib <- vector(mode="numeric", length=nrow(incr_calcov))
+for(i in 1:nrow(incr_calcov)){
   #Function arguments:
   #SPCD - is number code of species of tree record
   #SDI - is SDI of stand (Stage 1968)
-  Species <- density_data$SPCD[i]
+  Species <- incr_calcov$SPCD[i]
   if(Species %in% CR_WEIB_df$species){
     #SDI max values for each species were pulled from UT Variant overview
     SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species]
     #Calculate relative density
-    RD <- density_data$SDI[i]/SDIMAX
+    RD <- incr_calcov$SDI[i]/SDIMAX
     
     #Calculate average stand crown ratio (ACR) for each species in the stand
     d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
@@ -132,48 +149,37 @@ for(i in 1:nrow(density_data)){
     #N  - number of records in the stand by year
     
     #Calculate scale parameter
-    SCALE = (1.0 - .00167 * (density_data$CCF[i]-100.0))
+    SCALE = (1.0 - .00167 * (incr_calcov$CCF[i]-100.0))
     if(SCALE < 0.3){SCALE = 0.3}
     if(SCALE > 1.0){SCALE = 1.0}
     
-    plot_cn <- density_data$PLT_CN[i]
-    year <- density_data$Year[i]
-    rank_df <- density_data[density_data$Year == year 
-                            & density_data$PLT_CN == plot_cn,]
-    N <- length(rank_df$TRE_CN)
+    N <- incr_calcov$num_t[i]
     #X is tree's rank in diameter distribution
     #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
-    Y <- density_data$rank_pltyr[i]/N * SCALE
+    Y <- incr_calcov$rank_pltyr[i]/N * SCALE
+    if(Y < 0.05){Y = 0.05}
+    if(Y > 0.95){Y = 0.95}
+    #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
     
     #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
-    X <- WEIBA + WEIBB*(-1*(log(1-Y)/WEIBC))
-    #Constrain X between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
-    if(X < 0.05){X = 0.05}
-    if(X > 0.95){X = 0.95}
-    density_data$CR_weib[i] <- X
+    X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+    incr_calcov$CR_weib[i] <- X
   }
   if(!(Species %in% CR_WEIB_df$species)){
-    density_data$CR_weib[i] <- NA
+    incr_calcov$CR_weib[i] <- NA
   }
 }
 
 #fine but I don't trust it - a lot of 0.05 and .95 values
-hist(density_data$CR_weib)
+hist(incr_calcov$CR_weib)
 
-density_check <- density_data %>%
-  filter(SPCD == 202)
-
-  #If a tree has a DBH less than 1" or is dead, assign a value of zero to CR
-  #Use the equation you were using before to impute crown ratio values for these records.
-  #Your live and dead codes for tree records will likely be different than the FVS codes
-  #if(DBH < 1 | HISTORY == 6 | HISTORY == 9)
-  #{
-  #  CR = 0
-  #}
+save(incr_calcov,file = "./data/formatted/incr_calcov")
 
 
 #Subset out live trees with DBH >= 1 to check crown ratio values predicted by weibull function
-cr.check<-subset(cr.data, History == 1 & DBH >= 1);cr.check
+cr_check<- incr_calcov %>%
+  select(TRE_CN,Year,MEASYEAR,PLT_CN,SPCD,CCF,CR,CR_weib) %>%
+  filter(MEASYEAR == Year)
 
 #Compare CR_PRED values against predicted crown ratios in treelist file (CR column) output by UTAH_CR.key for year 2014 ONLY
 #They should be within 1-2 percent. The difference I think is due to rounding error between the FVS FORTRAN code and R. 
