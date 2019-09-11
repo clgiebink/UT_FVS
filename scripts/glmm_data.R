@@ -10,8 +10,10 @@ library(tidyverse)
 load(file = "./data/formatted/incr_calcov")
 
 #forest service predicts change in squared inside bark diameter
+#TODO convert ring width from mm to inches
+#RW = RW * 0.0393701
 incr_calcov <- incr_calcov %>%
-  mutate(dds = (2*RW)^2)
+  mutate(dds = (2*RW*0.0393701)^2)
 
 #add climate variables
 #and make sure it is reproducible in case more are needed
@@ -25,8 +27,6 @@ tmax.extr <- read.csv(paste(processed.path,"tmax_extr.csv",sep=''), header = T)
 #for all trees
 #same dataset LAT/LONG used to extract climate
 all_trees <- unique(final_trees$TRE_CN)
-#probably should be:
-all_trees <- unique(incr_calcov$TRE_CN)
 
 clim_col <- function(PRISM,clim_var,TRE_CN){
   #make a list
@@ -73,6 +73,8 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 
+#check
+length(unique(data_all$TRE_CN)) #504
 
 #make seasonal climate variables
 #refer to climate-growth analysis
@@ -81,6 +83,7 @@ data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 #DF
 data_all_df <- data_all %>%
   filter(SPCD == 202)
+length(unique(data_all_df$TRE_CN)) #131
 
 #total ppt
 #1 month: pOct,pDec, Jun, Jul
@@ -127,9 +130,12 @@ data_all_df <- data_all_df %>%
          tmax_FebJul = (tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul)/6,
          tmin_JanJun = (tmin_Jan + tmin_Feb + tmin_Mar + tmin_Apr + tmin_May + tmin_Jun)/6)
 
+save(data_all_df, file = "./data/formatted/data_all_df")
+
 ##PP
 data_all_pp <- data_all %>%
   filter(SPCD == 122)
+length(unique(data_all_pp$TRE_CN)) #73
 
 #total ppt
 #1 month: ,pDec, Jun, Jul, pOct
@@ -152,7 +158,7 @@ data_all_pp <- data_all_pp %>%
 data_all_pp <- data_all_pp %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
-  mutate(ppt_pJunJan = lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov) + lag(ppt_Dec) + ppt_Jan,
+  mutate(ppt_pAugJan = lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov) + lag(ppt_Dec) + ppt_Jan,
          wateryr = lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
 
 #average temp
@@ -165,10 +171,12 @@ data_all_pp <- data_all_pp %>%
   arrange(Year) %>%
   mutate(tmax_JunAug = (tmax_Jun + tmax_Jul + tmax_Aug)/3)
 
+save(data_all_pp, file = "./data/formatted/data_all_pp")
 
 #ES
 data_all_es <- data_all %>%
   filter(SPCD == 93)
+length(unique(data_all_es$TRE_CN)) #50
 
 #total ppt
 #1 month: Jul, Apr
@@ -212,70 +220,11 @@ data_all_es <- data_all_es %>%
   arrange(Year) %>%
   mutate(tmin_pNovApr = (lag(tmin_Nov) + lag(tmin_Dec) + tmin_Jan + tmin_Feb + tmin_Mar + tmin_Apr)/6)
 
+save(data_all_es, file = "./data/formatted/data_all_es")
+
 #filtering
 #by species
 #only going back 30 yrs - 1958
 #need response: RW, dds
 #fixed effects: DBH (DIA), CR/CR_weib, PCCF, CCF, BAL, Climate
 #random effect: TRE_CN, Year
-
-
-#for each focal species 202=DF,122=PP,93=ES
-#might be unnecessary
-##Douglas fir
-#PRISM data
-ppt.extr_DF <- read.csv(paste(processed.path,"ppt_extr_DF.csv",sep=''), header = T)
-tmin.extr_DF <- read.csv(paste(processed.path,"tmin_extr_DF.csv",sep=''), header = T)
-tmax.extr_DF <- read.csv(paste(processed.path,"tmax_extr_DF.csv",sep=''), header = T)
-
-df_trees <- unique(final_trees_DF$TRE_CN)
-
-DF_ppt <- clim_col(ppt.extr_DF,clim_var = "ppt_",start_yr = 1895,end_yr = 2000,TRE_CN = df_trees)
-DF_tmin <- clim_col(tmin.extr_DF,clim_var = "tmin_",start_yr = 1895,end_yr = 2000,TRE_CN = df_trees)
-DF_tmax <- clim_col(tmax.extr_DF,clim_var = "tmax_",start_yr = 1895,end_yr = 2000,TRE_CN = df_trees)
-
-df_clim <- full_join(DF_ppt,DF_tmin, by = c("TRE_CN","Year")) %>%
-  full_join(.,DF_tmax,by = c("TRE_CN","Year"))
-
-data_DF <- data[data$SPCD == 202,]
-
-data_DF <- left_join(data_DF,df_clim, by = c("TRE_CN","Year"))
-
-
-##Ponderosa pine
-ppt.extr_PP <- read.csv(paste(processed.path,"ppt_extr_PP.csv",sep=''), header = T)
-tmin.extr_PP <- read.csv(paste(processed.path,"tmin_extr_PP.csv",sep=''), header = T)
-tmax.extr_PP <- read.csv(paste(processed.path,"tmax_extr_PP.csv",sep=''), header = T)
-
-pp_trees <- unique(final_trees_PP$TRE_CN)
-
-PP_ppt <- clim_col(ppt.extr_PP,clim_var = "ppt_",start_yr = 1895,end_yr = 2000,TRE_CN = pp_trees)
-PP_tmin <- clim_col(tmin.extr_PP,clim_var = "tmin_",start_yr = 1895,end_yr = 2000,TRE_CN = pp_trees)
-PP_tmax <- clim_col(tmax.extr_PP,clim_var = "tmax_",start_yr = 1895,end_yr = 2000,TRE_CN = pp_trees)
-
-pp_clim <- full_join(PP_ppt,PP_tmin, by = c("TRE_CN","Year")) %>%
-  full_join(.,PP_tmax,by = c("TRE_CN","Year"))
-
-data_PP <- data[data$SPCD == 122,]
-
-data_PP <- left_join(data_PP,pp_clim, by = c("TRE_CN","Year"))
-
-
-##Engelman spruce
-ppt.extr_ES <- read.csv(paste(processed.path,"ppt_extr_ES.csv",sep=''), header = T)
-tmin.extr_ES <- read.csv(paste(processed.path,"tmin_extr_ES.csv",sep=''), header = T)
-tmax.extr_ES <- read.csv(paste(processed.path,"tmax_extr_ES.csv",sep=''), header = T)
-
-es_trees <- unique(final_trees_ES$TRE_CN)
-
-ES_ppt <- clim_col(ppt.extr_ES,clim_var = "ppt_",start_yr = 1895,end_yr = 2000,TRE_CN = es_trees)
-ES_tmin <- clim_col(tmin.extr_ES,clim_var = "tmin_",start_yr = 1895,end_yr = 2000,TRE_CN = es_trees)
-ES_tmax <- clim_col(tmax.extr_ES,clim_var = "tmax_",start_yr = 1895,end_yr = 2000,TRE_CN = es_trees)
-
-es_clim <- full_join(ES_ppt,ES_tmin, by = c("TRE_CN","Year")) %>%
-  full_join(.,ES_tmax,by = c("TRE_CN","Year"))
-
-data_ES <- data[data$SPCD == 93,]
-
-data_ES <- left_join(data_ES,df_clim, by = c("TRE_CN","Year"))
-
