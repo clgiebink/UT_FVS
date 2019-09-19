@@ -17,12 +17,17 @@ subp_exam <- density_data %>%
 #expansion factor (TPA) is based on DIA in variale radius plots
 #410 is 40 BAF variable radius
 #TPA = (BAF/0.005454*DIA^2)/N
+#if DIA_C timber < 5 and woodland < 3 inches measured on microplots; TPA is 60
 #constant if fixed radius plot (423,424,425)
 
 density_data <- density_data %>%
-  mutate(TPA_C = ifelse(DESIGNCD == 410, 
-                        (40/(0.005454*(DIA_C^2)))/5,
-                        TPA_UNADJ))
+  mutate(TPA_C = ifelse(DESIGNCD %in% c(423,424,425),
+                        TPA_UNADJ,
+                        ifelse(SPCD %in% c(475,322,814,749,321,65,66,106) & DIA_C >= 3,
+                               (40/(0.005454*(DIA_C^2)))/5,
+                               ifelse(SPCD %in% c(202,122,93,15,108,19,96,133,113,102,746) & DIA_C >= 5,
+                                      (40/(0.005454*(DIA_C^2)))/5, 
+                                      ifelse(TPA_UNADJ == 75, 75,60)))))
 
 #Crown Competition Factor
 #measure of stand density
@@ -73,14 +78,15 @@ for(i in 1:nrow(density_data)){
 #pCCF = the sum of CCF_t on a subplot on a per acre basis
 #subplot given by SUBP
 #TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
-#4 subplots for DESIGNCD 423, 424, 425
-#5 subplots for DESIGNCD 410
+#4 subplots for DESIGNCD 423, 424, 425; 4 microplots
+#5 subplots for DESIGNCD 410; 4 microplots 
 density_data <- density_data %>%
   group_by(DESIGNCD) %>%
-  mutate(SUBP_N = max(SUBP_t))
+  mutate(SUBP_N = ifelse(TPA_C %in% c(75,60), 4, max(SUBP_t))) 
+#DIA timber < 5 and woodland < 3 inches measured on microplots; TPA is 75
 
 density_data <- density_data %>%
-  group_by(PLT_CN,SUBP,Year) %>%
+  group_by(PLT_CN,SUBP_t,Year) %>%
   mutate(PCCF = sum(CCF_t * (TPA_C * SUBP_N), na.rm = TRUE))
 
 length(unique(density_data$PLT_CN)) #435
