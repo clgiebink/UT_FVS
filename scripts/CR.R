@@ -101,7 +101,7 @@ CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
                          b0 = c(-0.90648,-0.24217,-0.82631),#,-0.89553,-0.89553,-0.90648,0.17162,-0.82631,-0.23830,-0.08414
                          b1 = c(1.08122,0.96529,1.06217),#,1.07728,1.07728,1.08122,1.07338,1.06217,1.18016,1.14765
                          c0 = c(3.48889,-7.94832,-1.02873),#,1.74621,1.74621,3.48889,3.15000,3.31429,3.04000,2.7750
-                         c1 = c(0,1.93832,0.80143,0.29052),#,0.29052,0,0,0,0,0
+                         c1 = c(0,1.93832,0.80143),#,0.29052,0.29052,0,0,0,0,0
                          d0 = c(6.81087,7.46296,6.19911),#,7.65751,7.65751,6.81087,6.00567,6.19911,4.62512,4.01678
                          d1 = c(-0.01037,-0.02944,-0.02216))#,-0.03513,-0.03513,-0.01037,-0.03520,-0.02216,-0.01604,-0.01516
 #can add other species if needed
@@ -163,7 +163,8 @@ for(i in 1:nrow(incr_calcov)){
     
     #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
     X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
-    incr_calcov$CR_weib[i] <- X
+    #X = a tree’s crown ratio expressed as a percent / 10
+    incr_calcov$CR_weib[i] <- X * 10
   }
   if(!(Species %in% CR_WEIB_df$species)){
     incr_calcov$CR_weib[i] <- NA
@@ -180,14 +181,6 @@ save(incr_calcov,file = "./data/formatted/incr_calcov")
 cr_check<- incr_calcov %>%
   select(TRE_CN,Year,MEASYEAR,PLT_CN,SPCD,CCF,CR,CR_weib) %>%
   filter(MEASYEAR == Year)
-
-#Compare CR_PRED values against predicted crown ratios in treelist file (CR column) output by UTAH_CR.key for year 2014 ONLY
-#They should be within 1-2 percent. The difference I think is due to rounding error between the FVS FORTRAN code and R. 
-
-#Extract neccesary columns
-cr.check<-cr.check[,c("Stand_CN", "Stand_ID", "StandPlot_CN", "StandPlot_ID", "Plot_ID", "Tree_Count",
-                      "History", "Species", "DBH", "DG", "Ht", "HTG", "HtTopK", "TREE_INDEX", "Tree_ID", "CR_PRED")]
-cr.check
 
 #Also FVS does have logic for adjusting a tree's crown ratio for top-kill 
 #I did not include this in the script.
