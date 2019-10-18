@@ -1,0 +1,116 @@
+---
+title: "Growth models for ponderosa pine"
+author: "Courtney Giebink"
+date: "October 1, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Model Selection
+
+```{r include=FALSE}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+```
+
+load data
+```{r}
+load(file = 'C:/Users/clgie/OneDrive/Documents/Masters/Utah/UT_FVS/data/formatted/glmm_pp_z')
+```
+
+run models
+```{r warning=FALSE}
+#current growth model with tree ring data (annual)
+#ccf insignificant in current lm
+lm <- lm(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+I(z.SLOPE^2)+
+                I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+I(z.CR_weib^2)+
+                I(z.DIA_C^2)+z.PCCF+I(z.CCF/100),
+              data = glmm_pp_z)
+#add random effects
+ran_slint <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                          I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
+                          I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
+                          I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+                          (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_pp_z)
+#add climate
+clim_1 <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
+                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+                     z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+clim_wy <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
+                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+                     z.wateryr*z.tmax_JunAug+ #interaction makes more significant
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+#reduce based on significance
+clim_1_red <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                       I(log(z.DIA_C))+
+                       I(z.CCF/100)+
+                       z.ppt_pAugOct+z.tmax_JunAug+
+                       (1+DIA_C|TRE_CN)+(1|Year),
+                     data = glmm_pp_z)
+clim_wy_red <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                       I(log(z.DIA_C))+
+                       I(z.CCF/100)+
+                       z.wateryr*z.tmax_JunAug+
+                       (1+DIA_C|TRE_CN)+(1|Year),
+                     data = glmm_pp_z)
+#gamma
+glmm_g <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
+                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+                     z.ppt_pAugOct+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+```
+
+summarize models
+```{r}
+models <- list(lm = lm, ran_slint = ran_slint, clim_1 = clim_1, clim_wy = clim_wy, clim_1_red = clim_1_red, clim_wy_red = clim_wy_red, glmm_g = glmm_g)
+sum_mod <- purrr::map_df(models, broom::tidy, .id = "model") %>%
+  dplyr::select(model,effect,term,estimate,p.value) %>%
+  mutate_at(4, round, 6)
+diag_mod <- purrr::map_df(models, broom::glance, .id = "model") %>%
+  dplyr::select(model,AIC)
+```
+
+compare models
+
+```{r warning=FALSE,message=FALSE}
+#kable
+library(kableExtra)
+color.me <- sum_mod$estimate[sum_mod$p.value >=0.05]
+    
+sum_mod %>%
+  rownames_to_column('cars') %>% # used to store row names (mutate deletes them)
+  mutate(
+    estimate = cell_spec(estimate, color = ifelse(estimate %in% color.me, "gray", "black"),
+                         bold = ifelse(estimate %in% color.me, F, T))) %>%
+  column_to_rownames('cars') %>% # used to put row names back in place
+  filter(!is.na(p.value)) %>%
+  dplyr::select(model,term,estimate) %>%
+  spread(model,estimate,fill = NA) %>%
+  kable(format = "html", digits = 6, escape = F) %>%
+  kable_styling()
+```
+
+```{r}
+kable(diag_mod)
+```
+
