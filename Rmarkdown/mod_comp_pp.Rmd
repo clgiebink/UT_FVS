@@ -23,56 +23,213 @@ load data
 load(file = 'C:/Users/clgie/OneDrive/Documents/Masters/Utah/UT_FVS/data/formatted/glmm_pp_z')
 ```
 
-run models
-```{r warning=FALSE}
+tree variables - DIA_C, DIA_C^2, CR, CR^2
+climate - precip, temp
+competition - PCCF, CCF, BAL
+site variables - SICOND, sin(ASPECT-0.7854)*SLOPE, cos(ASPECT-0.7854)*SLOPE, SLOPE, SLOPE^2
+
+
+```{r}
 #current growth model with tree ring data (annual)
 #ccf insignificant in current lm
-lm <- lm(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+I(z.SLOPE^2)+
-                I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+I(z.CR_weib^2)+
-                I(z.DIA_C^2)+z.PCCF+I(z.CCF/100),
+lm <- lm(log(dds)~
+           #tree variables
+           I(log(DIA_C))+I(DIA_C^2)+
+           CR_weib+I(CR_weib^2)+
+           #climate
+           #competition/density
+           I(BAL/100)+PCCF+I(CCF/100)+
+           #site variables
+           SICOND+SLOPE+I(SLOPE^2)+
+           I(sin(ASPECT-0.7854)*SLOPE)+
+           I(cos(ASPECT-0.7854)*SLOPE),
               data = glmm_pp_z)
+summary(lm)$coef
+```
+
+
+run models
+```{r warning=FALSE}
 #add random effects
-ran_slint <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                          I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                          I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                          I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                          (1+z.DIA_C|TRE_CN)+(1|Year),
+ran_slint <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+I(z.CR_weib^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                    I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
                         data = glmm_pp_z)
 #add climate
-clim_1 <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+clim_1 <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pAugOct+z.tmax_JunAug+
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_pp_z)
+clim_wy <- lmer(log(dds)~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  z.CR_weib+I(z.CR_weib^2)+
+                  #climate
+                  z.wateryr+z.tmax_JunAug+
+                  #competition/density
+                  z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                  I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                  I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                  #random effects
+                  (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_pp_z)
+#reduce based on vif score
+#slope^2
+#BAL
+#slope
+clim_1_red <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_weib+I(z.CR_weib^2)+
+                     #climate
                      z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                     #competition/density
+                     z.PCCF+z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                     #random effects
                      (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_pp_z)
-clim_wy <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                     z.wateryr*z.tmax_JunAug+ #interaction makes more significant
-                     (1+z.DIA_C|TRE_CN)+(1|Year),
-                   data = glmm_pp_z)
+clim_wy_red <- lmer(log(dds)~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      z.CR_weib+I(z.CR_weib^2)+
+                      #climate
+                      z.wateryr+z.tmax_JunAug+ #interaction not significant
+                      #competition/density
+                      z.PCCF+z.CCF+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+
+                      I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                      I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z)
 #reduce based on significance
-clim_1_red <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                       I(log(z.DIA_C))+
-                       I(z.CCF/100)+
-                       z.ppt_pAugOct+z.tmax_JunAug+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_pp_z)
-clim_wy_red <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                       I(log(z.DIA_C))+
-                       I(z.CCF/100)+
-                       z.wateryr*z.tmax_JunAug+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_pp_z)
+#CR
+#PCCF
+clim_1_red <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     I(z.CR_weib^2)+
+                     #climate
+                     z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                     #competition/density
+                     z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_pp_z)
+
+clim_wy_red <- lmer(log(dds)~
+                                            #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      z.CR_weib+I(z.CR_weib^2)+
+                      #climate
+                      z.wateryr+z.tmax_JunAug+ #interaction not significant
+                      #competition/density
+                      z.CCF+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+
+                      I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                      I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_pp_z)
+
 #gamma
-glmm_g <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
+glmm_1 <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+I(z.SLOPE^2)+
+                    z.DIA_C+z.BAL+z.CR_weib+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
                      z.ppt_pAugOct+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+
+glmm_wy <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+I(z.SLOPE^2)+
+                    z.DIA_C+z.BAL+z.CR_weib+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+
+#reduce based on vif score
+#slope
+#BAL
+glmm_1_red <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+I(z.SLOPE^2)+
+                    z.DIA_C+z.CR_weib+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pAugOct+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+
+glmm_wy_red <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+I(z.SLOPE^2)+
+                    z.DIA_C+z.CR_weib+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+#reduced based on significance
+#slope^2 (also has vif of 3.08)
+#cos(ASPECT-0.7854)*SLOPE
+#PCCF
+#CR
+glmm_1_red <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                    z.DIA_C+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.CCF+
+                     z.ppt_pAugOct+z.tmax_JunAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z,
+                  family = Gamma(link = "log"),
+                  glmerControl(optimizer = "bobyqa", 
+                               optCtrl = list(maxfun = 100000)))
+glmm_wy_red <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                    z.DIA_C+I(z.CR_weib^2)+
+                     I(z.DIA_C^2)+z.CCF+
+                     z.wateryr+z.tmax_JunAug+
                      (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_pp_z,
                   family = Gamma(link = "log"),
