@@ -21,8 +21,8 @@ glmm_data_es <- data_all_es %>%
          ppt_pJunAug, ppt_JunAug, ppt_pJulSep, ppt_pOctDec,
          ppt_pJunNov, wateryr,
          tmax_pAug, tmin_Feb, tmin_Mar,
-         tmin_FebApr, tmax_pJulSep, tmin_JanMar,
-         tmin_pNovApr) %>%
+         tmin_FebApr, tmax_pJulSep, tmin_JanMar, tmax_FebApr,
+         tmin_pNovApr, tmax_pNovApr) %>%
   filter(Year >= 1962)
 
 #climate
@@ -36,7 +36,7 @@ glmm_data_es <- data_all_es %>%
 #3 month: tmin_Feb-Apr, tmax_pJul-pSep, tmin_Jan-Mar
 #6 month + : tmin_Apr
 
-save(glmm_data_es, file = "./data/formatted/glmm_data_es")
+save(glmm_data_es, file = "./data/formatted/glmm_data_es.Rdata")
 
 #Exploration
 
@@ -44,7 +44,9 @@ save(glmm_data_es, file = "./data/formatted/glmm_data_es")
 sum(is.na(glmm_data_es)) #66
 summary(glmm_data_es)
 #ASPECT
-unique(glmm_data_es$TRE_CN[is.na(glmm_data_es$ASPECT)]) #2
+miss_asp_es <- unique(glmm_data_es$TRE_CN[is.na(glmm_data_es$ASPECT)]) #2
+asp_check_es <- per_cov %>%
+  filter(TRE_CN %in% miss_asp_es)
 glmm_data_es$ASPECT %>% replace_na(0)
 
 
@@ -190,9 +192,8 @@ library(lmerTest)
 
 #standardize to encourage convergence
 library(MuMIn)
-glmm_data_es <- as.data.frame(glmm_data_es)
-glmm_es_z <- stdize(glmm_data_es,append=TRUE)
-save(glmm_es_z,file = "./data/formatted/glmm_es_z")
+glmm_es_z <- stdize(as.data.frame(glmm_data_es),append=TRUE)
+save(glmm_es_z,file = "./data/formatted/glmm_es_z.Rdata")
 
 #slope^2, dbh^2, and pccf are insignificant in current lm
 old_fvs <- lm(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+

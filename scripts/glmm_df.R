@@ -40,7 +40,7 @@ glmm_data_df <- data_all_df %>%
 #3 month: tmax_Jun-Aug, tmax_pJul-pSep, tmin_Jan-Mar
 #6 month + : Jun, Jul
 
-save(glmm_data_df, file = "./data/formatted/glmm_data_df")
+save(glmm_data_df, file = "./data/formatted/glmm_data_df.Rdata")
 
 #Exploration
 
@@ -55,8 +55,10 @@ summary(glmm_data_df)
 #ppt_pJunNov - 5
 #wateryr - 5
 #tmax_pJulSep - 5
-unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$ASPECT)]) #5
+miss_asp_df <- unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$ASPECT)]) #5
 # 2.876521e+12 2.880164e+12 2.881010e+12 2.881027e+12 2.872497e+12
+asp_check_df <- per_cov %>%
+  filter(TRE_CN %in% miss_asp_df)
 glmm_data_df$ASPECT %>% replace_na(0)
 
 miss_clim_df <- unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$ppt_pOct)])
@@ -213,9 +215,8 @@ library(lmerTest)
 
 #standardize to encourage convergence
 library(MuMIn)
-glmm_data_df <- as.data.frame(glmm_data_df)
-glmm_df_z <- stdize(glmm_data_df,append=TRUE)
-save(glmm_df_z,file = "./data/formatted/glmm_df_z")
+glmm_df_z <- stdize(as.data.frame(glmm_data_df),append=TRUE)
+save(glmm_df_z,file = "./data/formatted/glmm_df_z.Rdata")
 
 #dbh^2 and ccf are insignificant in current lm
 old_fvs <- lm(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+

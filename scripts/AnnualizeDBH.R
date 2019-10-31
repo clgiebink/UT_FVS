@@ -74,4 +74,5 @@ length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 122])) #73, but 71 with <
 length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 93]))  #50
 
 #save dataframe
-save(incr_imputed,file = "./data/formatted/incr_imputed")
+save(incr_imputed,file = "./data/formatted/incr_imputed.Rdata")
+  

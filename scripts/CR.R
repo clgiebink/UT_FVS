@@ -20,7 +20,11 @@ density_data <- density_data %>%
 #mutate(SDI = ifelse(SDI == 0, NA, SDI))
 #ungroup?
 
-save(density_data, file = "./data/formatted/density_data")
+density_data <- density_data %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(num_t = length(unique(TRE_CN)))
+
+save(density_data, file = "./data/formatted/density_data.Rdata")
 
 #done with density
 #CR computationally expensive so fitler out trees i don't need (miss_data)
@@ -32,7 +36,7 @@ incr_calcov <- density_data %>%
 length(unique(incr_calcov$TRE_CN))
 #504
 
-save(incr_calcov,file = "./data/formatted/incr_calcov")
+save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 
 ##UT variant guide instructions below:
 
@@ -96,7 +100,7 @@ head(density_data)
 
 CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
                          #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,66=RM,96=BS,106=PI,108=LP,113=LM,133=PM,321=OH,475=MC,746=AS,814=GO,102=bristlecone pine
-                         SDIMAX = c(625,440,400),#,560,625,625,540,400,100,450
+                         SDIMAX = c(620,570,446),#,560,625,625,540,400,100,450
                          a0 = c(1,1,1),#,1,1,1,0,1,0,0
                          b0 = c(-0.90648,-0.24217,-0.82631),#,-0.89553,-0.89553,-0.90648,0.17162,-0.82631,-0.23830,-0.08414
                          b1 = c(1.08122,0.96529,1.06217),#,1.07728,1.07728,1.08122,1.07338,1.06217,1.18016,1.14765
@@ -174,7 +178,7 @@ for(i in 1:nrow(incr_calcov)){
 #fine but I don't trust it - a lot of 0.05 and .95 values
 hist(incr_calcov$CR_weib)
 
-save(incr_calcov,file = "./data/formatted/incr_calcov")
+save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 
 
 #Subset out live trees with DBH >= 1 to check crown ratio values predicted by weibull function

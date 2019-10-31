@@ -100,4 +100,4 @@ density_data <- density_data %>%
   #mutate(CCF = ifelse(CCF == 0, NA, CCF))
 
 
-save(density_data,file = "./data/formatted/density_data")
+save(density_data,file = "./data/formatted/density_data.Rdata")

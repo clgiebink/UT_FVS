@@ -36,6 +36,7 @@ colnames(miss_data)[colnames(miss_data)=="DIA"] <- "DIA_t"
 colnames(miss_data)[colnames(miss_data)=="SUBP"] <- "SUBP_t"
 miss_data$MEASYEAR <- plot$MEASYEAR[match(miss_data$PLT_CN, plot$CN)]
 miss_data$DESIGNCD <- plot$DESIGNCD[match(miss_data$PLT_CN, plot$CN)]
+miss_data$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
 miss_data$Year <- NA #important for mutate(Year) to work
 miss_data$BAR_av <- NA
 miss_data$DIA_C <- NA
@@ -79,6 +80,7 @@ length(unique(miss_data$TRE_CN[is.na(miss_data$BAR_av)]))
 #BAR = 1: 2970 for just plot, species, year
 length(unique(miss_data$TRE_CN))
 #4589
+#8406
 
 #unique(miss_data$SPCD[miss_data$BAR_av == 1])
 #[1]  66 321 202 746  65 475  15 814 113  19 108  93  96 122 106 102
@@ -125,7 +127,7 @@ unique(miss_data$CONDID)
 #[1] 1
 
 
-save(miss_data_imputed,file = "./data/formatted/miss_data_imputed")
+save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
 
 #join two dataframes to compute stand variables
 #first - trees back calculated with tree rings
@@ -134,7 +136,7 @@ save(miss_data_imputed,file = "./data/formatted/miss_data_imputed")
 ##miss_data_imputed
 density_data <- bind_rows(incr_imputed,miss_data_imputed)
 
-save(density_data,file = "./data/formatted/density_data")
+save(density_data,file = "./data/formatted/density_data.Rdata")
 
 trees_plot <- density_data %>%
   group_by(PLT_CN) %>%

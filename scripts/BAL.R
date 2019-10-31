@@ -35,4 +35,4 @@ bal_check <- density_data %>%
 bal_check$BALIVE <- per_cov$BALIVE[match(bal_check$PLT_CN, per_cov$PLT_CN)]
 #between 0 and 10 off
 
-save(density_data,file = "./data/formatted/density_data")
+save(density_data,file = "./data/formatted/density_data.Rdata")

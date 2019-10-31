@@ -52,13 +52,15 @@ miss_asp_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$ASPECT)]) #19
 # 2.858391e+12 2.858393e+12 2.873697e+12 2.875406e+12 2.876414e+12 2.876415e+12 2.876519e+12 2.879914e+12
 # 2.880191e+12 2.880197e+12 2.880321e+12 2.880322e+12 2.907647e+12 2.907648e+12 2.907875e+12 2.908047e+12
 # 2.930116e+12 2.907876e+12 2.875410e+12
-asp_check_pp <- data_all_pp %>%
+asp_check_pp <- per_cov %>%
   filter(TRE_CN %in% miss_asp_pp)
 asp_check_pp <- data_all_pp %>%
   filter(SLOPE <= 5)
 unique(asp_check_pp$ASPECT) #NA
 length(data_all_pp$ASPECT[data_all_pp$ASPECT == 0]) #1079;NAs?
 glmm_data_pp$ASPECT %>% replace_na(0)
+
+write.csv(asp_check,file = "./data/formatted/check/asp_check.csv")
 
 miss_clim_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$ppt_pDec)])
 # 2.858378e+12 2.875469e+12 2.930116e+12 2.907876e+12 2.875410e+12
@@ -228,9 +230,8 @@ library(lmerTest)
 
 #standardize to encourage convergence
 library(MuMIn)
-glmm_data_pp <- as.data.frame(glmm_data_pp)
-glmm_pp_z <- stdize(glmm_data_pp,append=TRUE)
-save(glmm_pp_z, file = "./data/formatted/glmm_pp_z")
+glmm_pp_z <- stdize(as.data.frame(glmm_data_pp),append=TRUE)
+save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
 
 
 #ccf insignificant in current lm
@@ -628,7 +629,6 @@ summary(spat_wateryr)
 
 library(sjPlot)
 library(sjmisc)
-library(ggplot2)
 
 plot_model(spat_wateryr, type = "pred", terms = c("wateryr", "LAT"))
 

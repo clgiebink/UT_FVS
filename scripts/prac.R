@@ -1,4 +1,4 @@
-##Making Utah data frame
+      ##Making Utah data frame
 ##Tables from Justing DeRose and FIA database
 #original code from Margaret Evans
 #margaret.ekevans@gmail.com
@@ -9,9 +9,9 @@ UT_rw <- read.csv("./data/raw/Q_Utah_Courtney_ringwidth.csv",header = T)
 
 library(tidyverse)
 
-UT_plot <- read.csv("./data/raw/PLOT.txt",header=T)
-UT_tree <- read.csv("./data/raw/TREE.txt",header = T)
-UT_cond <- read.csv("./data/raw/COND.txt",header = T)
+UT_plot <- read.csv("./data/raw/UT_PLOT.csv",header=T)
+UT_tree <- read.csv("./data/raw/UT_TREE.csv",header = T)
+UT_cond <- read.csv("./data/raw/UT_COND.csv",header = T)
 
 #make tables generic
 plot <- UT_plot
@@ -22,7 +22,7 @@ cond <- UT_cond
 ##FLDTYPCD_30, Site index for the condition, SIBASE Site index base age, SISP Site index species code
 
 #grab covariates for model
-covariates <- UT_tree[,c("CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","CR","UNCRCD","SITREE","TPA_UNADJ")]
+covariates <- tree[,c("CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","CR","UNCRCD","SITREE","TPA_UNADJ")]
 
 colnames(covariates)[colnames(covariates)=="CN"] <- "TRE_CN"
 colnames(covariates)[colnames(covariates)=="DIA"] <- "DIA_t"
@@ -88,6 +88,6 @@ yr_cored$MEASYEAR <- UT_per$MEASYEAR[match(yr_cored$TRE_CN, UT_per$TRE_CN)]
 yr_cored$diff <- yr_cored$Year - yr_cored$MEASYEAR
 sum(yr_cored$diff < -1) #96; what???
 
-save(per_cov,file = "./data/formatted/per_cov")
-save(incr_percov,file = "./data/formatted/incr_percov")
-
+save(per_cov,file = "./data/formatted/per_cov.Rdata")
+save(incr_percov,file = "./data/formatted/incr_percov.Rdata")
+  

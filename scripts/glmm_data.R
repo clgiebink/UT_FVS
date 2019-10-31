@@ -73,6 +73,8 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 
+save(data_all, file = "./data/formatted/data_all.Rdata")
+
 #check
 length(unique(data_all$TRE_CN)) #504
 
@@ -120,7 +122,8 @@ data_all_df <- data_all_df %>%
   arrange(Year) %>%
   mutate(tmax_pJulSep = (lag(tmax_Jul) + lag(tmax_Aug) + lag(tmax_Sep))/3,
          tmax_JunAug = (tmax_Jun + tmax_Jul + tmax_Aug)/3,
-         tmin_JanMar = (tmin_Jan + tmin_Feb + tmin_Mar)/3)
+         tmin_JanMar = (tmin_Jan + tmin_Feb + tmin_Mar)/3,
+         tmax_JanMar = (tmax_Jan + tmax_Feb + tmax_Mar)/3)
 
 #6 month + : Jun, Jul
 data_all_df <- data_all_df %>%
@@ -130,7 +133,7 @@ data_all_df <- data_all_df %>%
          tmax_FebJul = (tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul)/6,
          tmin_JanJun = (tmin_Jan + tmin_Feb + tmin_Mar + tmin_Apr + tmin_May + tmin_Jun)/6)
 
-save(data_all_df, file = "./data/formatted/data_all_df")
+save(data_all_df, file = "./data/formatted/data_all_df.Rdata")
 
 ##PP
 data_all_pp <- data_all %>%
@@ -171,7 +174,7 @@ data_all_pp <- data_all_pp %>%
   arrange(Year) %>%
   mutate(tmax_JunAug = (tmax_Jun + tmax_Jul + tmax_Aug)/3)
 
-save(data_all_pp, file = "./data/formatted/data_all_pp")
+save(data_all_pp, file = "./data/formatted/data_all_pp.Rdata")
 
 #ES
 data_all_es <- data_all %>%
@@ -212,15 +215,17 @@ data_all_es <- data_all_es %>%
   arrange(Year) %>%
   mutate(tmax_pJulSep = (lag(tmax_Jul) + lag(tmax_Aug) + lag(tmax_Sep))/3,
          tmin_FebApr = (tmin_Feb + tmin_Mar + tmin_Apr)/3,
+         tmax_FebApr = (tmax_Feb + tmax_Mar + tmax_Apr)/3,
          tmin_JanMar = (tmin_Jan + tmin_Feb + tmin_Mar)/3)
 
 #6 month + : tmin_Apr
 data_all_es <- data_all_es %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
-  mutate(tmin_pNovApr = (lag(tmin_Nov) + lag(tmin_Dec) + tmin_Jan + tmin_Feb + tmin_Mar + tmin_Apr)/6)
+  mutate(tmin_pNovApr = (lag(tmin_Nov) + lag(tmin_Dec) + tmin_Jan + tmin_Feb + tmin_Mar + tmin_Apr)/6,
+         tmax_pNovApr = (lag(tmax_Nov) + lag(tmax_Dec) + tmax_Jan + tmax_Feb + tmax_Mar + tmax_Apr)/6)
 
-save(data_all_es, file = "./data/formatted/data_all_es")
+save(data_all_es, file = "./data/formatted/data_all_es.Rdata")
 
 #filtering
 #by species
