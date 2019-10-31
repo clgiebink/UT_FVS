@@ -15,78 +15,285 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lme4)
 library(lmerTest)
+library(car)
 library(broom.mixed)
 ```
 
 load data
+```{r include=FALSE}
+load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_df_z.Rdata')
+```
+
+The current large-diameter growth model for the UT variant of FVS is a multiple regression.
+
+* SICOND: species site index on a 50-year age basis
+* ASPECT: stand aspect
+* SLOPE: stand slop
+* DIA_C: tree diameter at breast height
+* BAL: total basal area in trees larger than the subject tree
+* CR_weib: tree's live crown ratio expressed as proportion
+* PCCF: crown competition factor on the subplot level
+* CCF: stand crown competition factor
+
+All the covariates above are significant in the current model for Douglas fir, except DIA_C*^2* and CCF. In the model, the response variable (dds) and diameter at breast height (DIA_C) are log transformed to linearize the relationship. Basal area of larger trees than the subject tree (BAL) and CCF are divided by 100 to encourage model convergence. Below the structure for the current model is applied to annualized data set.
+
 ```{r}
-load(file = 'C:/Users/clgie/OneDrive/Documents/Masters/Utah/UT_FVS/data/formatted/glmm_df_z')
-```
-
-run models
-```{r warning=FALSE}
 #current growth model with tree ring data (annual)
-#ccf insignificant in current lm
-lm <- lm(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+I(z.SLOPE^2)+
-                I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+I(z.CR_weib^2)+
-                I(z.DIA_C^2)+z.PCCF+I(z.CCF/100),
+#dia^2 and ccf insignificant in current lm
+lm <- lm(log(dds)~
+           #tree variables
+           I(log(DIA_C))+I(DIA_C^2)+
+           CR_weib+I(CR_weib^2)+
+           #climate
+           #competition/density
+           I(BAL/100)+PCCF+I(CCF/100)+
+           #site variables
+           SICOND+SLOPE+I(SLOPE^2)+
+           I(sin(ASPECT-0.7854)*SLOPE)+
+           I(cos(ASPECT-0.7854)*SLOPE),
               data = glmm_df_z)
-#add random effects
-ran_slint <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                     (1+z.DIA_C|TRE_CN)+(1|Year),
-                    data = glmm_df_z)
-#add climate
-clim_1 <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                     z.ppt_pJunAug+z.tmax_FebJul+ #interaciton not significant
-                     (1+z.DIA_C|TRE_CN)+(1|Year),
-                   data = glmm_df_z)
-clim_wy <- lmer(log(dds)~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                     z.wateryr*z.tmax_FebJul+ #interaction significant
-                     (1+z.DIA_C|TRE_CN)+(1|Year),
-                   data = glmm_df_z)
-
-#reduce based on significance
-clim_1_red <- lmer(log(dds)~z.SICOND+
-                       I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                       I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                       I(z.CCF/100)+
-                       z.ppt_pJunAug+z.tmax_FebJul+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_df_z)
-clim_wy_red <- lmer(log(dds)~z.SICOND+
-                       I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                       I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                       I(z.CCF/100)+
-                       z.wateryr*z.tmax_FebJul+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_df_z)
-
-#gamma
-glmm_g <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
-                     I(cos(z.ASPECT-0.7854)*z.SLOPE)+z.SLOPE+
-                    I(log(z.DIA_C))+I(z.BAL/100)+z.CR_weib+
-                     I(z.DIA_C^2)+z.PCCF+I(z.CCF/100)+
-                     z.ppt_pJunAug+z.tmax_FebJul+
-                     (1+z.DIA_C|TRE_CN)+(1|Year),
-                   data = glmm_df_z,
-                  family = Gamma(link = "log"),
-                  glmerControl(optimizer = "bobyqa", 
-                               optCtrl = list(maxfun = 100000)))
+summary(lm)$coef
 ```
 
-summarize models
+Since there is a lot of unaccounted for variability due to individual tree and year differences, the updated model will be a mixed effects model. A random intercept on Tree ID and Year will be added to account for different baselines. A random slope on DIA_C for each year will serve as a detrending method to reduce the age effect in growth.
+
+Covariates are standardized, or mean-centered and divided by SD, to encourage model converage, which means there is no need for BAL and CCF to be divided by 100. In addition, the log transformation on DIA_C is problematic because a log of a negative number is impossible. Therefore, the log transformation on DIA_C will be removed.
+
+A tree's growth response is also influenced by climate, or temperature and precipitation, during the growing season. By annualizing the model with tree rings, climate can be included as a covariate. `ppt_` is the total precipitation over the following monthly range. `tmin/max_` is the average temperature over the following monthly range. Climate variables were chosen based on model AIC score, as well as ability to project into the future (e.g. `wateryr`).
+
 ```{r warning=FALSE}
-models <- list(lm = lm, ran_slint = ran_slint, clim_1 = clim_1, clim_wy = clim_wy, clim_1_red = clim_1_red, clim_wy_red = clim_wy_red, glmm_g = glmm_g)
+#add random effects
+#random intercept for each tree
+#random intercept for each year
+#random slope on DBH for each tree (detrending method)
+ran_slint <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+I(z.CR_weib^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                    I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_df_z)
+AIC(ran_slint)
+#add climate
+clim_1 <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pJunAug+z.tmax_FebJul+ 
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+AIC(clim_1)
+clim_wy <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+I(z.CR_weib^2)+
+                 #climate
+                 z.wateryr+z.tmax_FebJul+
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+AIC(clim_wy)
+```
+
+Using the full model with all the possible covariates, I will test for collinearity between predictors with the `car` package.
+
+```{r}
+vif(clim_1)
+```
+
+A Variance Inflation Factor (VIF) above 3 shows strong collinearity. Therefore, `SLOPE` is collinear and should be removed.
+
+```{r warning=FALSE}
+#reduced based on vif score
+#slope
+clim_1_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pJunAug+z.tmax_FebJul+
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+
+clim_wy_red <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+I(z.CR_weib^2)+
+                 #climate
+                 z.wateryr+z.tmax_FebJul+
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+#AIC - 9288.247
+vif(clim_1_red)
+```
+
+Now that all the covariates' VIF scores are below 3, the model can be reduced based on significance or importance (i.e. coeficient value).
+
+```{r}
+summary(clim_1_red)$coef
+```
+
+`CR_weib`*^2* can be removed based on significance. In addition, the exploration of the data didn't show any quadratic relationship between `log(dds)` and `CR_weib`. `PCCF` can be removed based on significance. In addition, there are several other competition or density factors in the model, such as `CCF` and `BAL`.
+
+```{r warning=FALSE}
+#reduce based on significance
+#CR^2
+#PCCF
+clim_1_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.ppt_pJunAug*z.tmax_FebJul+ #interaciton significant
+                 #competition/density
+                 z.BAL+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+
+#CR^2; AIC - 9280.636
+#PCCF; AIC - 9275.55
+clim_wy_red <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 #competition/density
+                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+I(z.SLOPE^2)+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+
+summary(clim_1_red)$coef
+```
+
+Since transforming a variable to meet the assumptions of linearity and normality are not ideal, a generalized linear mixed model (GLMM) can be parameterized.
+
+```{r warning=FALSE}
+#gamma
+glmm_g <- glmer(dds~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  z.CR_weib+I(z.CR_weib^2)+
+                  #climate
+                  z.ppt_pJunAug+z.tmax_FebJul+ 
+                  #competition/density
+                  z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                  I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                  I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                  #random effects
+                  (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_df_z,
+                family = Gamma(link = "log"),
+                glmerControl(optimizer = "bobyqa", 
+                             optCtrl = list(maxfun = 100000)))
+vif(glmm_g)
+```
+
+Again, `SLOPE` is collinear and should be removed.
+
+```{r}
+#reduce based on vif score
+#slope
+glmm_red <- glmer(dds~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  z.CR_weib+I(z.CR_weib^2)+
+                  #climate
+                  z.ppt_pJunAug+z.tmax_FebJul+
+                  #competition/density
+                  z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+I(z.SLOPE^2)+
+                  I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                  I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                  #random effects
+                  (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_df_z,
+                family = Gamma(link = "log"),
+                glmerControl(optimizer = "bobyqa", 
+                             optCtrl = list(maxfun = 100000)))
+vif(glmm_red)
+```
+
+```{r}
+summary(glmm_red)$coef
+```
+
+```{r}
+#reduced based on signficance
+#CR^2
+#PCCF
+glmm_red <- glmer(dds~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  z.CR_weib+
+                  #climate
+                  z.ppt_pJunAug*z.tmax_FebJul+ #interaciton significant
+                  #competition/density
+                  z.BAL+z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+I(z.SLOPE^2)+
+                  I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                  I(cos(z.ASPECT-0.7854)*z.SLOPE)+
+                  #random effects
+                  (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_df_z,
+                family = Gamma(link = "log"),
+                glmerControl(optimizer = "bobyqa", 
+                             optCtrl = list(maxfun = 100000)))
+summary(glmm_red)$coef
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+models <- list(ran_slint = ran_slint, clim_1 = clim_1, clim_wy = clim_wy, clim_1_red = clim_1_red, clim_wy_red = clim_wy_red, glmm_g = glmm_g, glmm_red = glmm_red)
 sum_mod <- purrr::map_df(models, broom::tidy, .id = "model") %>%
   dplyr::select(model,effect,term,estimate,p.value) %>%
   mutate_at(4, round, 6)
@@ -94,9 +301,9 @@ diag_mod <- purrr::map_df(models, broom::glance, .id = "model") %>%
   dplyr::select(model,AIC)
 ```
 
-compare models
+The table below easily compares the coefficients of the above models. The rows are coefficients and the columns are the different models. If a cell is NA, it means that the model doesn't include the coefficient of that row. Bolded coefficients are significant (i.e. p-value < 0.05), and non-bolded coefficients are insignificant. 
 
-```{r warning=FALSE}
+```{r echo=FALSE,warning=FALSE}
 #kable
 library(kableExtra)
 color.me <- sum_mod$estimate[sum_mod$p.value >=0.05]
@@ -114,6 +321,8 @@ sum_mod %>%
   kable_styling()
 ```
 
-```{r}
+The Akaike's Information Criterion can be used to compare models, except between linear mixed models and generalized linear mixed models. A residual analysis will determine which model is best.
+
+```{r echo=FALSE}
 kable(diag_mod)
 ```
