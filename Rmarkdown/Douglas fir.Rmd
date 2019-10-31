@@ -16,7 +16,7 @@ library(tidyverse)
 ## Data Summary
 
 ```{r }
-load(file = 'C:/Users/clgie/OneDrive/Documents/Masters/Utah/UT_FVS/data/formatted/data_all_df')
+load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/data_all_df.Rdata')
 ```
 
 My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Pseudotsuga menziesii* (Douglas fir) in Utah. I was able to extract and calculate annual data for 59 trees between the years of 1958 and 1995. 
@@ -36,7 +36,7 @@ glmm_data_df <- data_all_df %>%
          ppt_pJunAug, ppt_pAugOct, ppt_MayJul,
          ppt_pJunNov, ppt_FebJul, wateryr,
          tmin_Feb, tmax_Jul,
-         tmax_JunAug, tmax_pJulSep, tmin_JanMar,
+         tmax_JunAug, tmax_pJulSep, tmin_JanMar, tmax_JanMar,
          tmax_JanJun,tmin_JanJun,tmax_FebJul) %>%
   filter(Year >= 1958)
 
@@ -54,42 +54,65 @@ glmm_data_df <- data_all_df %>%
 
 My data, `glmm_data_df`, consists of raw radial increment, or ring width value, (`RW`) in mm and annual change in squared inside bark diameter (dds) in inches^2 with corresponding tree, climate, and site variables. Some variables stay constant, such as site index (`SICOND`), aspect (`ASPECT`), and slope (`SLOPE`), while diameter at breast height (`DIA_C`) and crown ratio (CR, CR_weib) vary annually. In addition, density variables, being basal area of trees larger than the subject tree (`BAL`), crown competition factor on the inventory point (`PCCF`), and stand crown competition factor (`CCF`), vary annually. Significant seasonal precipitation and temperature variables were identified based on tradition dendro analysis tools, using R packages `dplR` and `treeclim` (see `Climate-growth.Rmd`)
 
+```{r}
+glmm_data_df <- glmm_data_df %>%
+  mutate(DI = RW*2)
+```
 
-##Exploration
+
+## Exploration
 
 It is necessary to explore the dataset to determine if the data complies with model assumptions (Zuur, Ieno, and Elphick 2010).
 
-###Normality
+### Normality
 
 The response variable, annual change in squared inside bark diameter (DDS), is continuous. It will be explained using a linear mixed model.
 
 ```{r}
+par(mfrow=c(2,2))
 hist(glmm_data_df$RW,breaks = 50, 
      main = "Histogram of RW (mm)", xlab = "Increment")
 hist(glmm_data_df$dds,breaks = 100,
      main = "Histogram of DDS (in^2)", xlab = "Increment")
+hist(log(glmm_data_df$dds),breaks = 100, 
+     main = "Histogram of log(DDS)", xlab = "Increment")
 ```
 
 The distribution of DDS is skewed right, similarly to the distribution of raw radial increment (RW). The Gamma distribution is often used for skewed data, although Gaussian might still be appropriate and easier to interpret. 
 
 ```{r}
-which(glmm_data_df$RW == 0) #0
-#no missing rings
-which(is.na(glmm_data_df$RW)) #0
-hist(log(glmm_data_df$dds),breaks = 100, 
-     main = "Histogram of log(DDS)", xlab = "Increment")
 #Cleveland dotplot
+par(mfrow=c(1,2))
 dotchart(glmm_data_df$dds)
 dotchart(log(glmm_data_df$dds))
 ```
 
 A log transformation normalizes the distribution of DDS and gets rid of outliers.
 
-###Zeros and Missing Data
+### Zeros and Missing Data
+
+```{r}
+which(glmm_data_df$RW == 0) #0
+#no missing rings
+which(is.na(glmm_data_df$RW)) #0
+
+range_df <- glmm_data_df %>%
+  select(TRE_CN,Year) %>%
+  group_by(TRE_CN) %>%
+  summarise(minyr = min(Year),
+            maxyr = max(Year))%>%
+  gather("stat","year",-TRE_CN)
+ggplot(range_df, aes(year, as.character(TRE_CN))) +
+        geom_point(aes(color = stat)) +
+   theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  ylab("TRE_CN")
+```
+
 
 My data is unbalanced. Almost all trees have a growth measurement for 1958, but one tree's growth measurements start several years later. In addition, most trees end growth in 1992, but some end in 1993, 1994, or 1995. There are no missing data in between first and last year of growth for each tree, and there are no years of zero growth, indicating a missing ring.
 
-###Random and Fixed Effects
+### Random and Fixed Effects
 
 In the linear mixed effects model, tree, stand, and climate variables will be fixed effects and a tree identifier and year of growth will be random effects.
 
@@ -110,11 +133,11 @@ growth_yr_plots_df <- glmm_data_df %>%
        aes(x=Year, y=RW) + geom_point() + 
        ggtitle(unique(.$TRE_CN)))
 
+par(mfrow=c(2,2))
 growth_yr_plots_df$plots[[1]]
 growth_yr_plots_df$plots[[2]]
 growth_yr_plots_df$plots[[3]]
 growth_yr_plots_df$plots[[4]]
-growth_yr_plots_df$plots[[5]]
 #can do more all the way to tree 59
 ```
 
@@ -126,7 +149,7 @@ growth_wateryr_plots_df <- glmm_data_df %>%
        aes(x=wateryr, y=RW) + geom_point() +
        geom_smooth(method = "lm") + ggtitle(unique(.$Year)))
 
-growth_wateryr_plots_df$plots[[1]]
+par(mfrow=c(2,2))
 growth_wateryr_plots_df$plots[[8]]
 growth_wateryr_plots_df$plots[[15]]
 growth_wateryr_plots_df$plots[[22]]
@@ -137,6 +160,7 @@ growth_wateryr_plots_df$plots[[29]]
 A proxy for age (time) is diameter at breast height, which is continuous. As a tree gets older, it grows, puts on biomass, and increases its diameter. While a tree could put on the same amount of biomass each year, the biomass will be stretched over an increasing larger circumference. As such, diameter increment decays as a tree ages, or as diameter at breast height increases. This age trend has been clearly described in tree-ring science. Below is a plot of age (dbh) by my response (incr), which is fit with a linear trend:
 
 ```{r}
+par(mfrow=c(2,2))
 #detrend
 ggplot(data = glmm_data_df, aes(x = DIA_C, y = RW)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
@@ -216,7 +240,7 @@ There is a positive relationship between growth and CR and relatively constant v
 Based on the exploration, I will transform the response variable (dds) satisfy assumptions of normality of the response variable. I will also further explore outliers with Cleveland dotplots. Normality and homogeneity will be further checked using the residuals of the final models.
 
 
-##Model Building
+## Model Building
 
 For now, I will use `lme4` to fit models. To fit a covariance-variance structure other than compound symmetry, I can use `nlme`. I may also explore the model fit options with `glmmTMB`.
 
@@ -229,37 +253,19 @@ library(lmerTest)
 
 The current large diameter growth model for Douglas fir in the Utah variant of FVS is a multiple regression.
 
-```{r}
-old_fvs <- lm(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+I(SLOPE^2)+
-                I(log(DIA_C))+I(BAL/100)+CR+I(CR^2)+PCCF,
-              data = glmm_data_df)
-summary(old_fvs)$coef
-```
-
 My growth model using tree ring and forest inventory data will be a linear mixed model.
 
-```{r}
-full_model <- lmer(log(dds) ~ DIA_C + SICOND + SLOPE + ASPECT + 
-                     BAL + PCCF + CCF + CR + wateryr + tmax_JanJun + 
-                     (1 + DIA_C|TRE_CN) + (1|Year), data=glmm_data_df)
-summary(full_model)$coef
-```
 
-
-
-
-###Collinearity
+### Collinearity
 
 Using the full model with all the possile covariates, I will test for collinearity between predictors with the `car` package.
 
 ```{r echo=FALSE, warning=FALSE,message=FALSE}
 library(car)
-vif(full_model)
 ```
 
 The Variance Inflation Factors (VIFs) are relatively low, showing no collinearity.
 
-##Model Selection
+## Model Selection
 
 Compare models via Akaike's Information Criterion. Check for homogeneity and normality using residuals.
