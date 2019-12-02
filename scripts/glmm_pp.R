@@ -7,6 +7,11 @@
 #all data is provided in
 load(file = './data/formatted/data_all_pp')
 
+data_all_pp <- data_all_pp %>%
+  mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
+  mutate(sin = sin(tASPECT - 0.7854) * SLOPE,
+         cos = cos(tASPECT - 0.7854) * SLOPE)
+
 #create new dataframe with only variables needed for linear mixed model
 #response: RW, dds
 #covariates: SI, ASP, SL, DBH/DIA_C, BAL, CR, CCF, PCCF, climate
@@ -16,10 +21,10 @@ min(data_all_pp$MEASYEAR) #1992 -> 1962
 
 glmm_data_pp <- data_all_pp %>%
   dplyr::select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF,
+         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_pDec, ppt_Jun, ppt_Jul, ppt_pOct,
          ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
-         ppt_pAugJan, wateryr,
+         ppt_pAugJan, wateryr, ppt_pAugJul,
          tmax_Jun, tmax_JunAug) %>%
   filter(Year >= 1962)
 
@@ -33,7 +38,7 @@ glmm_data_pp <- data_all_pp %>%
 #1 month: Jun tmax
 #3 month: tmax_Jun-Aug
 
-save(glmm_data_pp, file = "./data/formatted/glmm_data_pp")
+save(glmm_data_pp, file = "./data/formatted/glmm_data_pp.Rdata")
 
 #Exploration
 
@@ -48,6 +53,9 @@ summary(glmm_data_pp)
 #ppt_pNovJan - 5
 #ppt_pAugJan - 5
 #wateryr - 5
+which(is.na(glmm_pp_z$ppt_pDec))
+glmm_pp_z <- glmm_pp_z %>%
+  filter(!is.na(ppt_pDec))
 miss_asp_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$ASPECT)]) #19
 # 2.858391e+12 2.858393e+12 2.873697e+12 2.875406e+12 2.876414e+12 2.876415e+12 2.876519e+12 2.879914e+12
 # 2.880191e+12 2.880197e+12 2.880321e+12 2.880322e+12 2.907647e+12 2.907648e+12 2.907875e+12 2.908047e+12
@@ -58,7 +66,8 @@ asp_check_pp <- data_all_pp %>%
   filter(SLOPE <= 5)
 unique(asp_check_pp$ASPECT) #NA
 length(data_all_pp$ASPECT[data_all_pp$ASPECT == 0]) #1079;NAs?
-glmm_data_pp$ASPECT %>% replace_na(0)
+glmm_pp_z <- glmm_pp_z %>% 
+  mutate(z.ASPECT = replace_na(z.ASPECT,0))
 
 write.csv(asp_check,file = "./data/formatted/check/asp_check.csv")
 
@@ -231,6 +240,9 @@ library(lmerTest)
 #standardize to encourage convergence
 library(MuMIn)
 glmm_pp_z <- stdize(as.data.frame(glmm_data_pp),append=TRUE)
+#remove missing data
+glmm_pp_z <- glmm_pp_z %>%
+  filter(!is.na(z.wateryr))
 save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
 
 
@@ -579,11 +591,110 @@ glmm_ig_red <- glmer(dds~z.SICOND+I(sin(z.ASPECT-0.7854)*z.SLOPE)+
 AIC(glmm_ig_red)#-5957.705
 summary(glmm_ig_red)
 
+#Gaussian with log link
+#reduced
+glmm_n_red <- glmer(dds~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      I(z.CR_weib^2)+
+                      #climate
+                      z.ppt_pAugOct+z.tmax_JunAug+
+                      #competition/density
+                      z.CCF+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+
+                      I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z,
+                    family = gaussian(link = "log"),
+                    glmerControl(optimizer = "bobyqa", 
+                                 optCtrl = list(maxfun = 100000)))
+
+resid_glmm_n <- residuals(glmm_n_red,type="pearson",scaled=TRUE)
+qqnorm(resid_glmm_n,main="QQ plot of LogN residuals")
+qqline(resid_glmm_n)
+
+#temporal correlation
+library(nlme)
+#random effects
+lmm_ranef <- lme(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE),
+               data = glmm_pp_z,
+               #random effects
+               random = ~1+z.DIA_C|TRE_CN,#not easy to implement 2 random intercepts
+               na.action=na.exclude)
+#add autoregressive correlation structure
+lmm_ar1 <- lme(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE),
+               data = glmm_pp_z,
+               #random effects
+               random = ~1+z.DIA_C|TRE_CN,
+               correlation = corAR1(), #on the intercept
+               na.action=na.exclude)
+#add weights
+lmm_wght <- lme(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 I(z.CR_weib^2)+
+                 #climate
+                 z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+
+                 I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                 I(cos(z.ASPECT-0.7854)*z.SLOPE),
+               data = glmm_pp_z,
+               #random effects
+               random = ~1+z.DIA_C|TRE_CN,
+               correlation = corAR1(),#on the intercept,
+               weights = varExp(form = ~z.ppt_pAugOct),
+               na.action=na.exclude)
+
+nlm_di <- lme(DI~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  I(z.CR_weib^2)+
+                  #climate
+                  z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                  #competition/density
+                  z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+
+                  I(sin(z.ASPECT-0.7854)*z.SLOPE)+
+                  I(cos(z.ASPECT-0.7854)*z.SLOPE),
+                data = glmm_pp_z,
+                #random effects
+                random = ~1+z.DIA_C|TRE_CN,
+                correlation = corAR1(),#on the intercept,
+                weights = varExp(form = ~z.ppt_pAugOct),
+                na.action=na.exclude)
 
 #assess
-presid_glm <- residuals(fvs_glmm,type="pearson",scaled=TRUE)
-qqnorm(presid_glm,main="QQ plot of Gamma residuals")
-qqline(presid_glm)
+resid_nlme <- residuals(lmm_ar1,type="pearson",scaled=TRUE)
+qqnorm(resid_nlme,main="QQ plot of LMM_AR1 residuals")
+qqline(resid_nlme)
 
 library(gplots)
 pred_glm <- predict(fvs_glmm, type="response")
@@ -636,5 +747,243 @@ spat_explore <- lmer(log(dds) ~ DIA_C + ppt_Jun + LAT + ppt_Jun:LAT + (1+DIA_C|T
 summary(spat_explore)
 
 
-##Model Selection
+##Model Selection ----
+lmm1_pp <- lmer(log(dds)~
+                  #tree variables
+                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                  z.CR_weib+I(z.CR_weib^2)+
+                  #climate
+                  z.ppt_pAugJul+z.tmax_JunAug+
+                  #competition/density
+                  z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                  #site variables
+                  z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                  z.sin+z.cos+
+                  #random effects
+                  (1+z.DIA_C|TRE_CN)+(1|Year),
+                data = glmm_pp_z)
+vif(lmm1_pp)
+#CR and BAL are collinear
+#slope^2
+summary(lmm1_pp)
+AIC(lmm1_pp)
+#4968.284
 
+#get rid of quadratic
+lmm1_red2_pp <- lmer(log(dds)~
+                       #tree variables
+                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                       z.CR_weib+
+                       #climate
+                       z.ppt_pAugJul+z.tmax_JunAug+
+                       #competition/density
+                       z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                       #site variables
+                       z.SICOND+z.SLOPE+
+                       z.sin+z.cos+
+                       #random effects
+                       (1+z.DIA_C|TRE_CN)+(1|Year),
+                     data = glmm_pp_z)
+AIC(lmm1_red2_pp)
+#4960.081
+summary(lmm1_red2_pp)
+
+#reduce significance
+#PCCF, cos, sin,
+lmm1_reds_pp <- lmer(log(dds)~
+                       #tree variables
+                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                       z.CR_weib+I(z.CR_weib^2)+
+                       #climate
+                       z.ppt_pAugJul+z.tmax_JunAug+
+                       #competition/density
+                       z.BAL+z.CCF+ #remove /100 due to standardization
+                       #site variables
+                       z.SICOND+z.SLOPE+
+                       #random effects
+                       (1+z.DIA_C|TRE_CN)+(1|Year),
+                     data = glmm_pp_z)
+AIC(lmm1_reds_pp) 
+#4953.219
+summary(lmm1_reds2_pp)
+
+#try different competition factors
+#with CR
+lmm2_cr_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_weib+I(z.CR_weib^2)+
+                     #climate
+                     z.ppt_pAugJul+z.tmax_JunAug+
+                     #competition/density
+                     #z.BAL+z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+AIC(lmm2_cr_pp)
+#fail to converge
+#4945.951
+
+#bal
+lmm2_bal_pp <- lmer(log(dds)~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      #z.CR_weib+
+                      #climate
+                      z.ppt_pAugJul+z.tmax_JunAug+
+                      #competition/density
+                      z.BAL+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+z.SLOPE+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z)
+#warning - fail to converge
+summary(lmm2_bal_pp)
+AIC(lmm2_bal_pp)
+#4945.546
+
+#CCF
+lmm2_ccf_pp <- lmer(log(dds)~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      #z.CR_weib+
+                      #climate
+                      z.ppt_pAugJul+z.tmax_JunAug+
+                      #competition/density
+                      z.CCF+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+z.SLOPE+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z)
+summary(lmm2_ccf_pp)
+AIC(lmm2_ccf_pp)
+#4939.473
+
+#two
+lmm2_crf_pp <- lmer(log(dds)~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      I(z.CR_weib^2)+
+                      #climate
+                      z.ppt_pAugJul+z.tmax_JunAug+
+                      #competition/density
+                      z.CCF+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+z.SLOPE+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z)
+summary(lmm2_crf_pp)
+AIC(lmm2_crf_pp)
+#4947.377
+
+lmm2_cfbl_pp <- lmer(log(dds)~
+                      #tree variables
+                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                      #I(z.CR_weib^2)+
+                      #climate
+                      z.ppt_pAugJul+z.tmax_JunAug+
+                      #competition/density
+                      z.CCF+z.BAL+ #remove /100 due to standardization
+                      #site variables
+                      z.SICOND+z.SLOPE+
+                      #random effects
+                      (1+z.DIA_C|TRE_CN)+(1|Year),
+                    data = glmm_pp_z)
+summary(lmm2_cfbl_pp)
+AIC(lmm2_cfbl_pp)
+#4944.769
+
+#visualize
+lmm_pp <-  tidy(lmm1_reds_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "Crown Ratio^2",
+                       z.ppt_pAugJul = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
+lmm_cr_pp <-  tidy(lmm2_cr_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_cr")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "Crown Ratio^2",
+                       z.ppt_pAugJul = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
+lmm_bal_pp <-  tidy(lmm2_bal_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_bal")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pAugJul = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
+lmm_ccf_pp <-  tidy(lmm2_ccf_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_ccf")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pAugJul = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
+lmm_crf_pp <-  tidy(lmm2_crf_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_crf")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "Crown Ratio",
+                       z.ppt_pAugJul = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
+modelspp_check4 <- full_join(lmm_pp,lmm_bal_pp) %>%
+  full_join(.,lmm_cr_pp) %>%
+  full_join(.,lmm_ccf_pp) %>%
+  full_join(.,lmm_crf_pp)
+
+dwplot(modelspp_check4, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Growth for Ponderosa Pine") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
