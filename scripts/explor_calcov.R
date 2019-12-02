@@ -106,9 +106,9 @@ density_data <- density_data %>%
 #also try Reineke's method
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
-  mutate(num_t = length(unique(TRE_CN)),
-         QMD = sqrt(sum(DIA_C^2)/num_t),
-         RSDI = ((QMD/10)^1.6)*TPA_C)
+  mutate(num_t = length(unique(TRE_CN)))#,
+         #QMD = sqrt(sum(DIA_C^2)/num_t),
+         #RSDI = ((QMD/10)^1.6)*TPA_C)
 
 #check SDI calculation with one plot, one year
 
@@ -122,3 +122,11 @@ write.csv(sdi_check,file = "./data/explore/sdi_check.csv")
 
 #calculations are right
 #go with first SDI calculation
+
+#BAL
+load("./data/formatted/density_data.Rdata")
+
+bal_check <- density_data %>%
+  select(PLT_CN,TRE_CN,Year,DIA_C,BALIVE,TPA_C,BA_pa,BAL,DESIGNCD) %>%
+  filter(PLT_CN == plot1) %>%
+  filter(Year == 1988)
