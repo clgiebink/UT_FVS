@@ -19,7 +19,23 @@ library(tidyverse)
 load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/data_all_df.Rdata')
 ```
 
-My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Pseudotsuga menziesii* (Douglas fir) in Utah. I was able to extract and calculate annual data for 59 trees between the years of 1958 and 1995. 
+My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Pseudotsuga menziesii* (Douglas fir) in Utah. 
+
+```{r echo=FALSE}
+library(maps)
+m = map_data('state', region = 'Utah')
+
+ggplot() + 
+  geom_polygon( data=m, aes(x=long, y=lat,group=group),colour="black", fill="white" )+
+  geom_point(data=data_all_df,aes(x=LON,y=LAT),colour="red")+
+  ggtitle("Distribution of Douglas fir")+
+  xlab('Longitude')+
+  ylab('Latitude')+
+  coord_fixed()
+```
+
+
+I was able to extract and calculate annual data for 59 trees between the years of 1958 and 1995. 
 
 ```{r}
 #create new dataframe with only variables needed for model
