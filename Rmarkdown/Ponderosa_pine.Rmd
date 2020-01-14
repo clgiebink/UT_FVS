@@ -276,9 +276,32 @@ Using the full model with all the possile covariates, I will test for collineari
 library(car)
 ```
 
-The Variance Inflation Factors (VIFs) are relatively low, showing no collinearity.
-
 
 ## Model Selection
 
 Compare models via Akaike's Information Criterion. Check for homogeneity and normality using residuals.
+
+```{r}
+#pp
+lmm_pp_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_JunAug+ #interaciton significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_pp_z)
+
+plot(effect("z.DIA_C",lmm_pp_red),xlab = "DBH",main = "DBH")
+plot(effect("z.CR_weib",lmm_pp_red),xlab = "Crown Ratio",main = "Crown Ratio")
+plot(effect("z.CCF",lmm_pp_red),xlab = "CCF",main = "CCF")
+plot(effect("z.SICOND",lmm_pp_red),xlab = "Site Index",main = "Site Index")
+plot(effect("z.SLOPE",lmm_pp_red),xlab = "Slope",main = "Slope")
+plot(effect("z.wateryr",lmm_pp_red),xlab = "Precipitation",main = "Precipitation")
+plot(effect("z.tmax_JunAug",lmm_pp_red),xlab = "Temperature",main = "Temperature")
+```
