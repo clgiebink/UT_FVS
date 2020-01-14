@@ -615,6 +615,7 @@ resid_glmm_n <- residuals(glmm_n_red,type="pearson",scaled=TRUE)
 qqnorm(resid_glmm_n,main="QQ plot of LogN residuals")
 qqline(resid_glmm_n)
 
+#nlme ----
 #temporal correlation
 library(nlme)
 #random effects
@@ -707,6 +708,7 @@ plotLowess(presid_glm~age,data = glmm.data.trun,ylab="Residuals",main="Gamma")
 #southern Utah seems to be dominated by monsoon rains
 #northern Utah seems to be dominated by winter rains
 
+#Spatial ----
 #first visualize data by plotting it on a map
 library(maps)
 m = map_data('state', region = 'Utah')
@@ -864,10 +866,10 @@ AIC(lmm2_ccf_pp)
 #4939.473
 
 #two
-lmm2_crf_pp <- lmer(log(dds)~
+lmm3_crf_pp <- lmer(log(dds)~
                       #tree variables
                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                      I(z.CR_weib^2)+
+                      z.CR_weib+
                       #climate
                       z.ppt_pAugJul+z.tmax_JunAug+
                       #competition/density
@@ -877,7 +879,7 @@ lmm2_crf_pp <- lmer(log(dds)~
                       #random effects
                       (1+z.DIA_C|TRE_CN)+(1|Year),
                     data = glmm_pp_z)
-summary(lmm2_crf_pp)
+        summary(lmm2_crf_pp)
 AIC(lmm2_crf_pp)
 #4947.377
 
