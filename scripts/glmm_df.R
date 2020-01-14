@@ -5,7 +5,7 @@
 
 #dataframe
 #all data is provided in
-load(file = './data/formatted/data_all_df')
+load(file = '~/data/formatted/data_all_df.Rdata')
 
 data_all_df <- data_all_df %>%
   mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
