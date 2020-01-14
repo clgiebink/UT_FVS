@@ -178,7 +178,7 @@ clim_1_red <- lmer(log(dds+0.001)~
                      #competition/density
                      z.BAL+z.CCF+ #remove /100 due to standardization
                      #site variables
-                     z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                     z.SICOND+I(z.SLOPE^2)+
                      I(sin(z.ASPECT-0.7854)*z.SLOPE)+
                      I(cos(z.ASPECT-0.7854)*z.SLOPE)+
                      #random effects
