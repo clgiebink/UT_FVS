@@ -111,6 +111,14 @@ data_all_df <- data_all_df %>%
          ppt_FebJul = ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul,
          wateryr = lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
 
+#16 months: previous June to current Sept
+data_all_df <- data_all_df %>%
+  group_by(TRE_CN) %>%
+  arrange(Year) %>%
+  mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
+           lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
+           ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
+
 #average temp
 #1 month: Feb, Jul
 #Feb tmin
@@ -165,6 +173,14 @@ data_all_pp <- data_all_pp %>%
          wateryr = lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep,
          ppt_pAugJul = lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul)
 
+#16 months: previous June to current Sept
+data_all_pp <- data_all_pp %>%
+  group_by(TRE_CN) %>%
+  arrange(Year) %>%
+  mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
+           lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
+           ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
+
 #average temp
 #1 month: Jun
 #Jun tmax
@@ -201,6 +217,14 @@ data_all_es <- data_all_es %>%
   mutate(ppt_pJunNov = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov),
          wateryr = lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep,
          ppt_pAugJul = lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
+
+#16 months: previous June to current Sept
+data_all_pp <- data_all_pp %>%
+  group_by(TRE_CN) %>%
+  arrange(Year) %>%
+  mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
+           lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
+           ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
 
 #average temp
 #1 month: tmax_pAug, Feb, Mar
