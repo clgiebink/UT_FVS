@@ -29,7 +29,7 @@ for (i in tminFiles) {
   tminStack <- stack(tminStack, raster(i))
 }
 
-tmaxStack <- stack()
+  tmaxStack <- stack()
 for (i in tmaxFiles) {
   print(i)
   tmaxStack <- stack(tmaxStack, raster(i))
@@ -47,7 +47,8 @@ for (i in tmaxFiles) {
 
 # Crop climate to extent of Utah
 library(maps)
-m = map_data('state', region = 'Utah')
+
+m <- ggplot2::map_data('state', region = 'Utah')
 
 ut_spat <- SpatialPointsDataFrame(coords = cbind(m$long, m$lat), 
                                   data = m, 
