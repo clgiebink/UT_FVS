@@ -1,0 +1,502 @@
+---
+title: "Progress as of Dec 2019"
+author: "Courtney Giebink"
+date: "12/9/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Verifying covariates
+
+I'd like to take another look at some of my covariates - BAL, crown ratio (CR) and aspect. Since I back calcuated BAL and CR, I'd like to double check their calcuations and outputs. For work done thus far on calculating covariates, please refer to my GitHub project, [Create data set](https://github.com/clgiebink/UT_FVS/projects/1). 
+
+```{r include=FALSE}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+```
+
+```{r include=FALSE}
+#load data
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/incr_calcov.Rdata")
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_df_z.Rdata")
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_pp_z.Rdata")
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_es_z.Rdata")
+#load packages
+library(corrplot)
+```
+
+Notice in the figure below that BAL and CR are significantly correlated. Their collinearity could be an issue in my models.
+
+```{r echo=FALSE}
+#correlation plot
+par(mfrow=c(2,2))
+#make dataframe with only necessary variables
+#all species
+cor_df <- incr_calcov %>%
+  ungroup() %>%
+  select(DIA_C,CR,CR_weib,BAL,PCCF,CCF) %>%
+  drop_na()
+M <- cor(cor_df)
+corrplot.mixed(M,title="All species",mar = c(0,0,1,0))
+#for each species
+cor_df_df <- glmm_df_z %>%
+  ungroup() %>%
+  select(DIA_C,CR,CR_weib,BAL,PCCF,CCF) %>%
+  drop_na()
+D <- cor(cor_df_df)
+corrplot.mixed(D,title="Douglas fir",mar = c(0,0,1,0))
+#ponderosa pine
+cor_df_pp <- glmm_pp_z %>%
+  ungroup() %>%
+  select(DIA_C,CR,CR_weib,BAL,PCCF,CCF) %>%
+  drop_na()
+P <- cor(cor_df_pp)
+corrplot.mixed(P,title="Ponderosa pine",mar = c(0,0,1,0))
+#englemann spruce
+cor_df_es <- glmm_es_z %>%
+  ungroup() %>%
+  select(DIA_C,CR,CR_weib,BAL,PCCF,CCF) %>%
+  drop_na()
+E <- cor(cor_df_es)
+corrplot.mixed(E,title="Englemann spruce",mar = c(0,0,1,0))
+```
+
+### BAL
+
+```{r include=FALSE}
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/density_data.Rdata")
+load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/per_cov.Rdata")
+```
+
+Below are the calcuations for BAL. Basal area per acre is summed on a particular plot for a particular year for all trees larger than the subject tree.
+
+```{r eval=FALSE}
+#calculate basal area per acre for each tree
+density_data <- density_data %>%
+  mutate(BA_pa = ((DIA_C^2) * 0.005454) * TPA_C)
+#BAL
+#sum BApa of trees larger on the same plot in same year
+density_data <- density_data %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(rank_pltyr = rank(DIA_C, na.last = TRUE, ties.method = "min")) %>%
+  #min assigns lowest value to ties (1,2,3,3,5,6)
+  mutate(BAL = map_dbl(DIA_C,~sum(BA_pa[DIA_C>.x],na.rm = TRUE)))
+```
+
+If BAL is calculated correctly, its maximum value on a plot should match BALIVE for a plot.
+
+```{r}
+#check
+bal_check <- density_data %>%
+  group_by(PLT_CN)%>%
+  summarise(max = max(BAL))
+bal_check$BALIVE <- per_cov$BALIVE[match(bal_check$PLT_CN, per_cov$PLT_CN)]
+head(bal_check)
+```
+
+We expect BAL to decrease as DBH increases, which appears to be the case here.
+
+```{r}
+#visualize bal
+#for all trees, all years
+plot(density_data$DIA_C,density_data$BAL,
+     xlab = "DBH", ylab = "BAL", main = "BAL over DBH")
+```
+
+If we look at BAL for a single tree over DBH, 
+
+```{r}
+#look at a single tree over time
+bal_yr_plots <- glmm_df_z%>%
+  group_by(TRE_CN) %>%
+  do(plots=ggplot(data=.) +
+       aes(x=DIA_C, y=BAL) + geom_point() + ggtitle(unique(.$TRE_CN)))
+
+par(mfrow=c(2,2))
+bal_yr_plots$plots[[10]]
+bal_yr_plots$plots[[20]]
+bal_yr_plots$plots[[40]]
+bal_yr_plots$plots[[70]]
+```
+
+I think what is happening here is the tree is shifting in its rank in the diameter distribution. The trees on a plot without tree-ring data were back calculated with an average ring width value, while the trees with tree-ring data were back calculated with ring width values specific to the year of growth. It may be that the year specific values were cumulatively larger than the average value, causing the tree to move in the diameter distribution. The shift is causing big jumps in BAL for a single tree over time. The question is: is this normal? We see the same for crown ratio.
+
+```{r}
+#can also do calculation by hand
+plot1 <- incr_calcov[410,32] #15 trees
+bal_check <- density_data %>%
+  select(PLT_CN,TRE_CN,Year,DIA_C,BALIVE,TPA_C,BA_pa,BAL,DESIGNCD) %>%
+  filter(PLT_CN == plot1) %>%
+  filter(Year == 1988)
+```
+
+
+### Crown Ratio
+
+Below is the calculation for crown ratio following the Weibull distribution. The code is updated from Mark Castle.
+
+```{r eval=FALSE}
+#####################################
+#Step 1:
+#Calculate stand density index (RSDI)
+#and crown competition factor (CCF)
+#####################################
+
+#Instead of Reineke SDI (for stand) use
+#Calculations from John Shaw (2000; Stage 1968)
+#SDI = sum((DIA_t/10)^1.6)
+density_data <- density_data %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(SDI = sum((DIA_C/10)^1.6)) 
+
+#Crown Competition Factor (CCF - for stand)
+#Refer to variant overview for how to calculate CCF
+#calculated in CCF.R script
+
+head(density_data)
+
+#####################################
+#Step 2:
+#Calculate relative density (RD)
+#Step 3:
+#Calculate average stand crown ratio
+#by species (ACR)
+#Step 4:
+#Determine Weibull parameters to use
+#for crown ratio calculation
+#Step 5:
+#Calculate crown ratio for tree
+#records
+#####################################
+
+#Function for calculating relative density for each species in a stand
+#Maximum stand density index at stand level is weighted average,
+#by basal area proportion of individual species SDI max
+##for now use individual SDI max
+##from UT variant guide
+
+CR_WEIB_df <- data.frame(species=c(93,202,122),
+                         #93=ES,202=DF,122=PP
+                         SDIMAX = c(620,570,446),
+                         a0 = c(1,1,1),
+                         b0 = c(-0.90648,-0.24217,-0.82631),8414
+                         b1 = c(1.08122,0.96529,1.06217),
+                         c0 = c(3.48889,-7.94832,-1.02873),
+                         c1 = c(0,1.93832,0.80143),
+                         d0 = c(6.81087,7.46296,6.19911),
+                         d1 = c(-0.01037,-0.02944,-0.02216))
+#can add other species if needed
+
+#some species use height
+#PI,WJ,GO,PM,UJ,OH
+#CL = lm(HT)
+#CR = CL/HT
+
+CR_weib <- vector(mode="numeric", length=nrow(incr_calcov))
+for(i in 1:nrow(incr_calcov)){
+  #Function arguments:
+  #SPCD - is number code of species of tree record
+  #SDI - is SDI of stand (Stage 1968)
+  Species <- incr_calcov$SPCD[i]
+  if(Species %in% CR_WEIB_df$species){
+    #SDI max values for each species were pulled from UT Variant overview
+    SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species]
+    #Calculate relative density
+    RD <- incr_calcov$SDI[i]/SDIMAX
+    
+    #Calculate average stand crown ratio (ACR) for each species in the stand
+    d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+    d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+    ACR <- d0 + d1 * RD * 100
+    
+    #Parameters of Weibull distribution: A,B,C
+    a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+    b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+    b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+    c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+    c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+    
+    #A parameter
+    WEIBA <-a0
+    #B parameter
+    WEIBB <- b0 + b1*ACR
+    #C parameter
+    WEIBC <- c0 + c1*ACR
+    
+    #Function arguments:
+    
+    #CCF - crown competition factor of stand
+    #rank_pltyr - tree's rank in diameter distribution by plot by year
+    #N  - number of records in the stand by year
+    
+    #Calculate scale parameter
+    SCALE = (1.0 - .00167 * (incr_calcov$CCF[i]-100.0))
+    if(SCALE < 0.3){SCALE = 0.3}
+    if(SCALE > 1.0){SCALE = 1.0}
+    
+    N <- incr_calcov$num_t[i]
+    #X is tree's rank in diameter distribution
+    #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+    Y <- incr_calcov$rank_pltyr[i]/N * SCALE
+    if(Y < 0.05){Y = 0.05}
+    if(Y > 0.95){Y = 0.95}
+    #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+    
+    #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+    X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+    #X = a tree’s crown ratio expressed as a percent / 10
+    incr_calcov$CR_weib[i] <- X * 10
+  }
+  if(!(Species %in% CR_WEIB_df$species)){
+    incr_calcov$CR_weib[i] <- NA
+  }
+}
+```
+
+If we compare the calculation for crown ratio and the estimated crown ratio during the inventory year, we get very different answers.
+
+```{r}
+#check
+cr_check<- incr_calcov %>%
+  select(TRE_CN,Year,MEASYEAR,PLT_CN,SPCD,CCF,CR,CR_weib) %>%
+  filter(MEASYEAR == Year)
+cr_check[62:69,]
+```
+
+Crown ratio and calcuated crown ratio should be similar and follow the 1:1 line.
+
+```{r}
+#visualize
+plot(incr_calcov$CR,incr_calcov$CR_weib,
+     xlab = "Copied CR", ylab = "Calculated CR",
+     main = "Crown Ratio (CR) Calculated vs Copied")
+```
+
+```{r}
+par(mfrow=c(1,2))
+#copied
+plot(incr_calcov$DIA_C,incr_calcov$CR,
+     xlab = "DBH", ylab = "Copied CR")
+#calculated
+plot(incr_calcov$DIA_C,incr_calcov$CR_weib,
+     xlab = "DBH", ylab = "Calculated CR")
+```
+
+If we look at calculated crown ratio for a single tree back in time, it follows the same (but opposite) pattern as BAL. In the FVS Utah variant guide, it says that crown change is bounded to 1% per year for the length of the cycle to avoid drastic changes.
+
+```{r}
+#look at a single tree over time
+cr_yr_plots <- glmm_df_z%>% 
+  filter(!is.na(CR_weib)) %>%
+  group_by(TRE_CN) %>%
+  do(plots=ggplot(data=.) +
+       aes(x=DIA_C, y=CR_weib) + geom_point() + ggtitle(unique(.$TRE_CN)))
+
+par(mfrow=c(2,2))
+cr_yr_plots$plots[[10]]
+cr_yr_plots$plots[[20]]
+cr_yr_plots$plots[[40]]
+cr_yr_plots$plots[[70]]
+```
+
+### ASPECT
+
+Aspect is the only covariate that has missing data (NA values). My current solution has been to replace all NA values with 0. However, John said that all ASPECT values should be filled in the FIADB. Below is a dataframe of the trees (only my focal species) that don't have values for ASPECT. Most trees that have missing aspect values, except two trees, have a slope value less than 5.
+
+```{r warning=FALSE}
+#missing
+asp_check <- read_csv(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/check/asp_check.csv")
+asp_check2 <- asp_check %>%
+  select(TRE_CN,SPCD,ASPECT,SLOPE)
+head(asp_check2)
+```
+
+I don't currently have either aspect covariate in my model. The covariate should model the effect of radiation on growth, but I have a hard time interpretting it (see below).
+
+```{r}
+#interpretation
+par(mfrow=c(1,2))
+#graph of sin and cos of aspect
+x <- seq(1,360,1)
+plot(x,sin(x-0.7854),ylab = "sin(ASPECT-0.7854)")
+plot(x,cos(x-0.7854),ylab = "cos(ASPECT-0.7854)")
+```
+
+## Building Growth Models
+
+I've already build some growth models for Douglas fir, ponderosa pine, and Engelmann spruce. For more information on the process of building models, see my GitHub project, [Build LMM](https://github.com/clgiebink/UT_FVS/projects/2).
+
+### Competition
+
+As mentioned above, BAL and CR are collinear, which has an effect on my model outputs. One solution might be to reduce the number of competiton variables, since the current FVS models have many - CR, BAL, PCCF, CCF. Below are model outputs different combinations of competiton variables, where:
+
+* LMM: linear mixed model with all competition parameters - `CR_weib`,`BAL`, and `CCF`
+* LMM_bal: linear mixed model with only `BAL` as a competition parameter
+* LMM_cr: linear mixed model with only `CR_weib` as a competition parameter
+* LMM_ccf: linear mixed model with only `CCF` as a competition parameter
+* LMM_crf: linear mixed model with `CR_weib` and `CCF` as a competition parameters
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/competition_vis_df.png)
+
+Notice, BAL by itself becomes insignificant, and CR becomes less positive.
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/competition_vis_pp.png)
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/competition_vis_es.png)
+
+### Climate
+
+Notice in the above figures that precipitation always has a smaller effect size than temperature. One reason this could be is the parameter choice for precipitation versus temperature. For precipitation, we dicussed using an annual parameter instead of a seasonal parameter, since precipitation is more uncertain in climate projections, especially for particular months. Current models are fit with water year (Oct-Sept) as the precipitation parameter. However, models have the best AIC score with previous summer precipitation. Fitting models with seasonal parameters for precipitation might change the effect size. The temperature parameter is seasonal and chosen based on AIC score.
+
+```{r}
+#model here for each species
+#df
+#pp
+#es
+```
+
+### DBH
+
+The linear size term (DBH) is insignificant for all species, although the quadratic term is still significant and negative. It seems a little weird because DBH typically has a large effect on growth. One possibility for the insignificance of the linear term is the random slope on DBH. See below what happens when the random slope is removed. Figures also include the effect of calculated crown ratio from the Weibull distribution versus copied crown ratio from the FIADB on model coefficients.
+
+* LMM: linear mixed model with random slope on DBH and calculated crown ratio, `CR_weib`.
+* LMM_rmre: linear mixed model without random slope on DBH.
+* LMM_CR: linear mixed model copied crown ratio from the FIADB.
+* LMM_rm_CR: linear mixed model without random slope on DBH and copied crown ratio from the FIADB.
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_check_df.png)
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_check_pp.png)
+
+## Visualize Current Models
+
+```{r eval=FALSE}
+#df
+lmm_df_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+AIC(lmm_df_red)
+#pp
+lmm_pp_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_JunAug+ #interaciton significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_pp_z)
+AIC(lmm_pp_red)
+#es
+lmm_es_red <- lmer(log(dds+0.001)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_pAug+ #interaciton significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_es_z)
+AIC(lmm_es_red)
+```
+
+### Effects
+
+Some of the effects we've already discussed, such as linear DBH consistently insignificant and precipitation having a small effect size. All other parameters seem to make sense, right?
+
+```{r include=FALSE}
+library(effects)
+```
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_df.png)
+
+```{r}
+#df
+lmm_df_red <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 #competition/density
+                 z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_df_z)
+par(mfrow=c(2,2))
+plot(effect("z.DIA_C",lmm_df_red),xlab = "DBH",main = "DBH")
+plot(effect("z.CR_weib",lmm_df_red),xlab = "Crown Ratio",main = "Crown Ratio")
+plot(effect("z.CCF",lmm_df_red),xlab = "CCF",main = "CCF")
+plot(effect("z.SICOND",lmm_df_red),xlab = "Site Index",main = "Site Index")
+plot(effect("z.SLOPE",lmm_df_red),xlab = "Slope",main = "Slope")
+plot(effect("z.wateryr",lmm_df_red),xlab = "Precipitation",main = "Precipitation")
+plot(effect("z.tmax_FebJul",lmm_df_red),xlab = "Temperature",main = "Temperature")
+
+```
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_pp.png)
+
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_es.png)
+
+![optional caption text](/home/giebink/Documents/Masters/UT/UT_FVS/images/mod_all.png)
+
+### Residual Analysis
+
+I will only show residuals for Douglas fir here. Request other Rmarkdowns for residuals for ponderosa pine and Engelmann spruce.
+
+```{r}
+#residuals
+par(mfrow=c(1,2))
+#clim_1_red
+resid_lmm_df<- residuals(lmm_df_red,type="pearson",scaled=TRUE)
+qqnorm(resid_lmm_df,main="QQ plot of LMM for DF")
+qqline(resid_lmm_df)
+hist(resid_lmm_df)
+```
+
+
+```{r}
+#To test if my transformed residuals have a constant variance with a mean of zero, 
+#I will plot transformed residuals vs predicted values.
+library(gplots)
+pred_lmm_df <- predict(lmm_df_red, type="response")
+plotLowess(resid_lmm_df~pred_lmm_df, ylab="Residuals",xlab="Predicted", main="LMM for DF")
+```
+
+
+```{r}
+#residuals vs covariates
+plotLowess(resid_lmm_df~z.DIA_C,data = glmm_df_z,ylab="Residuals",main="LMM")
+plotLowess(resid_lmm_df~z.CR_weib,data = glmm_df_z,ylab="Residuals",main="LMM")
+plotLowess(resid_lmm_df~z.wateryr,data = glmm_df_z,ylab="Residuals",main="LMM") #heteroskedasticity
+plotLowess(resid_lmm_df~z.tmax_FebJul,data = glmm_df_z,ylab="Residuals",main="LMM")
+plotLowess(resid_lmm_df~z.CCF,data = glmm_df_z,ylab="Residuals",main="LMM")
+plotLowess(resid_lmm_df~z.SICOND,data = glmm_df_z,ylab="Residuals",main="LMM")
+plotLowess(resid_lmm_df~z.SLOPE,data = glmm_df_z,ylab="Residuals",main="LMM")
+```
+
