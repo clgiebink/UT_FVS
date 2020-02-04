@@ -73,6 +73,10 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 
+#tranform aspect
+data_all <- data_all %>%
+  mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT))
+
 save(data_all, file = "./data/formatted/data_all.Rdata")
 
 #check
@@ -259,3 +263,13 @@ save(data_all_es, file = "./data/formatted/data_all_es.Rdata")
 #need response: RW, dds
 #fixed effects: DBH (DIA), CR/CR_weib, PCCF, CCF, BAL, Climate
 #random effect: TRE_CN, Year
+
+# radiation index ----
+#filter all data for solar radiation index
+
+tre_loc <- data_all %>%
+  ungroup() %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  select(PLT_CN,TRE_CN,LAT,LON,ELEV) %>%
+  distinct()
+write.csv(as.data.frame(tre_loc),"./data/formatted/tre_loc.csv")
