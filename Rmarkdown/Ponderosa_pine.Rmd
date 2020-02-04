@@ -1,4 +1,4 @@
-  ---
+---
 title: "Linear Mixed Model for Ponderosa Pine"
 author: "Courtney Giebink"
 date: "August 6, 2019"
@@ -10,20 +10,19 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r include=FALSE}
-library(tinytex)
 library(tidyverse)
 ```
 
 ## Data Summary
 
-```{r }
-load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/data_all_pp.Rdata')
-
+```{r include=FALSE}
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_data_pp.Rdata')
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/data_all_pp.Rdata')
 ```
 
 My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Pinus ponderosa* (Ponderosa pine) in Utah. 
 
-```{r}
+```{r echo=FALSE, message=FALSE}
 library(maps)
 m = map_data('state', region = 'Utah')
 
@@ -39,7 +38,7 @@ ggplot() +
 
 I was able to extract and calculate annual data for 51 trees between the years of 1962 and 1995. 
 
-```{r}
+```{r eval=FALSE}
 #create new dataframe with only variables needed for model
 #response: RW, dds
 #fixed: SI, ASP, SL, DBH/DIA_C, BAL, CR, CCF, PCCF, climate
@@ -48,13 +47,12 @@ I was able to extract and calculate annual data for 51 trees between the years o
 min(data_all_pp$MEASYEAR) #1992 -> 1962
 
 glmm_data_pp <- data_all_pp %>%
-  select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF,
-         ppt_pDec, ppt_Jun, ppt_Jul,ppt_pOct, 
-        ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
-         ppt_pAugJan, wateryr,
-         tmax_Jun,
-         tmax_JunAug) %>%
+  dplyr::select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
+         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
+         ppt_pDec, ppt_Jun, ppt_Jul, ppt_pOct,
+         ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
+         ppt_pAugJan, wateryr, ppt_pAugJul, ppt_pJunSep,
+         tmax_Jun, tmax_JunAug) %>%
   filter(Year >= 1962)
 
 #climate
@@ -105,10 +103,9 @@ There is one consistent larger value at just over 6 mm.
 ### Zeros and Missing Data
 
 ```{r}
-#missing rings?
-which(glmm_data_pp$RW == 0)
-#missing data?
+which(glmm_data_pp$RW == 0) #missing data
 which(is.na(glmm_data_pp$RW))
+which(glmm_data_pp$dds ==0)
 
 range_df <- glmm_data_pp %>%
   select(TRE_CN,Year) %>%
@@ -281,27 +278,3 @@ library(car)
 
 Compare models via Akaike's Information Criterion. Check for homogeneity and normality using residuals.
 
-```{r}
-#pp
-lmm_pp_red <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR_weib+
-                 #climate
-                 z.wateryr*z.tmax_JunAug+ #interaciton significant
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-               data = glmm_pp_z)
-
-plot(effect("z.DIA_C",lmm_pp_red),xlab = "DBH",main = "DBH")
-plot(effect("z.CR_weib",lmm_pp_red),xlab = "Crown Ratio",main = "Crown Ratio")
-plot(effect("z.CCF",lmm_pp_red),xlab = "CCF",main = "CCF")
-plot(effect("z.SICOND",lmm_pp_red),xlab = "Site Index",main = "Site Index")
-plot(effect("z.SLOPE",lmm_pp_red),xlab = "Slope",main = "Slope")
-plot(effect("z.wateryr",lmm_pp_red),xlab = "Precipitation",main = "Precipitation")
-plot(effect("z.tmax_JunAug",lmm_pp_red),xlab = "Temperature",main = "Temperature")
-```
