@@ -9,8 +9,9 @@ load(file = '~/data/formatted/data_all_df.Rdata')
 
 data_all_df <- data_all_df %>%
   mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
-  mutate(sin = sin(tASPECT - 0.7854) * SLOPE,
-         cos = cos(tASPECT - 0.7854) * SLOPE)
+  mutate(radians = tASPECT * pi/180) %>%
+  mutate(sin = sin(radians - 0.7854) * SLOPE,
+         cos = cos(radians - 0.7854) * SLOPE)
 
 #data_all_df <- data_all_df %>%
 #  mutate(dds = (2*RW*0.0393701)^2) #mm to inches
@@ -28,7 +29,7 @@ glmm_data_df <- data_all_df %>%
          SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_pOct, ppt_pDec, ppt_Jun, ppt_Jul,
          ppt_pJunAug, ppt_pAugOct, ppt_MayJul,
-         ppt_pJunNov, ppt_FebJul, wateryr,
+         ppt_pJunNov, ppt_FebJul, wateryr, ppt_pJunSep,
          tmin_Feb, tmax_Jul,
          tmax_JunAug, tmax_pJulSep, tmin_JanMar,
          tmax_JanJun,tmin_JanJun,tmax_FebJul) %>%
@@ -50,9 +51,12 @@ save(glmm_data_df, file = "./data/formatted/glmm_data_df.Rdata")
 #Exploration
 
 #Missing data
-sum(is.na(glmm_data_df)) #204
+sum(is.na(glmm_data_df)) #314
 summary(glmm_data_df)
 #ASPECT - 169
+#SICOND - 70 
+## two trees
+#CR - 35
 #ppt_pOct - 5
 #ppt_pDec - 5
 #ppt_pJunAug - 5
@@ -64,8 +68,6 @@ miss_asp_df <- unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$ASPECT)]) #5
 # 2.876521e+12 2.880164e+12 2.881010e+12 2.881027e+12 2.872497e+12
 asp_check_df <- per_cov %>%
   filter(TRE_CN %in% miss_asp_df)
-glmm_data_df <- glmm_data_df %>%
-  replace_na(ASPECT,0)
 
 miss_clim_df <- unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$ppt_pOct)])
 #2.854250e+12 2.872497e+12 2.907837e+12 2.911563e+12 2.928494e+12
@@ -82,19 +84,43 @@ clim_check_df <- glmm_data_df %>%
 #to fix must go add another year to increment data and join?
 #probably will just delete missing year.
 
+#missing site index
+unique(glmm_data_df$TRE_CN[is.na(glmm_data_df$SICOND)]) #2
+si_plot <- glmm_data_df$PLT_CN[is.na(glmm_data_df$SICOND)]
+miss_si_df <- glmm_data_df %>%
+  filter(PLT_CN %in% si_plot)
+#only the 2 trees
+
 #almost one tree per plot so don't need to have plot as random effect
 length(unique(data_all_df$TRE_CN))
-#131
+#136
 length(unique(data_all_df$PLT_CN))
-#114
+#118
 
 #distribution of the response variable
 hist(glmm_data_df$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
 hist(glmm_data_df$dds,breaks = 100, main = "Histogram of DDS (in)", xlab = "Increment") 
 
-which(glmm_data_df$RW == 0) #0
-#no missing rings
+which(glmm_data_df$RW == 0) #262 (row number)
+#1 missing ring
+#replace with smallest rw of on same core
+miss_rw_df <- unique(glmm_data_df$TRE_CN[glmm_data_df$RW == 0])
+miss_rw_tre_df <- glmm_data_df %>%
+  select(TRE_CN,Year,RW) %>%
+  filter(TRE_CN == miss_rw_df)
+glmm_test_df <- glmm_data_df %>%
+  group_by(TRE_CN) %>%
+  mutate(dds = ifelse(RW != 0, dds, 
+                     min(RW[RW > 0])))
+glmm_test_df[262,c("RW")]
+#works
+glmm_data_df <- glmm_data_df %>%
+  group_by(TRE_CN) %>%
+  mutate(tdds = ifelse(RW != 0, dds, 
+                      (2*(min(RW[RW > 0]))*0.0393701)^2))
 which(is.na(glmm_data_df$RW)) #0
+which(glmm_data_df$dds == 0) #262
+which(glmm_data_df$tdds == 0) #0
 
 #growth trends across time
 library(ggplot2)
@@ -275,7 +301,7 @@ summary(fvs_clim_red)
 #total ppt
 #1 month: pOct,pDec, Jun, Jul
 #3 month: pJun-pAug, pAug-pOct, May-Jul
-#6 month + : pNov, Jul, wateryr
+#6 month + : pNov, Jul, wateryr, pJunSep
 
 fvs_clim_1 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
