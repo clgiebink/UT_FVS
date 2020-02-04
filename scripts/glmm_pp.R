@@ -9,8 +9,9 @@ load(file = './data/formatted/data_all_pp')
 
 data_all_pp <- data_all_pp %>%
   mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
-  mutate(sin = sin(tASPECT - 0.7854) * SLOPE,
-         cos = cos(tASPECT - 0.7854) * SLOPE)
+  mutate(radians = tASPECT * pi/180) %>%
+  mutate(sin = sin(radians - 0.7854) * SLOPE,
+         cos = cos(radians - 0.7854) * SLOPE)
 
 #create new dataframe with only variables needed for linear mixed model
 #response: RW, dds
@@ -24,7 +25,7 @@ glmm_data_pp <- data_all_pp %>%
          SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_pDec, ppt_Jun, ppt_Jul, ppt_pOct,
          ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
-         ppt_pAugJan, wateryr, ppt_pAugJul,
+         ppt_pAugJan, wateryr, ppt_pAugJul, ppt_pJunSep,
          tmax_Jun, tmax_JunAug) %>%
   filter(Year >= 1962)
 
@@ -43,9 +44,9 @@ save(glmm_data_pp, file = "./data/formatted/glmm_data_pp.Rdata")
 #Exploration
 
 #Missing data
-sum(is.na(glmm_data_pp)) #614
+sum(is.na(glmm_data_pp)) #756
 summary(glmm_data_pp)
-#ASPECT - 579
+#ASPECT - 711
 #ppt_pDec - 5
 #ppt_pOct - 5
 #ppt_pAugOct - 5
@@ -84,6 +85,9 @@ clim_check_pp <- glmm_data_pp %>%
 #to fix must go add another year to increment data and join?
 #probably will just delete missing year.
 
+which(glmm_data_pp$RW == 0) #0
+#no missing rings
+
 #distribution of the response variable
 hist(glmm_data_pp$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
 hist(glmm_data_pp$dds,breaks = 100, main = "Histogram of DDS (in)", xlab = "Increment") 
@@ -107,9 +111,6 @@ cdfcomp (list(fit_ex, fit_gm), legendtext = plot.legend)
 qqcomp  (list(fit_ex, fit_gm), legendtext = plot.legend)
 ppcomp  (list(fit_ex, fit_gm), legendtext = plot.legend)
 
-which(glmm_data_pp$RW == 0) #0
-#no missing rings
-which(is.na(glmm_data_pp$RW)) #0
 
 #growth trends across time
 library(ggplot2)
