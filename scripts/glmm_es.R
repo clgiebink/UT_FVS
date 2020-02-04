@@ -9,8 +9,9 @@ load(file = './data/formatted/data_all_es')
 
 data_all_es <- data_all_es %>%
   mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
-  mutate(sin = sin(tASPECT - 0.7854) * SLOPE,
-         cos = cos(tASPECT - 0.7854) * SLOPE)
+  mutate(radians = tASPECT * pi/180) %>%
+  mutate(sin = sin(radians - 0.7854) * SLOPE,
+         cos = cos(radians - 0.7854) * SLOPE)
 
 #create new dataframe with only variables needed for linear mixed model
 #response: RW, dds
@@ -24,7 +25,7 @@ glmm_data_es <- data_all_es %>%
          SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_Jul, ppt_Apr,
          ppt_pJunAug, ppt_JunAug, ppt_pJulSep, ppt_pOctDec,
-         ppt_pJunNov, wateryr, ppt_pAugJul,
+         ppt_pJunNov, wateryr, ppt_pAugJul, ppt_pJunSep,
          tmax_pAug, tmin_Feb, tmin_Mar,
          tmin_FebApr, tmax_pJulSep, tmin_JanMar, tmax_FebApr,
          tmin_pNovApr, tmax_pNovApr) %>%
@@ -46,9 +47,9 @@ save(glmm_data_es, file = "./data/formatted/glmm_data_es.Rdata")
 #Exploration
 
 #Missing data
-sum(is.na(glmm_data_es)) #66
+sum(is.na(glmm_data_es)) #556
 summary(glmm_data_es)
-#ASPECT
+#ASPECT - 556
 miss_asp_es <- unique(glmm_data_es$TRE_CN[is.na(glmm_data_es$ASPECT)]) #2
 asp_check_es <- per_cov %>%
   filter(TRE_CN %in% miss_asp_es)
@@ -61,13 +62,23 @@ length(unique(data_all_es$TRE_CN))
 length(unique(data_all_es$PLT_CN))
 #45
 
+which(glmm_data_es$RW == 0) #2611 (row number)
+#1 missing ring
+#replace with smallest rw of on same core
+#works
+glmm_data_es <- glmm_data_es %>%
+  group_by(TRE_CN) %>%
+  mutate(tdds = ifelse(RW != 0, dds, 
+                       (2*(min(RW[RW > 0]))*0.0393701)^2))
+which(is.na(glmm_data_es$RW)) #0
+which(glmm_data_es$dds == 0) #262
+which(glmm_data_es$tdds == 0) #0
+
+
 #distribution of the response variable
 hist(glmm_data_es$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
 hist(glmm_data_es$dds,breaks = 100, main = "Histogram of DDS (in)", xlab = "Increment") 
 
-which(glmm_data_es$RW == 0) #1396
-#1 missing ring
-which(is.na(glmm_data_es$RW)) #0
 
 #growth trends across time
 library(ggplot2)
