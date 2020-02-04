@@ -15,13 +15,14 @@ library(tidyverse)
 
 ## Data Summary
 
-```{r }
-load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/data_all_es.Rdata')
+```{r include=FALSE}
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_data_es.Rdata')
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/data_all_es.Rdata')
 ```
 
 My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Picea engelmannii* (Engelmann Spruce) in Utah. 
 
-```{r}
+```{r echo=FALSE, message=FALSE}
 library(maps)
 m = map_data('state', region = 'Utah')
 
@@ -37,7 +38,7 @@ ggplot() +
 
 I was able to extract and calculate annual data for 26 trees between the years of 1962 and 1994. 
 
-```{r}
+```{r eval=FALSE}
 #create new dataframe with only variables needed for model
 #response: RW, dds
 #fixed: SI, ASP, SL, DBH/DIA_C, BAL, CR, CCF, PCCF, climate
@@ -46,14 +47,14 @@ I was able to extract and calculate annual data for 26 trees between the years o
 min(data_all_es$MEASYEAR) #1992 -> 1962
 
 glmm_data_es <- data_all_es %>%
-  select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF,
+  dplyr::select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
+         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_Jul, ppt_Apr,
          ppt_pJunAug, ppt_JunAug, ppt_pJulSep, ppt_pOctDec,
-         ppt_pJunNov, wateryr,
+         ppt_pJunNov, wateryr, ppt_pAugJul, ppt_pJunSep,
          tmax_pAug, tmin_Feb, tmin_Mar,
          tmin_FebApr, tmax_pJulSep, tmin_JanMar, tmax_FebApr,
-         tmin_pNovApr,tmax_pNovApr) %>%
+         tmin_pNovApr, tmax_pNovApr) %>%
   filter(Year >= 1962)
 
 #climate
@@ -71,11 +72,11 @@ glmm_data_es <- data_all_es %>%
 My data, `glmm_data_es`, consists of raw radial increment, or ring width value, (`RW`) in mm and annual change in squared inside bark diameter (dds) in inches^2 with corresponding tree, climate, and site variables. Some variables stay constant, such as site index (`SICOND`), aspect (`ASPECT`), and slope (`SLOPE`), while diameter at breast height (`DIA_C`) and crown ratio (CR, CR_weib) vary annually. In addition, density variables, being basal area of trees larger than the subject tree (`BAL`), crown competition factor on the inventory point (`PCCF`), and stand crown competition factor (`CCF`), vary annually. Significant seasonal precipitation and temperature variables were identified based on tradition dendro analysis tools, using R packages `dplR` and `treeclim` (see `Climate-growth.Rmd`)
 
 
-##Exploration
+## Exploration
 
 It is necessary to explore the dataset to determine if the data complies with model assumptions (Zuur, Ieno, and Elphick 2010).
 
-###Normality
+### Normality
 
 The response variable, annual change in squared inside bark diameter (DDS), is continuous. It will be explained using a linear mixed model.
 
@@ -83,9 +84,9 @@ The response variable, annual change in squared inside bark diameter (DDS), is c
 par(mfrow=c(2,2))
 hist(glmm_data_es$RW,breaks = 50, 
      main = "Histogram of RW (mm)", xlab = "Increment")
-hist(glmm_data_es$dds,breaks = 100,
+hist(glmm_data_es$tdds,breaks = 100,
      main = "Histogram of DDS (in^2)", xlab = "Increment")
-hist(log(glmm_data_es$dds),breaks = 100, 
+hist(log(glmm_data_es$tdds),breaks = 100, 
      main = "Histogram of log(DDS)", xlab = "Increment")
 ```
 
@@ -94,18 +95,18 @@ The distribution of DDS is hightly skewed right, while the distribution of raw r
 ```{r}
 #Cleveland dotplot
 par(mfrow=c(1,2))
-dotchart(glmm_data_es$dds)
-dotchart(log(glmm_data_es$dds))
+dotchart(glmm_data_es$tdds)
+dotchart(log(glmm_data_es$tdds))
 ```
 
 A log transformation normalizes the distribution of DDS and gets rid of a majority of the outliers.
 
-###Zeros and Missing Data
+### Zeros and Missing Data
 
 ```{r}
-length(which(glmm_data_es$RW == 0)) #1
-#missing rings
-which(is.na(glmm_data_es$RW)) #0
+length(which(glmm_data_es$RW == 0)) #missing rings
+which(is.na(glmm_data_es$RW)) 
+which(glmm_data_es$tdds ==0)
 
 range_df <- glmm_data_es %>%
   select(TRE_CN,Year) %>%
@@ -122,7 +123,7 @@ ggplot(range_df, aes(year, as.character(TRE_CN))) +
 
 My data is unbalanced. All trees have a growth measurement for 1962, but the last year of growth is not the same for all trees. Some trees end growth in 1992, but some end in 1993 or 1994. There are no missing data in between first and last year of growth for each tree, and there is one year of zero growth for one tree, indicating a missing ring.
 
-###Random and Fixed Effects
+### Random and Fixed Effects
 
 In the linear mixed effects model, tree, stand, and climate variables will be fixed effects and a tree identifier and year of growth will be random effects.
 
@@ -174,14 +175,14 @@ par(mfrow=c(2,2))
 ggplot(data = glmm_data_es, aes(x = DIA_C, y = RW)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_data_es, aes(x = DIA_C, y = dds)) +
+ggplot(data = glmm_data_es, aes(x = DIA_C, y = tdds)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_data_es, aes(x = DIA_C, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = DIA_C, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
 #log to reduce heteroscedasticity
-ggplot(data = glmm_data_es, aes(x = log(DIA_C), y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = log(DIA_C), y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #positive relationship
 ```
@@ -191,7 +192,7 @@ Log transformation of DIA_C homogenizes variance and allows for linear relations
 Site index is a measure of site quality. It is the estimated height in feet of a tree on the site at a specific age (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_data_es, aes(x = SICOND, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = SICOND, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -200,7 +201,7 @@ There is a postive relationship between growth and site index, meaning growth in
 Slope is an estimated average at the subplot level, or condition level (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_data_es, aes(x = SLOPE, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = SLOPE, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -209,7 +210,7 @@ There is no relationship between growth and slope, and there is non-constant var
 Basal area of trees larger than the subject tree (BAL) is a calculated covariate at the plot level.
 
 ```{r}
-ggplot(data = glmm_data_es, aes(x = BAL, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = BAL, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -220,7 +221,7 @@ Crown competition factor is a measure of stand density (Krajicek et al. 1961). T
 Crown competitition factor on the inventory point where the tree is established (PCCF) is a calculated covariate on the plot level.
 
 ```{r}
-ggplot(data = glmm_data_es, aes(x = PCCF, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = PCCF, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -229,7 +230,7 @@ There is a negative relationship between growth and PCCF, and there is relativel
 Stand crown competition factor (CCF) is a calculated covariate on the plot level. It is a summation of PCCF on the plot.
 
 ```{r}
-ggplot(data = glmm_data_es, aes(x = CCF, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = CCF, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -239,10 +240,10 @@ Crown ratio (CR/CR_weib) is the percentage of the length of the tree with health
 
 ```{r}
 par(mfrow=c(1,2))
-ggplot(data = glmm_data_es, aes(x = CR, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = CR, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_data_es, aes(x = CR_weib, y = log(dds))) +
+ggplot(data = glmm_data_es, aes(x = CR_weib, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -251,7 +252,7 @@ There is a positive relationship between growth and CR and relatively constant v
 Based on the exploration, I will transform the response variable (dds) and DIA_C to linearize the relationship and reduce heterscedasticity and satisfy assumptions of normality of the response variable. I will also explore outliers with Cleveland dotplots. Normality and homogeneity will be further checked using the residuals of the final models.
 
 
-##Model Building
+## Model Building
 
 For now, I will use `lme4` to fit models. To fit a covariance-variance structure other than compound symmetry, I can use `nlme`. I may also explore the model fit options with `glmmTMB`.
 
@@ -267,7 +268,7 @@ The current large diameter growth model for Douglas fir in the Utah variant of F
 My growth model using tree ring and forest inventory data will be a linear mixed model.
 
 
-###Collinearity
+### Collinearity
 
 Using the full model with all the possile covariates, I will test for collinearity between predictors with the `car` package.
 
@@ -278,30 +279,8 @@ library(car)
 The Variance Inflation Factors (VIFs) are relatively low, showing no collinearity.
 
 
-##Model Selection
+## Model Selection
 
 Compare models via Akaike's Information Criterion. Check for homogeneity and normality using residuals.
 
-```{r}
-#es
-lmm_es_red <- lmer(log(dds+0.001)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR_weib+
-                 #climate
-                 z.wateryr*z.tmax_pAug+ #interaciton significant
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-               data = glmm_es_z)
-plot(effect("z.DIA_C",lmm_es_red),xlab = "DBH",main = "DBH")
-plot(effect("z.CR_weib",lmm_es_red),xlab = "Crown Ratio",main = "Crown Ratio")
-plot(effect("z.CCF",lmm_es_red),xlab = "CCF",main = "CCF")
-plot(effect("z.SICOND",lmm_es_red),xlab = "Site Index",main = "Site Index")
-plot(effect("z.SLOPE",lmm_es_red),xlab = "Slope",main = "Slope")
-plot(effect("z.wateryr",lmm_es_red),xlab = "Precipitation",main = "Precipitation")
-plot(effect("z.tmax_pAug",lmm_es_red),xlab = "Temperature",main = "Temperature")
-```
+
