@@ -15,13 +15,14 @@ library(tidyverse)
 
 ## Data Summary
 
-```{r }
-load(file = '/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/data_all_df.Rdata')
+```{r include=FALSE}
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_data_df.Rdata')
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/data_all_df.Rdata')
 ```
 
 My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Pseudotsuga menziesii* (Douglas fir) in Utah. 
 
-```{r echo=FALSE}
+```{r echo=FALSE, message=FALSE}
 library(maps)
 m = map_data('state', region = 'Utah')
 
@@ -37,7 +38,7 @@ ggplot() +
 
 I was able to extract and calculate annual data for 59 trees between the years of 1958 and 1995. 
 
-```{r}
+```{r eval=FALSE}
 #create new dataframe with only variables needed for model
 #response: RW, dds
 #fixed: SI, ASP, SL, DBH/DIA_C, BAL, CR, CCF, PCCF, climate
@@ -46,13 +47,14 @@ I was able to extract and calculate annual data for 59 trees between the years o
 min(data_all_df$MEASYEAR) #1988 -> 1958
 
 glmm_data_df <- data_all_df %>%
-  select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF,
+  ungroup() %>%
+  dplyr::select(PLT_CN, TRE_CN, RW, dds, Year, DIA_C, LAT,
+         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
          ppt_pOct, ppt_pDec, ppt_Jun, ppt_Jul,
          ppt_pJunAug, ppt_pAugOct, ppt_MayJul,
-         ppt_pJunNov, ppt_FebJul, wateryr,
+         ppt_pJunNov, ppt_FebJul, wateryr, ppt_pJunSep,
          tmin_Feb, tmax_Jul,
-         tmax_JunAug, tmax_pJulSep, tmin_JanMar, tmax_JanMar,
+         tmax_JunAug, tmax_pJulSep, tmin_JanMar,
          tmax_JanJun,tmin_JanJun,tmax_FebJul) %>%
   filter(Year >= 1958)
 
@@ -70,12 +72,6 @@ glmm_data_df <- data_all_df %>%
 
 My data, `glmm_data_df`, consists of raw radial increment, or ring width value, (`RW`) in mm and annual change in squared inside bark diameter (dds) in inches^2 with corresponding tree, climate, and site variables. Some variables stay constant, such as site index (`SICOND`), aspect (`ASPECT`), and slope (`SLOPE`), while diameter at breast height (`DIA_C`) and crown ratio (CR, CR_weib) vary annually. In addition, density variables, being basal area of trees larger than the subject tree (`BAL`), crown competition factor on the inventory point (`PCCF`), and stand crown competition factor (`CCF`), vary annually. Significant seasonal precipitation and temperature variables were identified based on tradition dendro analysis tools, using R packages `dplR` and `treeclim` (see `Climate-growth.Rmd`)
 
-```{r}
-glmm_data_df <- glmm_data_df %>%
-  mutate(DI = RW*2)
-```
-
-
 ## Exploration
 
 It is necessary to explore the dataset to determine if the data complies with model assumptions (Zuur, Ieno, and Elphick 2010).
@@ -88,9 +84,9 @@ The response variable, annual change in squared inside bark diameter (DDS), is c
 par(mfrow=c(2,2))
 hist(glmm_data_df$RW,breaks = 50, 
      main = "Histogram of RW (mm)", xlab = "Increment")
-hist(glmm_data_df$dds,breaks = 100,
+hist(glmm_data_df$tdds,breaks = 100,
      main = "Histogram of DDS (in^2)", xlab = "Increment")
-hist(log(glmm_data_df$dds),breaks = 100, 
+hist(log(glmm_data_df$tdds),breaks = 100, 
      main = "Histogram of log(DDS)", xlab = "Increment")
 ```
 
@@ -99,8 +95,8 @@ The distribution of DDS is skewed right, similarly to the distribution of raw ra
 ```{r}
 #Cleveland dotplot
 par(mfrow=c(1,2))
-dotchart(glmm_data_df$dds)
-dotchart(log(glmm_data_df$dds))
+dotchart(glmm_data_df$tdds)
+dotchart(log(glmm_data_df$tdds))
 ```
 
 A log transformation normalizes the distribution of DDS and gets rid of outliers.
@@ -108,9 +104,9 @@ A log transformation normalizes the distribution of DDS and gets rid of outliers
 ### Zeros and Missing Data
 
 ```{r}
-which(glmm_data_df$RW == 0) #0
-#no missing rings
-which(is.na(glmm_data_df$RW)) #0
+which(glmm_data_df$RW == 0) #missing rings
+which(is.na(glmm_data_df$RW))
+which(glmm_data_df$tdds ==0)
 
 range_df <- glmm_data_df %>%
   select(TRE_CN,Year) %>%
@@ -133,8 +129,8 @@ My data is unbalanced. Almost all trees have a growth measurement for 1958, but 
 In the linear mixed effects model, tree, stand, and climate variables will be fixed effects and a tree identifier and year of growth will be random effects.
 
 ```{r}
-length(unique(data_all_df$TRE_CN))
-length(unique(data_all_df$PLT_CN))
+length(unique(glmm_data_df$TRE_CN))
+length(unique(glmm_data_df$PLT_CN))
 ```
 
 There are almost as many unique plots as unique trees, so it is not necessary to have plots as a random effect as well.
@@ -181,15 +177,15 @@ par(mfrow=c(2,2))
 ggplot(data = glmm_data_df, aes(x = DIA_C, y = RW)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_data_df, aes(x = DIA_C, y = dds)) +
+ggplot(data = glmm_data_df, aes(x = DIA_C, y = tdds)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #non constant variance
 
-ggplot(data = glmm_data_df, aes(x = DIA_C, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = DIA_C, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
 #log to reduce heteroscedasticity
-ggplot(data = glmm_data_df, aes(x = log(DIA_C), y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = log(DIA_C), y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #negative relationship
 ```
@@ -197,7 +193,7 @@ ggplot(data = glmm_data_df, aes(x = log(DIA_C), y = log(dds))) +
 Site index is a measure of site quality. It is the estimated height in feet of a tree on the site at a specific age (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = SICOND, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = SICOND, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -206,7 +202,7 @@ There is a postive relationship between growth and site index, meaning growth in
 Slope is an estimated average at the subplot level, or condition level (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = SLOPE, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = SLOPE, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -215,7 +211,7 @@ There is a negative relationship between growth and slope, meaning growth decrea
 Basal area of trees larger than the subject tree (BAL) is a calculated covariate at the plot level.
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = BAL, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = BAL, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -226,7 +222,7 @@ Crown competition factor is a measure of stand density (Krajicek et al. 1961). T
 Crown competitition factor on the inventory point where the tree is established (PCCF) is a calculated covariate on the plot level.
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = PCCF, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = PCCF, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -235,7 +231,7 @@ There is a negative relationship between growth and PCCF, and there is relativel
 Stand crown competition factor (CCF) is a calculated covariate on the plot level. It is a summation of PCCF on the plot.
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = CCF, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = CCF, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -244,10 +240,10 @@ There is a negative relationship between growth and CCF. In addition, there is m
 Crown ratio (CR/CR_weib) is the percentage of the length of the tree with healthy foliage (FIA Database Description and User Guide for Phase 2). CR was extracted from the FIA Database for the measure year and copied backwards. CR_weib was back calculated using the Weibull distribution (Dixon 1985) on a plot level.
 
 ```{r}
-ggplot(data = glmm_data_df, aes(x = CR, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = CR, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_data_df, aes(x = CR_weib, y = log(dds))) +
+ggplot(data = glmm_data_df, aes(x = CR_weib, y = log(tdds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
