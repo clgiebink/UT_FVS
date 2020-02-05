@@ -22,9 +22,18 @@ swift_rad <- function(TRE_CN, LAT, SLOPE, ASPECT){
   #alternative route for poleward facing slope
   #when sum of the slope inclination + latitude of the slope exceeds 66
   #north poleward is azimuth/aspect <= 45 or >= 315
+  if((LAT+SLOPE > 66) & (LAT <= 45 | LAT >= 315)){
+    D1 <- cos(SLOPE) * cos(LAT) - sin(SLOPE) * sin(LAT) * cos(ASPECT)
+    ifelse(D1 == 0, D1 <- 0.0000000001, D1 <- D1)
+    L2 = atan(sin(SLOPE)*sin(ASPECT)/D1)
+    ifelse(D1 < 0, L2 <- L2+180, L2 <- L2)
+  }
+  else{
+    L2 <- atan((sin(SLOPE) * sin(ASPECT))/
+                            (cos(SLOPE) * cos(LAT) - sin(SLOPE) * sin(LAT) * cos(ASPECT)))
+  }
+  sol_rad_df$L2 <- L2
   
-  sol_rad_df$L2 <- atan((sin(SLOPE) * sin(ASPECT))/
-                 (cos(SLOPE) * cos(LAT) - sin(SLOPE) * sin(LAT) * cos(ASPECT)))
   #julian date in row
   #func1
   #Z = W - X * cos((J+Y) * 0.986)
@@ -69,17 +78,43 @@ swift_rad <- function(TRE_CN, LAT, SLOPE, ASPECT){
     ifelse(T6 > T0, T2 <- T6, T2 <- T0)
     
     #R4 is potential solar radiation for mountain slope
-    R4 <- R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T3-T2) / 15 + 
-                 cos(D) * cos(sol_rad_df$L1[i]) * (sin(T3+sol_rad_df$L2[i]) - 
-                                                     sin(T2+sol_rad_df$L2[i])) * 12/pi)
-    #TODO check for negatives
-    
+    if((LAT+SLOPE > 66) & (LAT <= 45 | LAT >= 315)){
+      ifelse(T3 < T2, (T2 <- 0) & (T3 <- 0), (T2 <- T2) & (T3 <- T3))
+      T6 <- T6 + 360
+      if(T6 < T1){
+        T8 <- T6
+        T9 <- T1
+        R4 <- R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T3-T2) / 15 + 
+                      cos(D) * cos(sol_rad_df$L1[i]) * (sin(T3+sol_rad_df$L2[i]) - sin(T2+sol_rad_df$L2[i])) * 12/pi) +
+          R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T9-T8) / 15 + 
+                  cos(D) * cos(sol_rad_df$L1[i]) * (sin(T9+sol_rad_df$L2[i]) - sin(T8+sol_rad_df$L2[i])) * 12/pi)
+      } else {
+        T7 <- T7 - 360
+        if(T7 > T0){
+          T8 <- T0
+          T9 <- T7
+          R4 <- R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T3-T2) / 15 + 
+                        cos(D) * cos(sol_rad_df$L1[i]) * (sin(T3+sol_rad_df$L2[i]) - sin(T2+sol_rad_df$L2[i])) * 12/pi) +
+            R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T9-T8) / 15 + 
+                    cos(D) * cos(sol_rad_df$L1[i]) * (sin(T9+sol_rad_df$L2[i]) - sin(T8+sol_rad_df$L2[i])) * 12/pi)
+        } else {
+          R4 <- R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T3-T2) / 15 + 
+                        cos(D) * cos(sol_rad_df$L1[i]) * (sin(T3+sol_rad_df$L2[i]) - sin(T2+sol_rad_df$L2[i])) * 12/pi)
+        }
+      }
+
+    } else {
+      R4 <- R1 + (sin(D) * sin(sol_rad_df$L1[i]) * (T3-T2) / 15 + 
+                    cos(D) * cos(sol_rad_df$L1[i]) * (sin(T3+sol_rad_df$L2[i]) - 
+                                                        sin(T2+sol_rad_df$L2[i])) * 12/pi)
+      #TODO check for negatives
+    }
     sol_rad_df$R4[i] <- R4
   }
   return(sol_rad_df$R4)
 }
 
-sol_rad_all <- data_all %>%
+sol_rad_test <- data_all %>%
   ungroup()%>%
   filter(SPCD %in% c(93, 122, 202)) %>%
   select(TRE_CN,LAT,SLOPE,tASPECT) %>%
