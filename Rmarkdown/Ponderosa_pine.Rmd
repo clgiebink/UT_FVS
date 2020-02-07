@@ -252,8 +252,6 @@ Based on the exploration, I will transform the response variable (dds) to satisf
 
 ## Model Building
 
-For now, I will use `lme4` to fit models. To fit a covariance-variance structure other than compound symmetry, I can use `nlme`. I may also explore the model fit options with `glmmTMB`.
-
 ```{r include=FALSE}
 library(lme4)
 library(lmerTest)
@@ -261,9 +259,71 @@ library(lmerTest)
 #library(glmmTMB)
 ```
 
-The current large diameter growth model for Douglas fir in the Utah variant of FVS is a multiple regression.
+```{r echo=FALSE}
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_pp_z.Rdata')
+```
 
-My growth model using tree ring and forest inventory data will be a linear mixed model.
+The current large-diameter growth model for the UT variant of FVS is a multiple regression.
+
+* SICOND: species site index on a 50-year age basis
+* ASPECT: stand aspect
+* SLOPE: stand slop
+* DIA_C: tree diameter at breast height
+* BAL: total basal area in trees larger than the subject tree
+* CR_weib: tree's live crown ratio expressed as proportion
+* PCCF: crown competition factor on the subplot level
+* CCF: stand crown competition factor
+
+All the covariates above are significant in the current model for ponderosa pine, except crown competition factor (CCF). In the model, the response variable (dds) and diameter at breast height (DIA_C) are log transformed to linearize the relationship. Basal area of larger trees than the subject tree (BAL) and CCF are divided by 100 to encourage model convergence. Below the structure for the current model is applied to annualized data set.
+
+```{r eval=FALSE}
+#current growth model with tree ring data (annual)
+#ccf insignificant in current lm
+lm_pp <- lm(log(dds)~
+           #tree variables
+           I(log(DIA_C))+I(DIA_C^2)+
+           CR_weib+I(CR_weib^2)+
+           #climate
+           #competition/density
+           I(BAL/100)+PCCF+I(CCF/100)+
+           #site variables
+           SICOND+SLOPE+I(SLOPE^2)+
+           I(sin(ASPECT-0.7854)*SLOPE)+
+           I(cos(ASPECT-0.7854)*SLOPE),
+              data = glmm_pp_z)
+```
+
+Since there is a lot of unaccounted for variability due to individual tree and year differences, the updated model will be a mixed effects model. A random intercept on Tree ID and Year will be added to account for different baselines. A random slope on DIA_C for each year will serve as a detrending method to reduce the age effect in growth.
+
+For now, I will use `lme4` to fit models. To fit a covariance-variance structure other than compound symmetry, I can use `nlme`. I may also explore the model fit options with `glmmTMB`.
+
+Covariates are standardized, or mean-centered and divided by SD, to encourage model converage, which means there is no need for BAL and CCF to be divided by 100. In addition, the log transformation on DIA_C is problematic because a log of a negative number is impossible. Therefore, the log transformation on DIA_C will be removed.
+
+
+# Annual Model of Tree Growth
+
+```{r}
+#add random effects
+#random intercept for each tree
+#random intercept for each year
+#random slope on DBH for each tree (detrending method)
+annual_pp <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+I(z.CR_weib^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_pp_z)
+AIC(annual_pp)
+```
+
+## Model Selection
 
 ### Collinearity
 
@@ -273,8 +333,441 @@ Using the full model with all the possile covariates, I will test for collineari
 library(car)
 ```
 
+```{r}
+vif(annual_pp)
+```
+
+A Variance Inflation Factor (VIF) above 3 shows strong collinearity; therefore, crown ratio (CR_weib) and basal area of trees larger than the subject tree (BAL) appear to be correlated. Slope and slope squared as well as crown competition factor of the subplot (PCCF) and the stand (CCF) seem to be mildly correlated.
+
+```{r}
+#reduce
+#BAL
+an_pp_red <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+I(z.CR_weib^2)+
+                    #climate
+                    #competition/density
+                    z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_pp_z)
+AIC(an_pp_red)
+vif(an_pp_red)
+```
+
+With VIF scores below 3, the model can be reduced based on significance or importance (i.e. coeficient value).
+
+```{r}
+summary(an_pp_red)$coef
+```
+
+`CR_weib`*^2* can be removed based on significance. `PCCF` can be removed based on significance and suspected collinearity with `CCF`, which describes the same process: competition. Finally, `SLOPE`*^2* can be removed based on significance.
+
+```{r}
+#reduce
+#CR^2, PCCF, Slope^2
+an_pp_red <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+
+                    #climate
+                    #competition/density
+                    z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+
+                    z.sin+z.cos+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_pp_z)
+AIC(an_pp_red)
+summary(an_pp_red)$coef
+```
+
+We could also try substituting `sin` and `cos`, the radiation parameters, for a single solar radiation parameter, such as the Swift's solar radiation potential (1976).
+
+# Annual Model with Climate
+
+A tree's growth response is also influenced by climate, or temperature and precipitation, during the growing season. By annualizing the model with tree rings, climate can be included as a covariate. `ppt_` is the total precipitation over the following monthly range. `tmin/max_` is the average temperature over the following monthly range. Climate variables were chosen based on model AIC score, as well as ability to project into the future (e.g. `wateryr`).
+
+```{r}
+#add climate
+#for pp, previous Oct is the most correlated
+#with pAug-Oct giving the best AIC
+#however a specific seasonal range of precipitation might be hard to predict
+#use 16mon pJun-Sep
+#better AIC than wateryear
+clim_1_pp <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+I(z.CR_weib^2)+
+                    #climate
+                    z.ppt_pAugOct+z.tmax_JunAug+ #interaction not significant
+                    #competition/density
+                    z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                  data = glmm_pp_z)
+AIC(clim_1_pp)
+clim_16_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_weib+I(z.CR_weib^2)+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                     z.sin+z.cos+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+AIC(clim_16_pp)
+```
+
 
 ## Model Selection
 
-Compare models via Akaike's Information Criterion. Check for homogeneity and normality using residuals.
+### Collinearity
+
+```{r}
+vif(clim_16_pp)
+```
+
+Crown ratio (CR_weib) and basal area of trees larger than the subject tree (BAL) are correlated. Slope and slope squared as well as crown competition factor of the subplot (PCCF) and the stand (CCF) seem to be mildly correlated.
+
+```{r warning=FALSE}
+#reduce
+#BAL
+clim_red_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_weib+I(z.CR_weib^2)+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+
+                     #competition/density
+                     z.PCCF+z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                     z.sin+z.cos+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+AIC(clim_red_pp)
+vif(clim_red_pp)
+```
+
+With VIF scores below 3, the model can be reduced based on significance or importance (i.e. coeficient value).
+
+```{r}
+summary(clim_red_pp)$coef
+```
+
+`CR_weib`*^2* can be removed based on significance. `PCCF` can be removed based on significance and suspected collinearity with `CCF`, which describes the same process: competition. Finally, `SLOPE`*^2* can be removed based on significance.
+
+```{r}
+#reduce
+#CR2, PCCF, SLOPE2
+clim_red_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_weib+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+
+                     #competition/density
+                     z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     z.sin+z.cos+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_pp_z)
+AIC(clim_red_pp)
+summary(clim_red_pp)$coef
+```
+
+We could also try substituting `sin` and `cos`, the radiation parameters, for a single solar radiation parameter, such as the Swift's solar radiation potential (1976).
+
+## Model Diagnostics
+
+### Test of Normality
+
+The linear mixed effect model assumes a Gaussian (normal) distribution. To test that assumption, a quantile-quantile (qq) plot will plot our distribution against a normal distribution.
+
+
+```{r echo=FALSE}
+#residuals
+par(mfrow=c(2,2))
+
+#full annual
+resid_annual<- residuals(annual_pp,type="pearson",scaled=TRUE)
+qqnorm(resid_annual,main="QQ plot of Full Annual")
+qqline(resid_annual)
+hist(resid_annual, breaks = 50, main = "Histogram of Full Annual Residuals")
+
+#annual reduced
+resid_annred <- residuals(an_pp_red,type="pearson",scaled=TRUE)
+qqnorm(resid_annred,main="QQ plot of Reduced Annual")
+qqline(resid_annred)
+hist(resid_annred, breaks = 50, main = "Histogram of Reduced Annual Residuals")
+
+#clim_16
+resid_clm<- residuals(clim_16_pp,type="pearson",scaled=TRUE)
+qqnorm(resid_clm,main="QQ plot of Full Climate")
+qqline(resid_clm)
+hist(resid_clm, breaks = 50, main = "Histogram of Full Climate Residuals")
+
+#clim_16_red
+resid_clmred <- residuals(clim_red_pp,type="pearson",scaled=TRUE)
+qqnorm(resid_clmred,main="QQ plot of Reduced Climate")
+qqline(resid_clmred)
+hist(resid_clmred, breaks = 50, main = "Histogram of Reduced Climate Residuals")
+```
+
+### Test of Homoscedasticity
+
+```{r include=FALSE}
+library(gplots)
+```
+
+To test if my transformed residuals have a constant variance with a mean of zero, I will plot transformed residuals vs predicted values.
+
+```{r}
+par(mfrow=c(2,2))
+pred_annual <- predict(annual_pp, type="response")
+plotLowess(resid_annual~pred_annual, ylab="Residuals",xlab="Predicted", main="Full Annual")
+pred_annred <- predict(an_pp_red, type="response")
+plotLowess(resid_annred~pred_annred, ylab="Residuals",xlab="Predicted", main="Reduced Annual")
+pred_clm <- predict(clim_16_pp, type="response")
+plotLowess(resid_clm~pred_clm, ylab="Residuals",xlab="Predicted", main="Full Climate")
+pred_clmred <- predict(clim_red_pp, type="response")
+plotLowess(resid_clmred~pred_clmred, ylab="Residuals",xlab="Predicted", main="Reduced Climate")
+```
+
+We can also test if residuals have a constant variance against predictor variables. Below plots are only given for the reduced climate model, but more models can be plotted.
+
+```{r echo=FALSE}
+par(mfrow=c(2,2))
+#dbh
+plotLowess(resid_clmred~z.DIA_C,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: DBH")
+#plotLowess(resid_lmm1~z.DIA_C,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+#CR
+plotLowess(resid_clmred~z.CR_weib,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: CR")
+#plotLowess(resid_lmm1~z.CR_weib,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+#precip
+plotLowess(resid_clmred~z.ppt_pJunSep,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: Precip") 
+#plotLowess(resid_lmm1~z.ppt_pJunSep,data = glmm_pp_z,ylab="Residuals",main="LMM1") 
+#temp
+plotLowess(resid_clmred~z.tmax_JunAug,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: Temp")
+#plotLowess(resid_lmm1~z.tmax_JunAug,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+#CCF
+plotLowess(resid_clmred~z.CCF,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: CCF")
+#plotLowess(resid_lmm1~z.CCF,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+#SI
+plotLowess(resid_clmred~z.SICOND,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: SI")
+#plotLowess(resid_lmm1~z.SICOND,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+#Slope
+plotLowess(resid_clmred~z.SLOPE,data = glmm_pp_z,ylab="Residuals",main="Climate Reduced: Slope")
+#plotLowess(resid_lmm1~z.SLOPE,data = glmm_pp_z,ylab="Residuals",main="LMM1")
+```
+
+
+### Mining
+
+```{r}
+#reduced models
+#BALIVE
+
+
+```
+
+
+## Visualization
+
+```{r include=FALSE}
+library(broom.mixed)
+library(dotwhisker)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+full_an_pp <-  tidy(annual_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Full Annual")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope"))
+red_an_pp <-  tidy(an_pp_red) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Reduced Annual")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope"))
+full_clim_pp <-  tidy(clim_16_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Full Climate")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope"))
+red_clim_pp <-  tidy(clim_red_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Reduced Climate")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope"))
+models_pp <- full_join(full_an_pp,red_an_pp) %>%
+  full_join(.,full_clim_pp) %>%
+  full_join(.,red_clim_pp)
+dwplot(models_pp, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Growth for Ponderosa pine") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+## Interpretation
+
+We can start to understand the influence of the covariate on the response variable, tree growth, with the `effects` package. Keeping all other variables constant, it shows the effect of the covariate on the reponse.
+
+```{r include=FALSE}
+library(effects)
+```
+
+### Diameter at Breast Height
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.DIA_C",annual_pp),xlab = "DBH",main = "Full Annual")
+plot(effect("z.DIA_C",an_pp_red),xlab = "DBH",main = "Reduced Annual")
+plot(effect("z.DIA_C",clim_16_pp),xlab = "DBH",main = "Full Climate")
+plot(effect("z.DIA_C",clim_red_pp),xlab = "DBH",main = "Reduced Climate")
+```
+
+### Crown Ratio
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.CR_weib",annual_pp),xlab = "Crown Ratio",main = "Full Annual")
+plot(effect("z.CR_weib",an_pp_red),xlab = "Crown Ratio",main = "Reduced Annual")
+plot(effect("z.CR_weib",clim_16_pp),xlab = "Crown Ratio",main = "Full Climate")
+plot(effect("z.CR_weib",clim_red_pp),xlab = "Crown Ratio",main = "Reduced Climate")
+```
+
+### Crown Competition Factor
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.CCF",annual_pp),xlab = "CCF",main = "Full Annual")
+plot(effect("z.CCF",an_pp_red),xlab = "CCF",main = "Reduced Annual")
+plot(effect("z.CCF",clim_16_pp),xlab = "CCF",main = "Full Climate")
+plot(effect("z.CCF",clim_red_pp),xlab = "CCF",main = "Reduced Climate")
+```
+
+### Site Index
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.SICOND",annual_pp),xlab = "Site Index",main = "Full Annual")
+plot(effect("z.SICOND",an_pp_red),xlab = "Site Index",main = "Reduced Annual")
+plot(effect("z.SICOND",clim_16_pp),xlab = "Site Index",main = "Full Climate")
+plot(effect("z.SICOND",clim_red_pp),xlab = "Site Index",main = "Reduced Climate")
+```
+
+### Slope
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.SLOPE",annual_pp),xlab = "Slope",main = "Full Annual")
+plot(effect("z.SLOPE",an_pp_red),xlab = "Slope",main = "Reduced Annual")
+plot(effect("z.SLOPE",clim_16_pp),xlab = "Slope",main = "Full Climate")
+plot(effect("z.SLOPE",clim_red_pp),xlab = "Slope",main = "Reduced Climate")
+```
+
+### Radiation
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.sin",annual_pp),xlab = "sin(Aspect-0.7854)*Slope",main = "Full Annual")
+plot(effect("z.sin",an_pp_red),xlab = "sin(Aspect-0.7854)*Slope",main = "Reduced Annual")
+plot(effect("z.sin",clim_16_pp),xlab = "sin(Aspect-0.7854)*Slope",main = "Full Climate")
+plot(effect("z.sin",clim_red_pp),xlab = "sin(Aspect-0.7854)*Slope",main = "Reduced Climate")
+```
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(2,2))
+plot(effect("z.cos",annual_pp),xlab = "cos(Aspect-0.7854)*Slope",main = "Full Annual")
+plot(effect("z.cos",an_pp_red),xlab = "cos(Aspect-0.7854)*Slope",main = "Reduced Annual")
+plot(effect("z.cos",clim_16_pp),xlab = "cos(Aspect-0.7854)*Slope",main = "Full Climate")
+plot(effect("z.cos",clim_red_pp),xlab = "cos(Aspect-0.7854)*Slope",main = "Reduced Climate")
+```
+
+### Climate
+
+```{r echo=FALSE, fig.width=3.5,fig.height=3}
+par(mfrow=c(1,2))
+plot(effect("z.ppt_pJunSep",clim_16_pp),xlab = "Precipitation",main = "Full Climate")
+plot(effect("z.ppt_pJunSep",clim_red_pp),xlab = "Precipitation",main = "Reduced Climate")
+plot(effect("z.tmax_JunAug",clim_16_pp),xlab = "Temperature",main = "Full Climate")
+plot(effect("z.tmax_JunAug",clim_red_pp),xlab = "Temperature",main = "Reduced Climate")
+```
+```{r echo}
+plot(effect("z.ppt_pJunSep:z.tmax_JunAug",clim_16_pp),xlab = "Interaction",main = "Full Climate")
+plot(effect("z.ppt_pJunSep:z.tmax_JunAug",clim_red_pp),xlab = "Interaction",main = "Reduced Climate")
+```
 
