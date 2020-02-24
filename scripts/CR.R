@@ -206,6 +206,7 @@ colnames(plot_data_cr)[colnames(plot_data_cr)=="CN"] <- "TRE_CN"
 plot_data_cr$MEASYEAR <- plot$MEASYEAR[match(plot_data_cr$PLT_CN, plot$CN)]
 plot_data_cr$DESIGNCD <- plot$DESIGNCD[match(plot_data_cr$PLT_CN, plot$CN)]
 plot_data_cr$CONDID <- cond$CONDID[match(plot_data_cr$PLT_CN, cond$PLT_CN)]
+plot_data_cr$SDImax <- cond$SDIMAX_RMRS[match(plot_data_cr$PLT_CN, cond$PLT_CN)]
 
 #check
 length(plot_crtest) #129
@@ -266,7 +267,9 @@ for(i in 1:nrow(valcr_check)){
   Species <- valcr_check$SPCD[i]
   if(Species %in% CR_WEIB_df$species){
     #SDI max values for each species were pulled from UT Variant overview
-    SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species]
+    ifelse(is.na(valcr_check$SDImax),
+           SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+           SDIMAX <- valcr_check$SDImax[i])
     #Calculate relative density
     RD <- valcr_check$SDI[i]/SDIMAX
     
@@ -322,6 +325,6 @@ for(i in 1:nrow(valcr_check)){
 cr_reg <- lm(CR_weib~UNCRCD,data = valcr_check)
 summary(cr_reg)
 #             Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 70.028987   1.826586  38.339   <2e-16 ***
-#  UNCRCD      -0.003219   0.022129  -0.145    0.884 
+#(Intercept) 70.067779   1.828172  38.327   <2e-16 ***
+#UNCRCD      -0.004857   0.022149  -0.219    0.826     
 plot(valcr_check$UNCRCD,valcr_check$CR_weib)
