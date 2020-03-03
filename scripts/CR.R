@@ -17,17 +17,15 @@ density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
   mutate(SDI = sum((DIA_C/10)^1.6)) 
 
-#mutate(SDI = ifelse(SDI == 0, NA, SDI))
-#ungroup?
-
+#number of trees on plot for a given year
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
   mutate(num_t = length(unique(TRE_CN)))
 
 save(density_data, file = "./data/formatted/density_data.Rdata")
 
-#done with density
-#CR computationally expensive so fitler out trees i don't need (miss_data)
+#done with nonfocal trees on plot
+#CR computationally expensive so fitler out trees I don't need (miss_data)
 length(unique(incr_imputed$TRE_CN))
 #[1] 568
 incr_tre <- unique(incr_imputed$TRE_CN)
@@ -71,12 +69,9 @@ load('./data/formatted/incr_calcov')
 #Calculations from John Shaw (2000; Stage 1968)
 #SDI = sum((DIA_t/10)^1.6)
 
-
 #Crown Competition Factor (CCF - for stand)
 #Refer to variant overview for how to calculate CCF
 #calculated in CCF.R script
-
-head(density_data)
 
 #####################################
 #Step 2:
@@ -117,7 +112,6 @@ CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
 
 CR_weib <- vector(mode="numeric", length=nrow(incr_calcov))
 for(i in 1:nrow(incr_calcov)){
-  #Function arguments:
   #SPCD - is number code of species of tree record
   #SDI - is SDI of stand (Stage 1968)
   Species <- incr_calcov$SPCD[i]
@@ -187,17 +181,17 @@ cr_check<- incr_calcov %>%
   filter(MEASYEAR == Year)
 
 #Also FVS does have logic for adjusting a tree's crown ratio for top-kill 
-#I did not include this in the script.
+#not included
 
 #Validation ----
 #use validation trees (2000 and after)
 #which have measured uncompacted crown ratio (UNCRCD)
 
-load(file = './data/formatted/val_crtest.Rdata')
+load(file = './data/formatted/val_dset.Rdata')
 
 #get trees on same plot
-plot_crtest <- unique(val_crtest$PLT_CN)
-tree_crtest <- unique(val_crtest$TRE_CN)
+plot_crtest <- unique(val_dset$PLT_CN)
+tree_crtest <- unique(val_dset$TRE_CN)
 plot_data_cr <- tree[(tree$PLT_CN %in% plot_crtest),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ","UNCRCD")]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including validation trees
@@ -206,19 +200,22 @@ colnames(plot_data_cr)[colnames(plot_data_cr)=="CN"] <- "TRE_CN"
 plot_data_cr$MEASYEAR <- plot$MEASYEAR[match(plot_data_cr$PLT_CN, plot$CN)]
 plot_data_cr$DESIGNCD <- plot$DESIGNCD[match(plot_data_cr$PLT_CN, plot$CN)]
 plot_data_cr$CONDID <- cond$CONDID[match(plot_data_cr$PLT_CN, cond$PLT_CN)]
+plot_data_cr$SDI <- cond$SDI_RMRS[match(plot_data_cr$PLT_CN, cond$PLT_CN)]
 plot_data_cr$SDImax <- cond$SDIMAX_RMRS[match(plot_data_cr$PLT_CN, cond$PLT_CN)]
 
 #check
-length(plot_crtest) #129
-length(unique(plot_data_cr$PLT_CN)) #129
+length(plot_crtest) #85
+length(unique(plot_data_cr$PLT_CN)) #85
 
 #First need to calcuate SDI
 #Calculations from John Shaw (2000; Stage 1968)
 #SDI = sum((DIA_t/10)^1.6)
 #then number of trees on a plot
+#rank in the diameter distribution
 plot_data_cr <- plot_data_cr %>%
   group_by(PLT_CN) %>%
-  mutate(SDI = sum((DIA/10)^1.6),
+  mutate(stage_sum = (DIA/10)^1.6,
+         SDI_stage = sum(stage_sum),
          num_t = length(unique(TRE_CN)),
          rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
 
@@ -250,13 +247,14 @@ for(i in 1:nrow(plot_data_cr)){
   plot_data_cr$CCF_t[i] <- CCF_t
 }
 
+#crown competition factor on a stand
 plot_data_cr <- plot_data_cr %>%
   group_by(PLT_CN) %>%
   mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
 
 #CR
 #first filter for focal species
-length(tree_crtest) #1082
+length(tree_crtest) #905
 valcr_check <- plot_data_cr %>%
   filter(TRE_CN %in% tree_crtest)
 
@@ -267,11 +265,14 @@ for(i in 1:nrow(valcr_check)){
   Species <- valcr_check$SPCD[i]
   if(Species %in% CR_WEIB_df$species){
     #SDI max values for each species were pulled from UT Variant overview
-    ifelse(is.na(valcr_check$SDImax),
+    ifelse(is.na(valcr_check$SDImax[i]),
            SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
            SDIMAX <- valcr_check$SDImax[i])
     #Calculate relative density
-    RD <- valcr_check$SDI[i]/SDIMAX
+    ifelse(is.na(valcr_check$SDI[i]),
+           SDI <- valcr_check$SDI_stage[i],
+           SDI <- valcr_check$SDI[i])
+    RD <- SDI/SDIMAX
     
     #Calculate average stand crown ratio (ACR) for each species in the stand
     d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
@@ -325,6 +326,6 @@ for(i in 1:nrow(valcr_check)){
 cr_reg <- lm(CR_weib~UNCRCD,data = valcr_check)
 summary(cr_reg)
 #             Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 70.067779   1.828172  38.327   <2e-16 ***
-#UNCRCD      -0.004857   0.022149  -0.219    0.826     
+#(Intercept) 55.77157    2.12068  26.299  < 2e-16 ***
+#UNCRCD       0.07914    0.02568   3.081  0.00212 **  
 plot(valcr_check$UNCRCD,valcr_check$CR_weib)
