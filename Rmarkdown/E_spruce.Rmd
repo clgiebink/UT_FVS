@@ -392,6 +392,23 @@ summary(an_red_es)$coef
 
 We could also try substituting `sin` and `cos`, the radiation parameters, for a single solar radiation parameter, such as the Swift's solar radiation potential (1976).
 
+```{r}
+an_red_es <- lmer(log(tdds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR_weib+
+                    #climate
+                    #competition/density
+                    z.BAL+#z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                        data = glmm_es_z)
+AIC(an_red_es)
+summary(an_red_es)$coef
+```
+
 # Annual Model with Climate
 
 A tree's growth response is also influenced by climate, or temperature and precipitation, during the growing season. By annualizing the model with tree rings, climate can be included as a covariate. `ppt_` is the total precipitation over the following monthly range. `tmin/max_` is the average temperature over the following monthly range. Climate variables were chosen based on model AIC score, as well as ability to project into the future (e.g. `wateryr`).
@@ -501,6 +518,26 @@ summary(clim_red_es)$coef
 ```
 
 We could also try substituting `sin` and `cos`, the radiation parameters, for a single solar radiation parameter, such as the Swift's solar radiation potential (1976).
+
+```{r}
+#reduce
+#sin+cos
+clim_red_es <- lmer(log(tdds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_weib+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = glmm_es_z)
+AIC(clim_red_es)
+summary(clim_red_es)$coef
+```
 
 ## Model Diagnostics
 
