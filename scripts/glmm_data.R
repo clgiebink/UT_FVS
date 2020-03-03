@@ -10,10 +10,30 @@ library(tidyverse)
 load(file = "./data/formatted/incr_calcov")
 
 #forest service predicts change in squared inside bark diameter
-#TODO convert ring width from mm to inches
+#convert ring width from mm to inches
 #RW = RW * 0.0393701
-incr_calcov <- incr_calcov %>%
-  mutate(dds = (2*RW*0.0393701)^2)
+#DG = 2*RW
+#dds = (dib + (2*RW))^2 - dib^2
+#dib = DBH/k
+#k = 1/BRATIO
+#BRATIO = b1 + b2/(DBH^exp)
+bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
+                        #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,96=BS,106=PI,108=LP,133=PM,321=OH
+                        b1 = c(0.9502,0.867,0.8967,0.890,0.890,0.9002,0.9502,0.9002,0.9625,0.9002,0.93789),
+                        b2 = c(-0.2528, 0, -0.4448,0,0,-0.3089,-0.2528,-0.3089,-0.1141,-0.3089,-0.24096),
+                        exp = c(1,0,1,0,0,1,1,1,1,1,1)) #can add more species later 
+for(i in 1:nrow(incr_calcov)){
+  Species <- incr_calcov$SPCD[i]
+  #BRATIO = b1+b2/(DBH^exp)
+  b1 <- bratio_df$b1[bratio_df$species == Species]
+  b2 <- bratio_df$b2[bratio_df$species == Species]
+  exp <- bratio_df$exp[bratio_df$species == Species]
+  BRATIO <- b1 + b2/(incr_calcov$DIA_C[i]^exp) #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
+  #k = 1/BRATIO
+  k <- 1/BRATIO
+  dib <- incr_calcov$DIA_C[i]/k
+  incr_calcov$dds[i] <- (dib + (2*incr_calcov$RW[i]*0.0393701))^2 - dib^2
+}
 
 #add climate variables
 #and make sure it is reproducible in case more are needed
