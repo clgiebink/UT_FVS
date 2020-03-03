@@ -258,153 +258,161 @@ summary(fvs_clim_red)
 #total ppt
 #1 month: Jul, Apr
 #3 month: pJun-pAug, Jun-Aug, pJul-pSep, pOct-pDec
-#6 month + : pNov, wateryr
+#6 month + : pNov, wateryr, pJunSep
 
-fvs_clim_1 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                       I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                       I(log(DIA_C))+I(BAL/100)+CR_weib+
-                       I(DIA_C^2)+PCCF+I(CCF/100)+
-                       ppt_Jul+tmax_pAug+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_es_z)
-fvs_clim_2 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                       I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                       I(log(DIA_C))+I(BAL/100)+CR_weib+
-                       I(DIA_C^2)+PCCF+I(CCF/100)+
-                       ppt_Apr+tmax_pAug+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_es_z)
-fvs_clim_3 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                       I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                       I(log(DIA_C))+I(BAL/100)+CR_weib+
-                       I(DIA_C^2)+PCCF+I(CCF/100)+
-                       ppt_pJunAug+tmax_pAug+
-                       (1+DIA_C|TRE_CN)+(1|Year),
-                     data = glmm_es_z)
-fvs_clim_4 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_1 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_Jul+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_5 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJulSep+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_2 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_Apr+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_6 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pOctDec+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_3 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pJunAug+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_7 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunNov+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_4 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_JunAug+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_8 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     wateryr+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_5 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pJulSep+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,fvs_clim_4,
-           fvs_clim_5,fvs_clim_6,fvs_clim_7,fvs_clim_8)
+fvs_clim_6 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pOctDec+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_es_z)
+fvs_clim_7 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pJunNov+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_es_z)
+fvs_clim_8 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_es_z)
+fvs_clim_9 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.ppt_pJunSep+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   data = glmm_es_z)
+AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,fvs_clim_4,fvs_clim_5,
+    fvs_clim_6,fvs_clim_7,fvs_clim_8,fvs_clim_9)
 #          df      AIC
-#fvs_clim_1 18 1824.233
-#fvs_clim_2 18 1824.192
-#fvs_clim_3 18 1818.055**pJunAug
-#fvs_clim_4 18 1824.221*JunAug after temp change
-#fvs_clim_5 18 1820.753
-#fvs_clim_6 18 1826.431
-#fvs_clim_7 18 1824.770
-#fvs_clim_8 18 1827.574
+#fvs_clim_1 19 4674.297
+#fvs_clim_2 19 4673.272
+#fvs_clim_3 19 4673.247
+#fvs_clim_4 19 4673.815
+#fvs_clim_5 19 4674.047
+#fvs_clim_6 19 4672.550
+#fvs_clim_7 19 4674.080
+#fvs_clim_8 19 4671.046*wateryear
+#fvs_clim_9 19 4671.478*pJunSep
 
 #temperature
 #1 month: tmax_pAug, Feb, Mar
 #3 month: tmin_Feb-Apr, tmax_pJul-pSep, tmin_Jan-Mar
 #6 month + : tmin_Apr
-fvs_clim_1 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmax_pAug+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_1 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmax_pAug+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_2 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmin_Feb+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_2 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmin_Feb+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_21 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmax_Feb+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_21 <- lmer(log(tdds)~z.SICOND+z.sin+
+                      z.cos+z.SLOPE+I(z.SLOPE^2)+
+                      z.DIA_C+I(BAL/100)+CR_weib+
+                      I(z.DIA_C^2)+z.PCCF+z.CCF+
+                      z.wateryr+z.tmax_Feb+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_3 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmin_Mar+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_3 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmin_Mar+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_31 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmax_Mar+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_31 <- lmer(log(tdds)~z.SICOND+z.sin+
+                      z.cos+z.SLOPE+I(z.SLOPE^2)+
+                      z.DIA_C+I(BAL/100)+CR_weib+
+                      I(z.DIA_C^2)+z.PCCF+z.CCF+
+                      z.wateryr+z.tmax_Mar+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_4 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmin_FebApr+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_4 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmin_FebApr+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_5 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmax_pJulSep+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_5 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmax_pJulSep+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_6 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmin_JanMar+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_6 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmin_JanMar+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-fvs_clim_7 <- lmer(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
-                     I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
-                     I(log(DIA_C))+I(BAL/100)+CR_weib+
-                     I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_JunAug+tmin_pNovApr+
-                     (1+DIA_C|TRE_CN)+(1|Year),
+fvs_clim_7 <- lmer(log(tdds)~z.SICOND+z.sin+
+                     z.cos+z.SLOPE+I(z.SLOPE^2)+
+                     z.DIA_C+I(BAL/100)+CR_weib+
+                     I(z.DIA_C^2)+z.PCCF+z.CCF+
+                     z.wateryr+z.tmin_pNovApr+
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    data = glmm_es_z)
-AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,fvs_clim_4,
-    fvs_clim_5,fvs_clim_6,fvs_clim_7)
+AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,
+    fvs_clim_4,fvs_clim_5,fvs_clim_6,fvs_clim_7)
 #          df      AIC
-#fvs_clim_1 18 1796.345**pAug 1794
-#fvs_clim_2 18 1819.616
-#fvs_clim_3 18 1817.436
-#fvs_clim_4 18 1818.055
-#fvs_clim_5 18 1797.422**pJulSep
-#fvs_clim_6 18 1817.751
-#fvs_clim_7 18 1817.683
+#fvs_clim_1 19 4671.046**pAug
+#fvs_clim_2 19 4704.564
+#fvs_clim_3 19 4703.738
+#fvs_clim_4 19 4704.307
+#fvs_clim_5 19 4673.249**pJulSep
+#fvs_clim_6 19 4704.269
+#fvs_clim_7 19 4704.287
 
 summary(fvs_clim_1)
 #remove based on significance
@@ -578,7 +586,7 @@ summary(lmm1_reds2_pp)
 
 #try different competition factors
 #with CR
-lmm2_cr_es <- lmer(log(dds + 0.001)~
+lmm2_cr_es <- lmer(log(tdds)~
                      #tree variables
                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                      z.CR_weib+
@@ -633,55 +641,58 @@ AIC(lmm2_ccf_es)
 #1850.598
 
 #two
-lmm2_crf_es <- lmer(log(dds+ 0.001)~
+lmm_crf_es <- lmer(log(tdds)~
                       #tree variables
                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                       z.CR_weib+
                       #climate
-                      z.ppt_pAugJul+z.tmax_pAug+
+                      z.ppt_pJunSep*z.tmax_pAug+
                       #competition/density
                       z.CCF+ #remove /100 due to standardization
                       #site variables
                       z.SICOND+z.SLOPE+
+                     z.sin+z.cos+
                       #random effects
                       (1+z.DIA_C|TRE_CN)+(1|Year),
                     data = glmm_es_z)
-summary(lmm2_crf_es)
-AIC(lmm2_crf_es)
+summary(lmm_crf_es)
+AIC(lmm_crf_es)
 #1856.008
 
-lmm2_crbal_es <- lmer(log(dds+ 0.001)~
+lmm_crbal_es <- lmer(log(tdds)~
                       #tree variables
                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                       z.CR_weib+
                       #climate
-                      z.ppt_pAugJul+z.tmax_pAug+
+                      z.ppt_pJunSep*z.tmax_pAug+
                       #competition/density
                       z.BAL+ #remove /100 due to standardization
                       #site variables
                       z.SICOND+z.SLOPE+
+                       z.sin+z.cos+
                       #random effects
                       (1+z.DIA_C|TRE_CN)+(1|Year),
                     data = glmm_es_z)
-summary(lmm2_crbal_es)
-AIC(lmm2_crbal_es)
+summary(lmm_crbal_es)
+AIC(lmm_crbal_es)
 #1853.053
 
-lmm2_ccfbal_es <- lmer(log(dds+ 0.001)~
+lmm_ccfbal_es <- lmer(log(tdds)~
                         #tree variables
                         z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                         #z.CR_weib+
                         #climate
-                        z.ppt_pAugJul+z.tmax_pAug+
+                        z.ppt_pJunSep*z.tmax_pAug+
                         #competition/density
                         z.BAL+z.CCF+ #remove /100 due to standardization
                         #site variables
                         z.SICOND+z.SLOPE+
+                        z.sin+z.cos+
                         #random effects
                         (1+z.DIA_C|TRE_CN)+(1|Year),
                       data = glmm_es_z)
-summary(lmm2_ccfbal_es)
-AIC(lmm2_ccfbal_es)
+summary(lmm_ccfbal_es)
+AIC(lmm_ccfbal_es)
 #1851.592
 vif(lmm2_ccfbal_es)
 
@@ -744,21 +755,37 @@ lmm_ccf_es <-  tidy(lmm2_ccf_es) %>%
                        z.SICOND = "Site Index",
                        z.SLOPE = "Slope"))
 
-lmm_crf_es <-  tidy(lmm2_crf_es) %>% 
+crf_es <-  tidy(lmm_crf_es) %>% 
   filter(effect == "fixed") %>%
   select(term,estimate,std.error) %>%
-  mutate(model = "LMM_crf")%>%
+  mutate(model = "LMM_crccf")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
                        z.CR_weib = "Crown Ratio",
                        "I(z.CR_weib^2)" = "Crown Ratio",
-                       z.ppt_pAugJul = "Precipitation",
+                       z.ppt_pJunSep = "Precipitation",
                        z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Interaction",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
                        z.SICOND = "Site Index",
                        z.SLOPE = "Slope"))
 
+crbal_es <-  tidy(lmm_crbal_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_crbal")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
 modelses_check4 <- full_join(lmm_es,lmm_bal_es) %>%
   full_join(.,lmm_cr_es) %>%
   full_join(.,lmm_ccf_es) %>%
@@ -775,57 +802,27 @@ dwplot(modelses_check4,
         legend.background = element_rect(colour="grey80"),
         legend.title.align = 0.5)
 
+ccfbal_es <-  tidy(lmm_ccfbal_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "LMM_ccfbal")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_weib = "Crown Ratio",
+                       "I(z.CR_weib^2)" = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope"))
+
 #two competition variables
-lmm_crbal_es <-  tidy(lmm2_crbal_es) %>% 
-  filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
-  mutate(model = "LMM_crbl")%>%
-  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
-                       "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "Crown Ratio",
-                       z.ppt_pAugJul = "Precipitation",
-                       z.tmax_pAug = "Temperature",
-                       z.BAL = "BAL",
-                       z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope"))
+models_comp_es <- full_join(crf_es,ccfbal_es) %>%
+  full_join(.,crbal_es)
 
-lmm_ccfbal_es <-  tidy(lmm2_ccfbal_es) %>% 
-  filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
-  mutate(model = "LMM_cfbl")%>%
-  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
-                       "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "Crown Ratio",
-                       z.ppt_pAugJul = "Precipitation",
-                       z.tmax_pAug = "Temperature",
-                       z.BAL = "BAL",
-                       z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope"))
-
-lmm_crf_es <-  tidy(lmm2_crf_es) %>% 
-  filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
-  mutate(model = "LMM_crf")%>%
-  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
-                       "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "Crown Ratio",
-                       z.ppt_pAugJul = "Precipitation",
-                       z.tmax_pAug = "Temperature",
-                       z.BAL = "BAL",
-                       z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope"))
-
-modelses_check5 <- full_join(lmm_es,lmm_ccfbal_es) %>%
-  full_join(.,lmm_crbal_es) %>%
-  full_join(.,lmm_crf_es)
-
-dwplot(modelses_check5, 
+dwplot(models_comp_es, 
        vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), # plot line at zero _behind_ coefs
        dot_args = list(aes(shape = model)),
        whisker_args = list(aes(linetype = model))) +
