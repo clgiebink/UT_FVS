@@ -14,10 +14,12 @@ load(file = "./data/formatted/incr_percov")
 bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
                         #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,96=BS,106=PI,108=LP,133=PM,321=OH
                         b1 = c(0.9502,0.867,0.8967,0.890,0.890,0.9002,0.9502,0.9002,0.9625,0.9002,0.93789),
-                        b2 = c(-0.2528, 0, -0.4448,0,0,-0.3089,-0.2528,-0.3089,-0.1141,-0.3089,-0.24096)) #can add more species later 
+                        b2 = c(-0.2528, 0, -0.4448,0,0,-0.3089,-0.2528,-0.3089,-0.1141,-0.3089,-0.24096),
+                        exp = c(1,0,1,0,0,1,1,1,1,1,1)) #can add more species later 
 
 #annualized DBH
 #DBH0 = DBH - k * DG , where k = 1/BRATIO and DG = 2 * RW  
+#DG = periodic increment in inside bark diameter 
 #function to annualize, or back calculate dbh using diameter increment data (2*RW)
 library(tidyverse)
 calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
@@ -39,7 +41,8 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
       RW1 = RW1 * 0.0393701
       b1 <- bratio_df$b1[bratio_df$species == Species]
       b2 <- bratio_df$b2[bratio_df$species == Species]
-      tree_df$DIA_C[Curr_row] <- DIA_1 - ((2*RW1)/(b1+b2/DIA_1))
+      exp <- bratio_df$exp[bratio_df$species == Species]
+      tree_df$DIA_C[Curr_row] <- DIA_1 - ((2*RW1)/(b1+b2/(DIA_1^exp)))
       if(tree_df$DIA_C[Curr_row] < 1){
         tree_df$DIA_C[Curr_row] <- NA
       }
@@ -53,7 +56,7 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
 incr_imputed <- incr_percov %>%
   group_by(TRE_CN) %>% #for each tree calculate dbh
   arrange(Year) %>%
-  mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD))
+    mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD))
 
 #check
 #stop when DIA is less than 1
