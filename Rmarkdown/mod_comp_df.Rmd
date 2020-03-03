@@ -66,7 +66,7 @@ A tree's growth response is also influenced by climate, or temperature and preci
 #random intercept for each tree
 #random intercept for each year
 #random slope on DBH for each tree (detrending method)
-ran_slint <- lmer(log(dds)~
+an_noclim_df <- lmer(log(tdds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                     z.CR_weib+I(z.CR_weib^2)+
@@ -79,14 +79,15 @@ ran_slint <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                         data = glmm_df_z)
-AIC(ran_slint)
+AIC(an_noclim_df)
 #add climate
 #for df, Jun is important
 #previous Jun is the most correlated
 #with pJun-Aug giving the best AIC
 #however a specific seasonal range of precipitation might be hard to predict
-#so wateryear is also used
-clim_1 <- lmer(log(dds)~
+#use 16mon pJun-Sep
+#better AIC than wateryear
+clim_1 <- lmer(log(tdds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+I(z.CR_weib^2)+
@@ -101,12 +102,12 @@ clim_1 <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
 AIC(clim_1)
-clim_wy <- lmer(log(dds)~
+clim_16 <- lmer(log(tdds)~
                   #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+I(z.CR_weib^2)+
                  #climate
-                 z.wateryr+z.tmax_FebJul+
+                 z.ppt_pJunSep+z.tmax_FebJul+
                  #competition/density
                  z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
                  #site variables
@@ -115,7 +116,7 @@ clim_wy <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
-AIC(clim_wy)
+AIC(clim_16)
 ```
 
 Using the full model with all the possible covariates, I will test for collinearity between predictors with the `car` package.
@@ -138,7 +139,7 @@ summary(clim_1)$coef
 #reduce based on significance
 #CR^2
 #PCCF
-clim_1_red <- lmer(log(dds)~
+clim_1_red <- lmer(log(tdds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
@@ -154,12 +155,12 @@ clim_1_red <- lmer(log(dds)~
                data = glmm_df_z)
 AIC(clim_1_red)
 
-clim_wy_red <- lmer(log(dds)~
+clim_16_red <- lmer(log(tdds)~
                   #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
                  #climate 
-                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 z.ppt_pJunSep*z.tmax_FebJul+ #interaciton significant
                  #competition/density
                  z.BAL+z.CCF+ #remove /100 due to standardization
                  #site variables
@@ -173,12 +174,12 @@ summary(clim_1_red)$coef
 ```
 
 Further, we can reduce based on interpretability. `z.sin` and `z.cos` are suppose to account for the radiation received by the tree based on the aspect and slope of the site the tree is located on. However, their interpretation is inconsistent, so we will remove them.
-#TODO include graph of sin and cos of aspect?
+
 
 ```{r}
 #reduce based on interpretability
 #z.sin and z.cos
-lmm_2_red <- lmer(log(dds)~
+clim_1_red <- lmer(log(tdds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
@@ -191,14 +192,14 @@ lmm_2_red <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
-AIC(lmm_2_red)
+AIC(clim_1_red)
 
-lmm_wy_red <- lmer(log(dds)~
+clim_16_red <- lmer(log(tdds)~
                   #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
                    #climate 
-                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 z.ppt_pJunSep*z.tmax_FebJul+ #interaciton significant
                  #competition/density
                  z.BAL+z.CCF+ #remove /100 due to standardization
                  #site variables
@@ -207,7 +208,7 @@ lmm_wy_red <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
 
-summary(lmm_2_red)$coef
+summary(clim_1_red)$coef
 ```
 
 Also, it may not be necessary to include two competition factors (CCF and BAL). We can reduce BAL due to its collinearity with CR.
@@ -215,7 +216,7 @@ Also, it may not be necessary to include two competition factors (CCF and BAL). 
 ```{r}
 #reduce
 #BAL
-lmm_1_red <- lmer(log(dds)~
+clim_1_red <- lmer(log(tdds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
@@ -228,14 +229,14 @@ lmm_1_red <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
-AIC(lmm_1_red)
+AIC(clim_1_red)
 
-lmm_wy_red <- lmer(log(dds)~
+clim_16_red <- lmer(log(tdds)~
                   #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR_weib+
                  #climate 
-                 z.wateryr*z.tmax_FebJul+ #interaciton significant
+                 z.ppt_pJunSep*z.tmax_FebJul+ #interaciton significant
                  #competition/density
                  z.CCF+ #remove /100 due to standardization
                  #site variables
@@ -244,7 +245,7 @@ lmm_wy_red <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                data = glmm_df_z)
 
-summary(lmm_1_red)$coef
+summary(clim_1_red)$coef
 ```
 
 Since transforming a variable to meet the assumptions of linearity and normality are not ideal, a generalized linear mixed model (GLMM) can be parameterized.
