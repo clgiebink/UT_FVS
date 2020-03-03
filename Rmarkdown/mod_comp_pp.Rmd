@@ -77,6 +77,11 @@ ran_slint <- lmer(log(dds)~
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                         data = glmm_pp_z)
 #add climate
+#for pp, previous Oct is the most correlated
+#with pAug-Oct giving the best AIC
+#however a specific seasonal range of precipitation might be hard to predict
+#use 16mon pJun-Sep
+#better AIC than wateryear
 clim_1 <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
