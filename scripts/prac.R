@@ -55,6 +55,16 @@ covariates$DESIGNCD <- plot$DESIGNCD[match(covariates$PLT_CN, plot$CN)]
 covariates$SUBP_EXAM <- plot$SUBP_EXAMINE_CD[match(covariates$PLT_CN, plot$CN)]
 #covariates$PREV_MEASYEAR <- plots$MEASYEAR[match(covariates$PREV_PLT_CN, plots$CN)]
 
+#location codes found in FIADB
+#(FVS_LOC_CD) in PLOTGEOM table
+library(dbplyr)
+library(RSQLite)
+
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
+  collect()
+covariates$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(covariates$PLT_CN, PLOTGEOM$CN)]
+
 #data for glmm - ring widths
 per_cov <- left_join(UT_per,covariates)
 per_cov[duplicated(per_cov$TRE_CN),] #are there any dublicated trees?
