@@ -1,4 +1,4 @@
-#Swift radiation parameter
+#Swift radiation parameter----
 #Swift 1976
 #Courtney Giebink
 #clgiebink@gmail.com
@@ -202,3 +202,53 @@ F = R4 / R3
   
 #if poleward-facing slope
 #when the sum of the slope inclination plus the absolute value of the latitude of the slope exceeds 66
+
+#solrad ----
+library(solrad)
+
+incr_imputed <- incr_imputed %>%
+  mutate(tASPECT = ifelse(is.na(ASPECT) & SLOPE <= 5, 0, ASPECT))
+miss_asp <- unique(incr_imputed$TRE_CN[is.na(incr_imputed$tASPECT)]) 
+asp_check_df <- incr_imputed %>% 
+  filter(TRE_CN %in% miss_asp) %>% 
+  select(TRE_CN,SPCD,ASPECT,SLOPE) %>% #most are 106 - pinyon
+  distinct()
+save(incr_imputed, file = "./data/formatted/incr_imputed.Rdata")
+
+un_tre_cov <- incr_imputed %>%
+  select(-c(Year,RW,DIA_C)) %>%
+  ungroup() %>%
+  distinct()
+length(unique(un_tre_cov$TRE_CN)) #568
+save(un_tre_cov, file = "./data/formatted/un_tre_cov.Rdata")
+
+
+#function applied to all trees.
+seas_dirad <- function(begin, end, Lat, Lon, Elevation, Slope, Aspect) {
+  DOY <- seq(1,365,1)
+  aspect_s <- ifelse(Aspect[1] <= 180, Aspect[1] + 180, Aspect[1] - 180)
+  yr_dirad <- DirectRadiation(DOY = DOY, Lat = abs(Lat[1]), Lon = abs(Lon[1]), #lat & lon in degrees
+                              SLon = -105, DS = 60, #Slon and DS for UT; SLon = -7*15, DS = 60 minutes
+                              Elevation = Elevation[1]/3.281, #from ft to meters
+                              Slope[1], Aspect = aspect_s) #Aspect
+  sum_rad = sum(yr_dirad[begin:end])
+  return(sum_rad) #W/m2
+}
+
+#JanApr = (1:120)
+#MayAug = (121:243)
+#SepDec = (244:365)
+
+incr_test <- incr_imputed %>%
+  group_by(TRE_CN) %>%
+  mutate(solrad_an = seas_dirad(begin = 1, end = 365, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
+         solrad_JanApr = seas_dirad(begin = 1, end = 120, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
+         solrad_MayAug = seas_dirad(begin = 121, end = 243, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
+         solrad_SepDec = seas_dirad(begin = 244, end = 365, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT))
+
+
+
