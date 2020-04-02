@@ -26,9 +26,9 @@ unique(incr_imputed$SPCD) #Values of BAR can be used for other species
 #[1] 106 202 122  93  15  65 108  19  96 133 321
 
 #create dataframe of trees without increment cores in plots with trees that have increment cores
-plot_rw <- unique(incr_imputed$PLT_CN) #435
-tree_rw <- unique(incr_imputed$TRE_CN) #504
-miss_data <- UT_tree[(UT_tree$PLT_CN %in% plot_rw) & !(UT_tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ")]
+plot_rw <- unique(incr_imputed$PLT_CN) #475
+tree_rw <- unique(incr_imputed$TRE_CN) #568
+miss_data <- tree[(tree$PLT_CN %in% plot_rw) & !(tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","STATUSCD","DIA","TPA_UNADJ")]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including trees with increment data; 508
 colnames(miss_data)[colnames(miss_data)=="CN"] <- "TRE_CN"
@@ -42,8 +42,10 @@ miss_data$BAR_av <- NA
 miss_data$DIA_C <- NA
 
 #check
-length(plot_rw) #435
-length(unique(miss_data$PLT_CN)) #435
+length(plot_rw) #475
+length(unique(miss_data$PLT_CN)) #474
+unique(miss_data_imputed$STATUSCD)
+# 1 2
 
 #empty (year&DIA_C) dataframe?
 miss_data <- miss_data %>% 
@@ -79,8 +81,7 @@ length(unique(miss_data$TRE_CN[is.na(miss_data$BAR_av)]))
 #0
 #BAR = 1: 2970 for just plot, species, year
 length(unique(miss_data$TRE_CN))
-#4589
-#8406
+#9132
 
 #unique(miss_data$SPCD[miss_data$BAR_av == 1])
 #[1]  66 321 202 746  65 475  15 814 113  19 108  93  96 122 106 102
@@ -117,15 +118,23 @@ unique(incr_imputed$TRE_CN[incr_imputed$BAR > abs(1)])
 #NA
 min(miss_data$DIA_C,na.rm = T) #Inf
 length(which(miss_data_imputed$DIA_C <= 1))
-#12179; get rid of these?
+#13879; get rid of these?
 length(which(miss_data_imputed$DIA_C <= 0))
 #0
 unique(incr_percov$CONDID)
 #[1] 1
-miss_data$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
-unique(miss_data$CONDID)
+miss_data_imputed$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
+unique(miss_data_imputed$CONDID)
 #[1] 1
+miss_data_imputed$tCONDID <- tree$CONDID[match(miss_data_imputed$TRE_CN,tree$CN)]
+unique(miss_data_imputed$tCONDID)
+#1
 
+#filter for not dead trees
+length(unique(miss_data_imputed$TRE_CN)) #9132
+miss_data_imputed <- miss_data_imputed %>%
+  filter(STATUSCD != 2)
+length(unique(miss_data_imputed$TRE_CN)) # 8025
 
 save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
 
@@ -143,7 +152,7 @@ trees_plot <- density_data %>%
   summarise(trees_plot <- length(unique(TRE_CN)))
 
 min(trees_plot[,2])
-# 2
+# 1
 max(trees_plot[,2])
 # 66
 
