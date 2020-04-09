@@ -6,6 +6,25 @@
 
 #load the data, long format with trees stacked
 load(file = "./data/formatted/incr_percov")
+length(unique(incr_percov$TRE_CN)) #603
+load(file = "./data/formatted/incr_percov2.Rdata")
+length(unique(incr_percov2$TRE_CN)) #67
+
+incr_1cov <- incr_percov %>%
+  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
+         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
+         DIA_t,CR,TPA_UNADJ)
+
+incr_2cov <- incr_percov2 %>%
+  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
+         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
+         DIA_t,CR,TPA_UNADJ)
+
+incr_comb <- incr_1cov %>%
+  bind_rows(incr_2cov)
+length(unique(incr_comb$TRE_CN)) #670
+
+save(incr_comb, file = "./data/formatted/incr_comb.Rdata")
 
 #explore
 
@@ -53,7 +72,7 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
   return(tree_df$DIA_C)
 }
 
-incr_imputed <- incr_percov %>%
+incr_imputed <- incr_comb %>%
   group_by(TRE_CN) %>% #for each tree calculate dbh
   arrange(Year) %>%
     mutate(DIA_C = calculateDIA(TRE_CN = TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD))
@@ -67,14 +86,14 @@ check_data <- incr_imputed[which(incr_imputed$Year + 1 == incr_imputed$MEASYEAR)
 check_data <- check_data[check_data$SPCD == 202,]
 
 #filter for trees with back calculated DBH
-length(unique(incr_imputed$TRE_CN)) #603
+length(unique(incr_imputed$TRE_CN)) #670
 incr_imputed <- incr_imputed %>%
   filter(!is.na(DIA_C)) #filter for >5" later
-length(unique(incr_imputed$TRE_CN)) #504
+length(unique(incr_imputed$TRE_CN)) #568
 
-length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 202])) #131
-length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 122])) #73, but 71 with <5"
-length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 93]))  #50
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 202])) #131, 136
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 122])) #73, 87
+length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 93]))  #50, 95
 
 #save dataframe
 save(incr_imputed,file = "./data/formatted/incr_imputed.Rdata")
