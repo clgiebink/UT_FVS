@@ -15,7 +15,7 @@ load('./data/formatted/density_data')
 
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
-  mutate(SDI = sum((DIA_C/10)^1.6)) 
+  mutate(SDI = sum(TPA_C*(DIA_C/10)^1.6)) 
 
 #number of trees on plot for a given year
 density_data <- density_data %>%
@@ -214,7 +214,7 @@ length(unique(plot_data_cr$PLT_CN)) #85
 #rank in the diameter distribution
 plot_data_cr <- plot_data_cr %>%
   group_by(PLT_CN) %>%
-  mutate(stage_sum = (DIA/10)^1.6,
+  mutate(stage_sum = TPA_UNADJ*(DIA/10)^1.6,
          SDI_stage = sum(stage_sum),
          num_t = length(unique(TRE_CN)),
          rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
@@ -252,7 +252,10 @@ plot_data_cr <- plot_data_cr %>%
   group_by(PLT_CN) %>%
   mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
 
-#CR
+save(plot_data_cr,file = './data/formatted/plot_data_cr.Rdata')
+write.csv(plot_data_cr, file = './data/formatted/plot_data_cr.csv')
+
+  #CR
 #first filter for focal species
 length(tree_crtest) #905
 valcr_check <- plot_data_cr %>%
@@ -321,6 +324,9 @@ for(i in 1:nrow(valcr_check)){
     valcr_check$CR_weib[i] <- NA
   }
 }
+
+save(valcr_check,file = './data/formatted/valcr_check.Rdata')
+write.csv(valcr_check, file = './data/formatted/valcr_check.csv')
 
 #
 cr_reg <- lm(CR_weib~UNCRCD,data = valcr_check)
