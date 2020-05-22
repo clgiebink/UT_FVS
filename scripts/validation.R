@@ -45,6 +45,7 @@ val_crtest <- val_dset %>%
   filter(!is.na(UNCRCD))
 length(unique(val_crtest$TRE_CN)) #1082
 save(val_crtest,file = './data/formatted/val_crtest.Rdata')
+
 #filter for SICOND?
 val_sitest <- val_dset %>%
   filter(!is.na(SICOND))
@@ -67,10 +68,26 @@ SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE FROM SITETREE")) %>
 SITREE$PLT_CN <- as.numeric(SITREE$PLT_CN)
 val_si_test <- left_join(val_sicheck, SITREE, by = c("PLT_CN","SPCD")) %>%
   distinct()
+#get rid of trees where sitesp is the same as spcd
+val_si_plt <- val_si_test %>%
+  filter(SPCD != SISP)
+#calculate average site index per species per plot
+val_si_plt <- val_si_plt %>%
+  dplyr::select(PLT_CN,SPCD,SITREE) %>%
+  group_by(PLT_CN,SPCD) %>%
+  summarise(mean = mean(SITREE,na.rm=TRUE))
+#replace in validation dataset
+val_dset <- val_dset %>%
+  mutate(SICOND_c = ifelse(SPCD == SISP,
+                           SICOND,
+                           val_si_plt$mean[val_si_plt$PLT_CN == PLT_CN &
+                                               val_si_plt$SPCD == SPCD])) %>%
+  filter(!is.na(SICOND_c))
 
 colnames(val_dset)[colnames(val_dset)=="CN"] <- "TRE_CN"
 
 val_dset$CONDID <- cond$CONDID[match(val_dset$PLT_CN, cond$PLT_CN)]
+val_dset$SISP <- cond$SISP[match(val_dset$PLT_CN, cond$PLT_CN)]
 val_dset$ASPECT <- cond$ASPECT[match(val_dset$PLT_CN, cond$PLT_CN)]
 val_dset$SLOPE <- cond$SLOPE[match(val_dset$PLT_CN, cond$PLT_CN)]
 val_dset$SDI <- cond$SDI_RMRS[match(val_dset$PLT_CN, cond$PLT_CN)]
@@ -427,6 +444,39 @@ plot(val_dset$eDIA,val_dset$fDIA,
   #check difference between measyear and fmeasyear
 #might need to express output as a proportion
 
+#from FVS online
+
+fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_runs.csv")
+length(unique(fvs_treelist$StandID)) #63
+fvs_red <- fvs_treelist %>%
+  select(StandID,Year,PrdLen,TreeId,SpeciesFIA,DBH,DG,PctCr,PtBAL) %>%
+  filter(SpeciesFIA %in% c(93,122,202)) %>%
+  filter(DBH >= 1)
+length(unique(fvs_red$StandID)) #40
+
+library(RSQLite)
+UT_fvsred_db <- dbConnect(RSQLite::SQLite(), "./New_Utah/FVS_Data.db")
+#Extract FVS_StandInit_Plot table
+fvsStandInitPlot<-dbReadTable(UT_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
+std2plt <- fvsStandInitPlot %>%
+  select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID)) #63
+length(unique(std2plt$STAND_CN)) #63
+
+fvs_red$PLT_CN <- std2plt$STAND_CN[match(fvs_red$StandID,std2plt$STAND_ID)]
+length(unique(fvs_red$StandID)) #40
+length(unique(fvs_red$PLT_CN)) #40
+
+length(unique(fvs_red$StandID))
+#43
+#should be 63 - what is up?
+fvs_stid <- read.csv(file = "./data/raw/FVS/StandID.csv", header = T)
+head(fvs_stid)
+length(unique(fvs_stid$StandID)) #43
+stid_red <- fvs_stid %>%
+  filter(!(StandID %in% fvs_red$StandID))
+
+
 
 # Climate ----
 #Precipitation
@@ -695,17 +745,40 @@ es_stats <- glmm_es_z %>%
 sp_stats <- list(sp_202 = df_stats, sp_122 = pp_stats,sp_93 = es_stats)
 #use to standardize newdata covariates
 
-tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
+val_an <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df) {
   #parameters:
   #newdata - validataion trees from FIADB
-  newdata <- newdata %>%
+  newdata_rep <- newdata %>%
     ungroup() %>%
-    dplyr::select(PLT_CN, TRE_CN, SPCD, STATUSCD, SUBP, MEASYEAR, 
+    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
                   TPA_UNADJ, DESIGNCD, tCONDID, census_int,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDImax,SICOND,solrad_MayAug,
-                  DIA,CCF, PCCF, BAL, SDI, CR_weib, fMEASYEAR, fDIA)
+                  FVS_LOC_CD,SDImax,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA) %>%
+    mutate(Year = NA,
+           DIA = NA,
+           CCF = NA,
+           PCCF = NA,
+           BAL = NA,
+           SDI = NA,
+           CR_weib = NA)
+  newdata_rep <- newdata_rep %>% 
+    group_by(TRE_CN) %>%
+    slice(rep(1:n(), each = census_int+1)) %>%
+    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
+    ungroup()
   ##density for new data in MEASYEAR will already be calculated
+  #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
+  for(i in 1:nrow(newdata_rep)){
+    TRE_CN <- newdata_rep$TRE_CN[i]
+    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
+      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
+      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
+      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
+      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CR_weib[i] <- newdata$CR_weib[newdata$TRE_CN == TRE_CN]
+    }
+  }
   #mod_obj - list of model objects for each species
   #sp_stats - list of species statistics (mean and standard deviation) for each covariate
   ##will be used to standardize newdata covariates
@@ -716,17 +789,18 @@ tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df
   #bratio - dataframe of bark ratio constants for equation
   #ccf - dataframe of crown competiton factor constants for equation
   #CR_weib_df - dataframe of crown ratio constants for equation
-  #climate - dataframe of climate variables (ppt & tmax) for each tree
+  
+  #empty dataframe to add results
+  pred_df <- newdata_rep[FALSE,]
   
   # loop over plot
-  # into order to calculate density after MEASYR
-  for(i in unique(newdata$PLT_CN)) {
-    #create plot dataframe
-    plt_df <- newdata[newdata$PLT_CN == i,] %>%
-      mutate(Year = MEASYEAR)
+  # to calculate density after MEASYR
+  for(i in unique(newdata_rep$PLT_CN)) {
+    #create plot dataframe to predict growth
+    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
     #assign projection start year
-    growthyr <- min(plt_df$Year) # assumes all trees on a plot have same MEASYEAR
-    while (growthyr <= min(plt_df$Year) + (plt_df$census_int[1]-1)){ #stops after fMEASYEAR
+    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
+    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
       #filter dataframe for year of projection
       plt_yr_df <- plt_df %>%
         filter(Year == growthyr)
@@ -737,86 +811,32 @@ tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df
         
         #select model to predict growth
         #models are species specific
-        if(Species == 202){
-          mod_obj <- mod_df
-        } else {
-          if(Species == 122){
-            mod_obj <- mod_pp
-          } else {
-            mod_obj <- mod_es
-          } 
-        }
+        if(Species == 202){mod_obj <- mod_df} 
+        if(Species == 122){mod_obj <- mod_pp} 
+        if(Species == 93){mod_obj <- mod_es} 
         
-        #standardize
+        #standardize covariates
         #get mean/sd for each species
-        ifelse(Species == 202,
-               para_std <- sp_stats$sp_202,
-               ifelse(Species == 122,
-                      para_std <- sp_stats$sp_122,
-                      para_std <- sp_stats$sp_93))
-        #first row is mean, second row is sd
-        z.DIA_C = (plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"]
-        z.CR_weib = (plt_yr_df[i,"CR_weib"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"]
-        z.BAL = (plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"]
-        z.CCF = (plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"]
-        z.SDI = (plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"]
-        z.SICOND = (plt_yr_df[i,"SICOND"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"]
-        z.SLOPE = (plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"]
-        z.sin = (plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"]
-        z.cos = (plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"]
-        z.solrad_MayAug = (plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"]
+        if(Species == 202){para_std <- sp_stats$sp_202}
+        if(Species == 122){para_std <- sp_stats$sp_122}
+        if(Species == 93) {para_std <- sp_stats$sp_93}
         
+        #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist(z.DIA_C) 
-        plt_yr_df$z.CR_weib[i] = unlist(z.CR_weib)
-        plt_yr_df$z.BAL[i] = unlist(z.BAL)
-        plt_yr_df$z.CCF[i] = unlist(z.CCF)
-        plt_yr_df$z.SDI[i] = unlist(z.SDI)
-        plt_yr_df$z.SICOND[i] = unlist(z.SICOND)
-        plt_yr_df$z.SLOPE[i] = unlist(z.SLOPE)
-        plt_yr_df$z.sin[i] = unlist(z.sin)
-        plt_yr_df$z.cos[i] = unlist(z.cos)
-        plt_yr_df$z.solrad_MayAug[i] = unlist(z.solrad_MayAug)
+        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
+        plt_yr_df$z.CR_weib[i] = unlist((plt_yr_df[i,"CR_weib"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"])
+        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
+        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
+        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
+        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
+        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
+        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
         #TODO there must be a better way to do this? for loop?
         
-        #join climate
-        if(missing(climate)){
-          plt_yr_df <- plt_yr_df
-        } else {
-          #extract climate coeficients
-          #mod_coef <- row.names(summary(mod_obj)$coef)
-          #z.ppt <- mod_coef[grepl("ppt",mod_coef)][1]
-          #z.tmax <- mod_coef[grepl("tmax",mod_coef)][1]
-          #tmax <- gsub("^.*\\.","", z.tmax)
-          
-          # match over tre_cn and year
-          plt_yr_df$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$TRE_CN == TRE_CN & 
-                                                            climate$Year == plt_yr_df$Year[1]]
-          z.ppt_pJunSep = (plt_yr_df[i,"ppt_pJunSep"] - para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"]
-          plt_yr_df$z.ppt_pJunSep[i] = unlist(z.ppt_pJunSep)
-          
-          if(Species == 202){
-            plt_yr_df$tmax_FebJul[i] <- climate$tmax_FebJul[climate$TRE_CN == TRE_CN & 
-                                                              climate$Year == plt_yr_df$Year[1]]
-            plt_yr_df$z.tmax_FebJul[i] = unlist((as.numeric(plt_yr_df[i,"tmax_FebJul"]) - para_std[1,"tmax_FebJul"]) / 
-                                                  para_std[2,"tmax_FebJul"])
-          } else {
-            if(Species == 122){
-              plt_yr_df$tmax_JunAug[i] <- climate$tmax_JunAug[climate$TRE_CN == TRE_CN & 
-                                                                climate$Year == plt_yr_df$Year[1]]
-              plt_yr_df$z.tmax_JunAug[i] = unlist((as.numeric(plt_yr_df[i,"tmax_JunAug"]) - para_std[1,"tmax_JunAug"]) / 
-                                                    para_std[2,"tmax_JunAug"])
-            } else {
-              plt_yr_df$tmax_pAug[i] <- climate$tmax_pAug[climate$TRE_CN == TRE_CN & 
-                                                            climate$Year == plt_yr_df$Year[1]]
-              plt_yr_df$z.tmax_pAug[i] = unlist((as.numeric(plt_yr_df[i,"tmax_pAug"]) - para_std[1,"tmax_pAug"]) / 
-                                                  para_std[2,"tmax_pAug"])
-            } 
-          }
-        }
-        
         #predict
-        #TODO modobj will change with different species
+        # modobj will change with different species
         plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
                                         re.form = NA, type = "response")
         #re.form specify random effects to include
@@ -834,18 +854,14 @@ tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df
         #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
         k <- 1/BRATIO 
         #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) - (plt_yr_df$DIA[i]/k))
-        
+        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
+                                  (plt_yr_df$DIA[i]/k))
       }
-      #new df here?
+      
       #so DBH0 + k*DG = DBH
-      plt_yr2_df <- plt_yr_df %>%
-        dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                      TPA_UNADJ, DESIGNCD, tCONDID, census_int,
-                      ASPECT,SLOPE,SDImax,SICOND,LAT,LON,ELEV,FVS_LOC_CD,
-                      fMEASYEAR,fDIA) %>%
-        mutate(Year = plt_yr_df$Year + 1,
-               DIA = plt_yr_df$DIA + plt_yr_df$DG)
+      plt_yr2_df <- plt_df %>%
+        filter(Year == (growthyr+1))%>%
+        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
       
       #join with nonfocal
       #fitler for trees on plots in validation set in same year
@@ -908,7 +924,7 @@ tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df
       
       density_cal <- density_cal %>%
         group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6),
+        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
                num_t = length(unique(TRE_CN)))
       
       #filter for focal trees
@@ -921,99 +937,379 @@ tre_val <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df
         #SPCD - is number code of species of tree record
         #SDI - is SDI of stand (Stage 1968)
         Species <- plt_yr2_df$SPCD[i]
-        if(Species %in% CR_WEIB_df$species){
-          #SDI max values for each species were pulled from UT Variant overview
-          ifelse(is.na(plt_yr2_df$SDImax[i]),
-                 SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
-                 SDIMAX <- plt_yr2_df$SDImax[i])
-          #Calculate relative density
-          ifelse(is.na(plt_yr2_df$SDI[i]),
-                 SDI <- plt_yr2_df$SDI_stage[i],
-                 SDI <- plt_yr2_df$SDI[i])
-          RD <- SDI/SDIMAX
-          
-          #Calculate average stand crown ratio (ACR) for each species in the stand
-          d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
-          d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
-          ACR <- d0 + d1 * RD * 100
-          
-          #Parameters of Weibull distribution: A,B,C
-          a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
-          b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
-          b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
-          c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
-          c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
-          
-          #A parameter
-          WEIBA <-a0
-          #B parameter
-          WEIBB <- b0 + b1*ACR
-          #C parameter
-          WEIBC <- c0 + c1*ACR
-          
-          #Function arguments:
-          
-          #CCF - crown competition factor of stand
-          #rank_pltyr - tree's rank in diameter distribution by plot by year
-          #N  - number of records in the stand by year
-          
-          #Calculate scale parameter
-          SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
-          if(SCALE < 0.3){SCALE = 0.3}
-          if(SCALE > 1.0){SCALE = 1.0}
-          
-          N <- plt_yr2_df$num_t[i]
-          #X is tree's rank in diameter distribution
-          #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
-          Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
-          if(Y < 0.05){Y = 0.05}
-          if(Y > 0.95){Y = 0.95}
-          #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
-          
-          #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
-          X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
-          #X = a tree’s crown ratio expressed as a percent / 10
-          plt_yr2_df$CR_weib[i] <- X * 10
-        }
-        if(!(Species %in% CR_WEIB_df$species)){
-          plt_yr2_df$CR_weib[i] <- NA
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDImax[i]),
+                         CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+                         plt_yr2_df$SDImax[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+        d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+        b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+        b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+        c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+        c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        plt_yr2_df$CR_weib[i] <- X * 10
+      }
+      
+      #join with plt_df
+      for(i in 1:nrow(plt_df)){
+        TRE_CN <- plt_df$TRE_CN[i]
+        if(plt_df$Year[i] == (growthyr + 1)){
+          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_weib[i] <- plt_yr2_df$CR_weib[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
-      #select columns
-      plt_yr2_df <- plt_yr2_df %>%
-        dplyr::select(PLT_CN, Year, TRE_CN, SPCD, SUBP,
-                      MEASYEAR,TPA_UNADJ,DESIGNCD, tCONDID, census_int,
-                      ASPECT,SLOPE,SDImax,SICOND,LAT,LON,ELEV,FVS_LOC_CD,
-                      DIA, CCF_t,PCCF,CCF,BAL,SDI,CR_weib, fMEASYEAR, fDIA)
-      #row bind with plt_df
-      plt_df <- bind_rows(plt_df,plt_yr2_df)
-      #join by PLT_CN,TRE_CN,etc..Year
-      #TODO would a join be more efficient?
+      #add density metrics in
+      
       
       #loop over next year
       growthyr = growthyr + 1
     }
-    #row bind plt_df with new data
-    newdata <- bind_rows(newdata,plt_df)
-    #TODO would a join be more efficient?
+    #join plt_df with empty data frame
+    #output
+    pred_df <- bind_rows(pred_df,plt_df)
     
     #loop over next plot
   }
-  #remove years with NA (duplicates)
-  newdata <- newdata %>%
-    filter(!is.na(Year))
   
-  return(newdata)
+  return(pred_df)
 }
 
-val_dset <- val_dset %>%
-  mutate(census_int = fMEASYEAR - MEASYEAR)
 
-#practice
-plt_val <- unique(val_dset$PLT_CN)
-plt_val[1:2]
-val_tset <- val_dset %>%
-  mutate(DIA = DIA,
-         CR_weib = UNCRCD) %>%
-  filter(PLT_CN %in% plt_val[1:2])
+val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
+  #parameters:
+  #newdata - validataion trees from FIADB
+  newdata_rep <- newdata %>%
+    ungroup() %>%
+    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
+                  TPA_UNADJ, DESIGNCD, tCONDID, census_int,
+                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
+                  FVS_LOC_CD,SDImax,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA) %>%
+    mutate(Year = NA,
+           DIA = NA,
+           CCF = NA,
+           PCCF = NA,
+           BAL = NA,
+           SDI = NA,
+           CR_weib = NA)
+  newdata_rep <- newdata_rep %>% 
+    group_by(TRE_CN) %>%
+    slice(rep(1:n(), each = census_int+1)) %>%
+    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
+    ungroup()
+  ##density for new data in MEASYEAR will already be calculated
+  #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
+  for(i in 1:nrow(newdata_rep)){
+    TRE_CN <- newdata_rep$TRE_CN[i]
+    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
+      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
+      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
+      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
+      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CR_weib[i] <- newdata$CR_weib[newdata$TRE_CN == TRE_CN]
+    }
+    #add climate
+    #match over tree and year
+    newdata_rep$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$TRE_CN == TRE_CN &
+                                                        climate$Year == newdata_rep$Year[i]]
+    newdata_rep$tmax_JunAug[i] <- climate$tmax_JunAug[climate$TRE_CN == TRE_CN &
+                                                        climate$Year == newdata_rep$Year[i]]
+    newdata_rep$tmax_FebJul[i] <- climate$tmax_FebJul[climate$TRE_CN == TRE_CN &
+                                                        climate$Year == newdata_rep$Year[i]]
+    newdata_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$TRE_CN == TRE_CN &
+                                                    climate$Year == newdata_rep$Year[i]]
+  }
+  
+  #mod_obj - list of model objects for each species
+  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
+  ##will be used to standardize newdata covariates
+  #nonfocal - trees on the same plot as validation trees
+  nonfocal <- nonfocal %>%
+    ungroup()
+  ##will be used to compute density parameters
+  #bratio - dataframe of bark ratio constants for equation
+  #ccf - dataframe of crown competiton factor constants for equation
+  #CR_weib_df - dataframe of crown ratio constants for equation
+  #climate - dataframe of climate variables (ppt & tmax) for each tree
+  
+  #empty dataframe to add results
+  pred_df <- newdata_rep[FALSE,]
+  
+  # loop over plot
+  # to calculate density after MEASYR
+  for(i in unique(newdata_rep$PLT_CN)) {
+    #create plot dataframe to predict growth
+    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
+    #assign projection start year
+    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
+    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
+      #filter dataframe for year of projection
+      plt_yr_df <- plt_df %>%
+        filter(Year == growthyr)
+      
+      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
+        Species <- plt_yr_df$SPCD[i]
+        TRE_CN <- plt_yr_df$TRE_CN[i]
+        
+        #select model to predict growth
+        #models are species specific
+        if(Species == 202){mod_obj <- mod_df} 
+        if(Species == 122){mod_obj <- mod_pp} 
+        if(Species == 93){mod_obj <- mod_es} 
+        
+        #standardize covariates
+        #get mean/sd for each species
+        if(Species == 202){para_std <- sp_stats$sp_202}
+        if(Species == 122){para_std <- sp_stats$sp_122}
+        if(Species == 93) {para_std <- sp_stats$sp_93}
+        
+        #first row is mean, second row is sd
+        #the inputs of the equation are from a list so output needs to be unlisted
+        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
+        plt_yr_df$z.CR_weib[i] = unlist((plt_yr_df[i,"CR_weib"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"])
+        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
+        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
+        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
+        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
+        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
+        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
+        plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
+                                               para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
+        #temperature different for each species
+        plt_yr_df$z.tmax_FebJul[i] = unlist((plt_yr_df[i,"tmax_FebJul"] -
+                                               sp_stats$sp_202[1,"tmax_FebJul"]) /
+                                              sp_stats$sp_202[2,"tmax_FebJul"])
+        plt_yr_df$z.tmax_JunAug[i] = unlist((plt_yr_df[i,"tmax_JunAug"] -
+                                               sp_stats$sp_122[1,"tmax_JunAug"]) /
+                                              sp_stats$sp_122[2,"tmax_JunAug"])
+        plt_yr_df$z.tmax_pAug[i] = unlist((plt_yr_df[i,"tmax_pAug"] -
+                                             sp_stats$sp_93[1,"tmax_pAug"]) / 
+                                            sp_stats$sp_93[2,"tmax_pAug"])
+        #TODO there must be a better way to do this? for loop?
+        
+        #predict
+        # modobj will change with different species
+        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
+                                        re.form = NA, type = "response")
+        #re.form specify random effects to include
+        ##NA include none
+        
+        #see page 53 of prognosis model
+        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
+        # k = 1/BRATIO
+        #see UT variant guide
+        #BRATIO = b1+b2/(DBH^exp)
+        b1 <- bratio$b1[bratio$species == Species]
+        b2 <- bratio$b2[bratio$species == Species]
+        exp <- bratio$exp[bratio$species == Species]
+        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
+        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
+        k <- 1/BRATIO 
+        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
+        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
+                                  (plt_yr_df$DIA[i]/k))
+      }
+      
+      #so DBH0 + k*DG = DBH
+      plt_yr2_df <- plt_df %>%
+        filter(Year == (growthyr+1))%>%
+        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
+      
+      #join with nonfocal
+      #fitler for trees on plots in validation set in same year
+      non_foc_filt <- nonfocal %>%
+        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
+        mutate(DIA = DIA_int) %>%
+        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
+               Year == plt_yr2_df$Year[1])
+      #join
+      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
+      
+      #compute density parameters
+      #ccf
+      for(i in 1:nrow(density_cal)){
+        Species <- density_cal$SPCD[i]
+        r1 <- ccf_df$r1[ccf_df$species == Species]
+        r2 <- ccf_df$r2[ccf_df$species == Species]
+        r3 <- ccf_df$r3[ccf_df$species == Species]
+        r4 <- ccf_df$r4[ccf_df$species == Species]
+        r5 <- ccf_df$r5[ccf_df$species == Species]
+        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
+        if(Species == 475){
+          ifelse(density_cal$DIA[i] < dbrk,
+                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
+                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
+        }
+        if(Species != 475){
+          ifelse(is.na(density_cal$DIA[i]), 
+                 CCF_t <- NA,
+                 ifelse(density_cal$DIA[i] <= 0.1, 
+                        CCF_t <- 0.0001,
+                        ifelse(density_cal$DIA[i] < dbrk, 
+                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
+                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
+        }
+        density_cal$CCF_t[i] <- CCF_t
+      }
+      
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,SUBP,Year) %>%
+        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
+      
+      #stand CCF = sum(CCFt on a plot) on a per acre basis
+      #TPA measured on a plot/stand level
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
+      
+      #bal
+      density_cal <- density_cal %>%
+        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
+      
+      #rank trees per year per plot
+      #sum BApa of trees larger on the same plot in same year
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
+        #min assigns lowest value to ties (1,2,3,3,5,6)
+        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+      
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
+               num_t = length(unique(TRE_CN)))
+      
+      #filter for focal trees
+      plt_yr2_df <- density_cal %>%
+        filter(TRE_CN %in% plt_yr_df$TRE_CN)
+      
+      #cr
+      for(i in 1:nrow(plt_yr2_df)){
+        #Function arguments:
+        #SPCD - is number code of species of tree record
+        #SDI - is SDI of stand (Stage 1968)
+        Species <- plt_yr2_df$SPCD[i]
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDImax[i]),
+                         CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+                         plt_yr2_df$SDImax[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+        d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+        b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+        b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+        c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+        c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        plt_yr2_df$CR_weib[i] <- X * 10
+      }
+      
+      #join with plt_df
+      for(i in 1:nrow(plt_df)){
+        TRE_CN <- plt_df$TRE_CN[i]
+        if(plt_df$Year[i] == (growthyr + 1)){
+          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_weib[i] <- plt_yr2_df$CR_weib[plt_yr2_df$TRE_CN == TRE_CN]
+        }
+      }
+      #add density metrics in
+      
+      #loop over next year
+      growthyr = growthyr + 1
+    }
+    #join plt_df with empty data frame
+    #output
+    pred_df <- bind_rows(pred_df,plt_df)
+    
+    #loop over next plot
+  }
+  
+  return(pred_df)
+}
+#clt+enter through code works
+#running function error: object of type 'closure' is not subsettable
 
