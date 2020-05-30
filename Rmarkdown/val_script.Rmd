@@ -1423,6 +1423,13 @@ sqrt(mean(fit_an_dg$residuals^2))
 
 ### Residuals
 
+```{r}
+ppt_norm <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_ppt_extr.csv")
+tmp_norm <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmp_extr.csv")
+tmx_norm <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmx_extr.csv")
+```
+
+
 #### Full
 
 ```{r}
@@ -1434,6 +1441,20 @@ qqnorm(pred_fan_fmy$diff)
 qqline(pred_fan_fmy$diff)
 plot(pred_fan_fmy$DIA,pred_fan_fmy$diff, xlab = "predicted", ylab= "residuals")
 ```
+
+```{r}
+pred_fan_fmy$ppt.norm <- ppt_norm$normalspptNormals[match(pred_fan_fmy$TRE_CN,ppt_norm$TRE_CN)]
+pred_fan_fmy$tmp.norm <- tmp_norm$normalstmpNormals[match(pred_fan_fmy$TRE_CN,tmp_norm$TRE_CN)]
+pred_fan_fmy$tmx.norm <- tmx_norm$normalstmxNormals[match(pred_fan_fmy$TRE_CN,tmx_norm$TRE_CN)]
+par(mfrow=c(2,2))
+plot(pred_fan_fmy$ppt.norm,pred_fan_fmy$diff,
+     xlab = "Mean Annual Precipitation", ylab = "Residuals")
+plot(pred_fan_fmy$tmp.norm,pred_fan_fmy$diff,
+     xlab = "Mean Annual Temperature", ylab = "Residuals")
+plot(pred_fan_fmy$tmx.norm,pred_fan_fmy$diff,
+     xlab = "Mean Annual Max Temperature", ylab = "Residuals")
+```
+
 
 
 #### Reduced
@@ -1456,6 +1477,20 @@ qqnorm(pred_an_fmy$diff)
 qqline(pred_an_fmy$diff)
 plot(pred_an_fmy$DIA,pred_an_fmy$diff, xlab= "predicted", ylab = "residuals")
 ```
+
+```{r}
+pred_an_fmy$ppt.norm <- ppt_norm$normalspptNormals[match(pred_an_fmy$TRE_CN,ppt_norm$TRE_CN)]
+pred_an_fmy$tmp.norm <- tmp_norm$normalstmpNormals[match(pred_an_fmy$TRE_CN,tmp_norm$TRE_CN)]
+pred_an_fmy$tmx.norm <- tmx_norm$normalstmxNormals[match(pred_an_fmy$TRE_CN,tmx_norm$TRE_CN)]
+par(mfrow=c(2,2))
+plot(pred_an_fmy$ppt.norm,pred_an_fmy$diff,
+     xlab = "Mean Annual Precipitation", ylab = "Residuals")
+plot(pred_an_fmy$tmp.norm,pred_an_fmy$diff,
+     xlab = "Mean Annual Temperature", ylab = "Residuals")
+plot(pred_an_fmy$tmx.norm,pred_an_fmy$diff,
+     xlab = "Mean Annual Max Temperature", ylab = "Residuals")
+```
+
 
 ## Climate
 
@@ -1543,7 +1578,7 @@ plot(pred_rclim_fmy$DIA,pred_rclim_fmy$diff, xlab= "predicted", ylab = "residual
 ## current FVS growth model
 
 ```{r}
-fvs_treelist <- read_csv(file = "./fvs_runs.csv")
+fvs_treelist <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/fvs_runs.csv")
 length(unique(fvs_treelist$StandID)) #63
 fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
 fvs_red <- fvs_treelist %>%
@@ -1554,8 +1589,9 @@ length(unique(fvs_red$StandID)) #63
 ```
 
 ```{r}
+library(dbplyr)
 library(RSQLite)
-UT_fvsred_db <- dbConnect(RSQLite::SQLite(), "./FVS_Data.db")
+UT_fvsred_db <- dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/FVS_Data.db")
 #Extract FVS_StandInit_Plot table
 fvsStandInitPlot<-dbReadTable(UT_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
 std2plt <- fvsStandInitPlot %>%
@@ -1593,7 +1629,7 @@ fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
 #validation dataset for future observations
 library(dbplyr)
 library(RSQLite)
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FS_FIADB_STATECD_49.db")
 TREE <- dbReadTable(UT_FIA, 'TREE')
 TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
   collect()
@@ -1640,4 +1676,128 @@ sqrt(mean(fit_fvs_dg$residuals^2))
 
 # Predict CR
 
- 
+```{r}
+pred_fan_cr <- val_an_cr(newdata = val_dset,mod_df = an_al_df, mod_pp = an_al_pp, 
+                              mod_es = an_al_es,sp_stats = sp_stats,nonfocal = non_focal,
+                              bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df)
+```
+
+```{r}
+pred_an_cr <- val_an_cr(newdata = val_dset,mod_df = an_red_df, mod_pp = an_red_pp, 
+                              mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
+                              bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df)
+```
+
+Predict growth using annualized with tree rings and climate models for each species.
+
+```{r}
+pred_fclim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_al_pp, 
+                              mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal,
+                              bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df, climate = val_clim)
+```
+
+```{r}
+pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                              mod_es = clim_red_es,sp_stats = sp_stats,nonfocal = non_focal,
+                              bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df, climate = val_clim)
+```
+
+```{r}
+#save
+save(pred_fan_cr,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_fan_cr.Rdata")
+save(pred_an_cr,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_cr.Rdata")
+save(pred_fclim_cr,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_fclim_cr.Rdata")
+save(pred_clim_cr,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr.Rdata")
+```
+
+# Explore
+
+
+```{r}
+pred_fan_cr <- pred_fan_cr %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fan_cr_fmy <- pred_fan_cr %>%
+  filter(Year == fMEASYEAR)
+# par(mfrow=c(1,2))
+# plot(pred_fan_cr_fmy$DIA,pred_fan_cr_fmy$fDIA,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DBH - Reduced: Tree-Rings + Climate")
+# plot(pred_fan_cr_fmy$DG_pred,pred_fan_cr_fmy$DG_obs,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DG - Reduced: Tree-Rings + Climate")
+fit_fan_cr <- lm(fDIA~DIA,data = pred_fan_cr_fmy)
+summary(fit_fan_cr )
+sqrt(mean(fit_fan_cr $residuals^2))
+# fit_fan_cr_dg <- lm(DG_obs~DG_pred,data = pred_fan_cr_fmy)
+# summary(fit_fan_cr_dg)
+# sqrt(mean(fit_fan_cr_dg$residuals^2))
+```
+
+```{r}
+pred_an_cr <- pred_an_cr %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_an_cr_fmy <- pred_an_cr %>%
+  filter(Year == fMEASYEAR)
+# par(mfrow=c(1,2))
+# plot(pred_fan_cr_fmy$DIA,pred_fan_cr_fmy$fDIA,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DBH - Reduced: Tree-Rings + Climate")
+# plot(pred_fan_cr_fmy$DG_pred,pred_fan_cr_fmy$DG_obs,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DG - Reduced: Tree-Rings + Climate")
+fit_an_cr <- lm(fDIA~DIA,data = pred_an_cr_fmy)
+summary(fit_an_cr )
+sqrt(mean(fit_an_cr $residuals^2))
+# fit_an_cr_dg <- lm(DG_obs~DG_pred,data = pred_an_cr_fmy)
+# summary(fit_an_cr_dg)
+# sqrt(mean(fit_an_cr_dg$residuals^2))
+```
+
+```{r}
+pred_fclim_cr <- pred_fclim_cr %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fclim_cr_fmy <- pred_fclim_cr %>%
+  filter(Year == fMEASYEAR)
+# par(mfrow=c(1,2))
+# plot(pred_fan_cr_fmy$DIA,pred_fan_cr_fmy$fDIA,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DBH - Reduced: Tree-Rings + Climate")
+# plot(pred_fan_cr_fmy$DG_pred,pred_fan_cr_fmy$DG_obs,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DG - Reduced: Tree-Rings + Climate")
+fit_fclim_cr <- lm(fDIA~DIA,data = pred_fclim_cr_fmy)
+summary(fit_fclim_cr )
+sqrt(mean(fit_fclim_cr $residuals^2))
+# fit_fan_cr_dg <- lm(DG_obs~DG_pred,data = pred_fan_cr_fmy)
+# summary(fit_fan_cr_dg)
+# sqrt(mean(fit_fan_cr_dg$residuals^2))
+```
+
+```{r}
+pred_clim_cr <- pred_clim_cr %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_clim_cr_fmy <- pred_clim_cr %>%
+  filter(Year == fMEASYEAR)
+# par(mfrow=c(1,2))
+# plot(pred_fan_cr_fmy$DIA,pred_fan_cr_fmy$fDIA,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DBH - Reduced: Tree-Rings + Climate")
+# plot(pred_fan_cr_fmy$DG_pred,pred_fan_cr_fmy$DG_obs,
+#      xlab = "Predicted", ylab = "Observed",
+#      main = "DG - Reduced: Tree-Rings + Climate")
+fit_clim_cr <- lm(fDIA~DIA,data = pred_clim_cr_fmy)
+summary(fit_clim_cr )
+sqrt(mean(fit_clim_cr $residuals^2))
+# fit_an_cr_dg <- lm(DG_obs~DG_pred,data = pred_an_cr_fmy)
+# summary(fit_an_cr_dg)
+# sqrt(mean(fit_an_cr_dg$residuals^2))
+```
+
