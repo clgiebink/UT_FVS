@@ -126,3 +126,80 @@ processed.path <- "./data/formatted/"
 write.csv(ppt.extr, paste0(processed.path,"ppt_extr.csv"), row.names = F)
 write.csv(tmin.extr, paste0(processed.path,"tmin_extr.csv"), row.names = F)
 write.csv(tmax.extr, paste0(processed.path,"tmax_extr.csv"), row.names = F)
+
+#Climate Normals ----
+#5/27/2020
+
+#Original code by Michiel Pillet
+#mdpillet@gmail.com
+#Updated by Courtney Giebink
+#clgiebink@gmail.com
+
+### PRISM download May, 2020
+### http://www.prism.oregonstate.edu/
+
+library(raster)
+library(rgdal)
+
+# Read PRISM normals
+PRISM.norm.path <-  "./data/raw/climate/normals"
+ppt.norm.files <- list.files(path = PRISM.norm.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+tmp.norm.files <- list.files(path = PRISM.norm.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
+tmx.norm.files <- list.files(path = PRISM.norm.path, pattern = glob2rx("*tmax*.bil"), full.names = TRUE)
+ppt.normals <- stack(ppt.norm.files)
+tmp.normals <- stack(tmp.norm.files)
+tmx.normals <- stack(tmx.norm.files)
+
+# Validation ----
+
+# Crop normals to extent of BA (for better visualization)
+library(maps)
+m <- ggplot2::map_data('state', region = 'Utah')
+ut_spat <- SpatialPointsDataFrame(coords = cbind(m$long, m$lat), 
+                                  data = m, 
+                                  proj4string = CRS("+proj=longlat +datum=NAD83"))
+cropUT <- extent(ut_spat)
+PPT.norm <- crop(ppt.normals, cropUT)
+TMP.norm <- crop(tmp.normals, cropUT)
+TMX.norm <- crop(tmx.normals, cropUT)
+
+# Export monthly normals
+writeRaster(PPT.norm, paste0(PRISM.norm.path, "pptNormals.tif"), overwrite = T)
+writeRaster(TMP.norm, paste0(PRISM.norm.path, "tmpNormals.tif"), overwrite = T)
+writeRaster(TMX.norm, paste0(PRISM.norm.path, "tmxNormals.tif"), overwrite = T)
+
+#original code from Margaret Evans
+#margaret.ekevans@gmail.com
+
+#new trees w/ LAT & LON
+val_trees <- val_dset %>%
+  dplyr::select(TRE_CN,LON,LAT)
+
+# Make lat, lon data spatial
+val_tree_spat <- SpatialPointsDataFrame(coords = cbind(val_trees$LON, val_trees$LAT), 
+                                        data = val_trees, 
+                                        proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# Read in PRISM climate stacks
+ppt.norm <- stack(paste(PRISM.norm.path,"pptNormals.tif",sep=''))
+tmx.norm <- stack(paste(PRISM.norm.path,"tmxNormals.tif",sep=''))
+tmp.norm <- stack(paste(PRISM.norm.path,"tmpNormals.tif",sep=''))
+
+# raster::extract PRISM data
+n.ppt.extr <- raster::extract(ppt.norm, val_tree_spat)
+n.tmp.extr <- raster::extract(tmp.norm, val_tree_spat)
+n.tmx.extr <- raster::extract(tmx.norm, val_tree_spat)
+
+# Add sensible column names for raster::extracted climate data
+n.ppt.extr <- as.data.frame(n.ppt.extr)
+n.ppt.extr$TRE_CN <- val_trees$TRE_CN
+n.tmp.extr <- as.data.frame(n.tmp.extr)
+n.tmp.extr$TRE_CN <- val_trees$TRE_CN
+n.tmx.extr <- as.data.frame(n.tmx.extr)
+n.tmx.extr$TRE_CN <- val_trees$TRE_CN
+
+# Export climate data
+processed.path <- "./data/formatted/"
+write.csv(n.ppt.extr, paste0(processed.path,"n_ppt_extr.csv"), row.names = F)
+write.csv(n.tmp.extr, paste0(processed.path,"n_tmp_extr.csv"), row.names = F)
+write.csv(n.tmx.extr, paste0(processed.path,"n_tmx_extr.csv"), row.names = F)
