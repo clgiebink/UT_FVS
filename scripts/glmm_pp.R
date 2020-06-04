@@ -8,8 +8,7 @@
 load(file = './data/formatted/data_all_pp')
 
 data_all_pp <- data_all_pp %>%
-  mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
-  mutate(radians = tASPECT * pi/180) %>%
+  mutate(radians = tASPECT * (pi/180)) %>%
   mutate(sin = sin(radians - 0.7854) * SLOPE,
          cos = cos(radians - 0.7854) * SLOPE)
 
@@ -21,8 +20,9 @@ data_all_pp <- data_all_pp %>%
 min(data_all_pp$MEASYEAR) #1992 -> 1962
 
 glmm_data_pp <- data_all_pp %>%
-  dplyr::select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
+  dplyr::select(PLT_CN,FVS_LOC_CD,TRE_CN, RW, dds, Year, DIA_C, 
+         SICOND, tASPECT, SLOPE, BAL, SDI, CR, CR_weib, PCCF, CCF, 
+         cos, sin, solrad_an, solrad_JanApr, solrad_MayAug, solrad_SepDec,
          ppt_pDec, ppt_Jun, ppt_Jul, ppt_pOct,
          ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
          ppt_pAugJan, wateryr, ppt_pAugJul, ppt_pJunSep,
@@ -46,7 +46,6 @@ save(glmm_data_pp, file = "./data/formatted/glmm_data_pp.Rdata")
 #Missing data
 sum(is.na(glmm_data_pp)) #756
 summary(glmm_data_pp)
-#ASPECT - 711
 #ppt_pDec - 5
 #ppt_pOct - 5
 #ppt_pAugOct - 5
@@ -57,20 +56,7 @@ summary(glmm_data_pp)
 which(is.na(glmm_pp_z$ppt_pDec))
 glmm_pp_z <- glmm_pp_z %>%
   filter(!is.na(ppt_pDec))
-miss_asp_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$ASPECT)]) #19
-# 2.858391e+12 2.858393e+12 2.873697e+12 2.875406e+12 2.876414e+12 2.876415e+12 2.876519e+12 2.879914e+12
-# 2.880191e+12 2.880197e+12 2.880321e+12 2.880322e+12 2.907647e+12 2.907648e+12 2.907875e+12 2.908047e+12
-# 2.930116e+12 2.907876e+12 2.875410e+12
-asp_check_pp <- per_cov %>%
-  filter(TRE_CN %in% miss_asp_pp)
-asp_check_pp <- data_all_pp %>%
-  filter(SLOPE <= 5)
-unique(asp_check_pp$ASPECT) #NA
-length(data_all_pp$ASPECT[data_all_pp$ASPECT == 0]) #1079;NAs?
-glmm_pp_z <- glmm_pp_z %>% 
-  mutate(z.ASPECT = replace_na(z.ASPECT,0))
-
-write.csv(asp_check,file = "./data/formatted/check/asp_check.csv")
+miss_asp_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$tASPECT)]) #0
 
 miss_clim_pp <- unique(glmm_data_pp$TRE_CN[is.na(glmm_data_pp$ppt_pDec)])
 # 2.858378e+12 2.875469e+12 2.930116e+12 2.907876e+12 2.875410e+12
@@ -114,13 +100,6 @@ ppcomp  (list(fit_ex, fit_gm), legendtext = plot.legend)
 
 #growth trends across time
 library(ggplot2)
-#library(bit64)
-#as.integer64(.Machine$integer.max) + 1L
-ggplot(data = glmm_data_pp, aes(x = Year, y = RW)) +
-  geom_line(colour = glmm_data_pp$TRE_CN, group = glmm_data_pp$TRE_CN) +
-  xlab("Year of Growth") + ylab("Increment (in)")
-#error
-
 
 #understanding random effects: TRE_CN
 growth_yr_plots_pp <- glmm_data_pp %>% 
@@ -230,6 +209,17 @@ ggplot(data = glmm_data_pp, aes(x = CR_weib, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #constant variance; slight negative relationship
 
+#FVS_loc_cd
+glmm_pp_z %>%
+  select(TRE_CN,FVS_LOC_CD) %>%
+  distinct() %>%
+  group_by(FVS_LOC_CD) %>%
+  summarise(n=n())
+#LOC_CD   n
+#  401     7
+#  407    51
+#  410    15
+
 ##Model Building
 library(lme4)
 library(lmerTest)
@@ -245,6 +235,13 @@ glmm_pp_z <- stdize(as.data.frame(glmm_data_pp),append=TRUE)
 glmm_pp_z <- glmm_pp_z %>%
   filter(!is.na(z.wateryr))
 save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
+
+#site index incorrect
+#either reduce or calculate with height and age
+glmm_pp_z <- glmm_pp_z %>%
+  filter(TRE_CN %in% data_si_ok$TRE_CN)
+length(unique(glmm_pp_z$TRE_CN))
+#87 -> 73
 
 
 #ccf insignificant in current lm
