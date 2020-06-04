@@ -48,9 +48,9 @@ unique(miss_data$STATUSCD)
 # 1 2
 miss_mort <- miss_data %>%
   filter(STATUSCD == 2) %>%
-  select(STATUSCD,MORTYR) %>%
-  distinct()
+  select(PLT_CN,SUBP,TRE_CN,SPCD,MEASYEAR,STATUSCD,MORTYR)
 #no mortality year; no way to reconstruct death
+write.csv(miss_mort,file = "./data/formatted/miss_mort.csv")
 
 #filter for live trees
 miss_data <- miss_data %>%
