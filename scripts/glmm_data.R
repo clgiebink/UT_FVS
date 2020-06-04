@@ -92,6 +92,9 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
+#alternative
+load(file = "./data/formatted/clim_all.Rdata")
+data_all <- left_join(incr_calcov,clim_all)
 
 #tranform aspect
 data_all <- data_all %>%
@@ -100,7 +103,52 @@ data_all <- data_all %>%
 save(data_all, file = "./data/formatted/data_all.Rdata")
 
 #check
-length(unique(data_all$TRE_CN)) #504
+length(unique(data_all$TRE_CN)) #568
+
+data_all$tCONDID <- tree$CONDID[match(data_all$TRE_CN,tree$CN)]
+data_check <- data_all %>%
+    filter(SPCD %in% c(93,122,202))
+unique(data_check$tCONDID)
+#1
+
+# Site index check
+# first site tree?
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE, SITREE_EST FROM SITETREE")) %>%
+  collect()
+#data_all$SITREE <- SITREE$SITREE[match(data_all$TRE_CN, SITREE$CN)]
+colnames(SITREE)[colnames(SITREE)=="SUBP"] <- "SUBP_t"
+SITREE$PLT_CN <- as.numeric(SITREE$PLT_CN)
+data_check <- left_join(data_all, SITREE)
+data_check2 <- data_check %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  ungroup() %>%
+  select(TRE_CN,SICOND,SITREE) %>%
+  distinct()
+#no match
+
+# second - site base age and site species
+data_all$SISP <- cond$SISP[match(data_all$PLT_CN, cond$PLT_CN)]
+data_all$SIBASE <- cond$SIBASE[match(data_all$PLT_CN, cond$PLT_CN)]
+data_check <- data_all %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  ungroup() %>%
+  select(PLT_CN,SUBP_t,TRE_CN,SPCD,SICOND,SISP,SIBASE) %>%
+  distinct()
+colnames(data_check)[colnames(data_check)=="SISP"] <- "SISP_cond"
+colnames(data_check)[colnames(data_check)=="SIBASE"] <- "SIBS_cond"
+data_si_test <- left_join(data_check, SITREE, by = c("PLT_CN","SUBP_t","SPCD"))
+
+cal_si <- data_si_test %>%
+  filter(SPCD != SISP)
+write.csv(cal_si, file = "./data/formatted/cal_si.csv")
+
+data_si_ok <- data_check %>%
+  filter(SPCD == SISP) #%>%
+  #group_by(SPCD) %>%
+  #summarise(n=n())
 
 #make seasonal climate variables
 #refer to climate-growth analysis
@@ -109,7 +157,7 @@ length(unique(data_all$TRE_CN)) #504
 #DF
 data_all_df <- data_all %>%
   filter(SPCD == 202)
-length(unique(data_all_df$TRE_CN)) #131
+length(unique(data_all_df$TRE_CN)) #136
 
 #total ppt
 #1 month: pOct,pDec, Jun, Jul
@@ -170,7 +218,7 @@ save(data_all_df, file = "./data/formatted/data_all_df.Rdata")
 ##PP
 data_all_pp <- data_all %>%
   filter(SPCD == 122)
-length(unique(data_all_pp$TRE_CN)) #73
+length(unique(data_all_pp$TRE_CN)) #87
 
 #total ppt
 #1 month: ,pDec, Jun, Jul, pOct
@@ -220,7 +268,7 @@ save(data_all_pp, file = "./data/formatted/data_all_pp.Rdata")
 #ES
 data_all_es <- data_all %>%
   filter(SPCD == 93)
-length(unique(data_all_es$TRE_CN)) #50
+length(unique(data_all_es$TRE_CN)) #95
 
 #total ppt
 #1 month: Jul, Apr
@@ -243,7 +291,7 @@ data_all_es <- data_all_es %>%
          ppt_pAugJul = lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) + lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
 
 #16 months: previous June to current Sept
-data_all_pp <- data_all_pp %>%
+data_all_es <- data_all_es %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
   mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
