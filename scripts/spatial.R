@@ -45,3 +45,32 @@ ggplot() +
   coord_fixed() +
   theme(legend.position = "bottom")
 
+
+#https://eriqande.github.io/rep-res-web/lectures/making-maps-with-R.html
+library(ggplot2)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(viridis)
+
+ut_df <- subset(states, region == "utah")
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+)
+
+ggplot()+
+  geom_polygon(data = m, aes(x = long, y = lat, group = group),
+               color = "black", fill = "white") + 
+  coord_fixed(1.3) + 
+  geom_point(data=spatial_df,aes(x=LON,y=LAT,
+                                     color=factor(Species),shape=factor(Species),alpha = .9))+
+  scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1")) +
+  theme_bw() +
+  ditch_the_axes
