@@ -13,7 +13,7 @@ unique(miss_data$DESIGNCD)
 subp_exam <- density_data %>%
   group_by(PLT_CN,DESIGNCD) %>%
   summarise(subp_des <- length(unique(SUBP_t)))
-
+  
 #expansion factor (TPA) is based on DIA in variale radius plots
 #410 is 40 BAF variable radius
 #TPA = (BAF/0.005454*DIA^2)/N
@@ -74,7 +74,7 @@ for(i in 1:nrow(density_data)){
   density_data$CCF_t[i] <- CCF_t
 }
 
-#PCCF is the crown competition factor on the inventory point where the tree is established
+  #PCCF is the crown competition factor on the inventory point where the tree is established
 #pCCF = the sum of CCF_t on a subplot on a per acre basis
 #subplot given by SUBP
 #TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
@@ -89,7 +89,7 @@ density_data <- density_data %>%
   group_by(PLT_CN,SUBP_t,Year) %>%
   mutate(PCCF = sum(CCF_t * (TPA_C * SUBP_N), na.rm = TRUE))
 
-length(unique(density_data$PLT_CN)) #435
+length(unique(density_data$PLT_CN)) #475
 
 #stand CCF = sum(CCFt on a plot) on a per acre basis
 #plot given by PLT_CN
