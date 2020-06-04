@@ -8,8 +8,7 @@
 load(file = './data/formatted/data_all_es')
 
 data_all_es <- data_all_es %>%
-  mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT)) %>%
-  mutate(radians = tASPECT * pi/180) %>%
+  mutate(radians = tASPECT * (pi/180)) %>%
   mutate(sin = sin(radians - 0.7854) * SLOPE,
          cos = cos(radians - 0.7854) * SLOPE)
 
@@ -21,8 +20,9 @@ data_all_es <- data_all_es %>%
 min(data_all_es$MEASYEAR) #1992 -> 1962
 
 glmm_data_es <- data_all_es %>%
-  dplyr::select(PLT_CN,TRE_CN, RW, dds, Year, DIA_C, 
-         SICOND, ASPECT, tASPECT, SLOPE, BAL, CR, CR_weib, PCCF, CCF, cos, sin,
+  dplyr::select(PLT_CN, FVS_LOC_CD, TRE_CN, RW, dds, Year, DIA_C, 
+         SICOND, tASPECT, SLOPE, BAL, SDI, CR, CR_weib, PCCF, CCF, 
+         cos, sin, solrad_an, solrad_JanApr, solrad_MayAug, solrad_SepDec,
          ppt_Jul, ppt_Apr,
          ppt_pJunAug, ppt_JunAug, ppt_pJulSep, ppt_pOctDec,
          ppt_pJunNov, wateryr, ppt_pAugJul, ppt_pJunSep,
@@ -47,32 +47,31 @@ save(glmm_data_es, file = "./data/formatted/glmm_data_es.Rdata")
 #Exploration
 
 #Missing data
-sum(is.na(glmm_data_es)) #556
+sum(is.na(glmm_data_es)) #0
 summary(glmm_data_es)
-#ASPECT - 556
-miss_asp_es <- unique(glmm_data_es$TRE_CN[is.na(glmm_data_es$ASPECT)]) #2
-asp_check_es <- per_cov %>%
-  filter(TRE_CN %in% miss_asp_es)
-glmm_data_es$ASPECT %>% replace_na(0)
-
 
 #almost one tree per plot so don't need to have plot as random effect
 length(unique(data_all_es$TRE_CN))
-#50
+#95
 length(unique(data_all_es$PLT_CN))
-#45
+#76
+tre_plt_es <- data_all_es %>% 
+  select(PLT_CN,TRE_CN) %>%
+  distinct() %>%
+  group_by(PLT_CN) %>%
+  summarise(n=n())
+length(unique(tre_plt_es$PLT_CN))#76
+max(tre_plt_es$n) #2
 
 which(glmm_data_es$RW == 0) #2611 (row number)
 #1 missing ring
 #replace with smallest rw of on same core
-#works
 glmm_data_es <- glmm_data_es %>%
   group_by(TRE_CN) %>%
-  mutate(tdds = ifelse(RW != 0, dds, 
-                       (2*(min(RW[RW > 0]))*0.0393701)^2))
+  mutate(dds = ifelse(RW != 0, dds, 
+                      min(dds[dds > 0])))
 which(is.na(glmm_data_es$RW)) #0
-which(glmm_data_es$dds == 0) #262
-which(glmm_data_es$tdds == 0) #0
+which(glmm_data_es$dds == 0) #0
 
 
 #distribution of the response variable
@@ -82,13 +81,6 @@ hist(glmm_data_es$dds,breaks = 100, main = "Histogram of DDS (in)", xlab = "Incr
 
 #growth trends across time
 library(ggplot2)
-#library(bit64)
-#as.integer64(.Machine$integer.max) + 1L
-ggplot(data = glmm_data_es, aes(x = Year, y = RW)) +
-  geom_line(colour = glmm_data_es$TRE_CN, group = glmm_data_es$TRE_CN) +
-  xlab("Year of Growth") + ylab("Increment (in)")
-#error
-
 
 #understanding random effects: TRE_CN
 growth_yr_plots_es <- glmm_data_es %>% 
@@ -198,6 +190,21 @@ ggplot(data = glmm_data_es, aes(x = CR_weib, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #constant variance; slight negative relationship
 
+#FVS_loc_cd
+glmm_es_z %>%
+  select(TRE_CN,FVS_LOC_CD) %>%
+  distinct() %>%
+  group_by(FVS_LOC_CD) %>%
+  summarise(n=n())
+#LOC_CD    n
+#   401     9
+#   404     1
+#   407    43
+#   408     1
+#   410    13
+#   418     3
+#   419     8
+
 ##Model Building
 library(lme4)
 library(lmerTest)
@@ -210,6 +217,13 @@ library(lmerTest)
 library(MuMIn)
 glmm_es_z <- stdize(as.data.frame(glmm_data_es),append=TRUE)
 save(glmm_es_z,file = "./data/formatted/glmm_es_z.Rdata")
+
+#site index incorrect
+#either reduce or calculate with height and age
+glmm_es_z <- glmm_es_z %>%
+  filter(TRE_CN %in% data_si_ok$TRE_CN)
+length(unique(glmm_es_z$TRE_CN))
+#95 -> 78
 
 #slope^2, dbh^2, and pccf are insignificant in current lm
 old_fvs <- lm(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
