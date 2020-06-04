@@ -239,7 +239,7 @@ seas_dirad <- function(begin, end, Lat, Lon, Elevation, Slope, Aspect) {
 #MayAug = (121:243)
 #SepDec = (244:365)
 
-incr_test <- incr_imputed %>%
+incr_imputed <- incr_imputed %>%
   group_by(TRE_CN) %>%
   mutate(solrad_an = seas_dirad(begin = 1, end = 365, Lat = LAT, Lon = LON, 
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
@@ -249,6 +249,29 @@ incr_test <- incr_imputed %>%
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
          solrad_SepDec = seas_dirad(begin = 244, end = 365, Lat = LAT, Lon = LON, 
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT))
+save(incr_imputed,file = "./data/formatted/incr_imputed.Rdata")
 
+#Validation data ----
 
+val_dset <- val_dset %>%
+  mutate(sin = sin((ASPECT * (pi/180)) - 0.7854) * SLOPE,
+         cos = cos((ASPECT * (pi/180)) - 0.7854) * SLOPE)
 
+#function applied to all trees.
+#seas_dirad
+#JanApr = (1:120)
+#MayAug = (121:243)
+#SepDec = (244:365)
+
+val_dset <- val_dset %>%
+  group_by(TRE_CN) %>%
+  mutate(solrad_an = seas_dirad(begin = 1, end = 365, Lat = LAT, Lon = LON, 
+                                Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT),
+         solrad_JanApr = seas_dirad(begin = 1, end = 120, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT),
+         solrad_MayAug = seas_dirad(begin = 121, end = 243, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT),
+         solrad_SepDec = seas_dirad(begin = 244, end = 365, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT))
+
+save(val_dset,file = "./data/formatted/val_dset.Rdata")
