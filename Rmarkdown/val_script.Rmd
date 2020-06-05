@@ -884,7 +884,9 @@ cr_int <- function(data){
   }
   return(cr_int_df)
 }
+save(cr_int_df, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/cr_int_df.Rdata")
 ```
+
 
 ```{r}
 val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df) {
@@ -1885,6 +1887,43 @@ bal_yr_plots$plots[[40]]
 bal_yr_plots$plots[[70]]
 ```
 
+```{r}
+#cr
+pred_clim_2 <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR | Year == MEASYEAR + 1) %>%
+  mutate(cr_change = lag(CR_weib) - CR_weib)
+hist(pred_clim_2$cr_change, breaks = 50,
+     xlab = "CR(t) - CR(t+1)")
+
+pred_clim_2 <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR | Year == fMEASYEAR) %>%
+  mutate(cr_change = lag(CR_weib) - CR_weib)
+hist(pred_clim_2$cr_change, breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "Weibull Distribution")
+
+hist((val_dset$CR_weib - val_dset$fCR), breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "Observed")
+
+##fvs
+hist((fvs_check_red$PctCr - fvs_check_red$CR2), breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "FVS")
+```
+
+```{r}
+#bal
+pred_clim_1 <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR)
+
+pred_clim_1$PtBAL <- fvs_check_red$PtBAL[match(pred_clim_1$TRE_CN,fvs_check_red$nTRE_CN)]
+
+plot(pred_clim_1$BAL,pred_clim_1$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL")
+```
+
+
 Compare predictions to observations
 
 ## Annual
@@ -1949,6 +1988,76 @@ plot(pred_fan_fmy$DIA,pred_fan_fmy$diff, xlab = "predicted", ylab= "residuals")
 ```
 
 
+```{r}
+#merge with climate normals
+n_ppt <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_ppt_extr.csv")
+n_tmp <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmp_extr.csv")
+n_tmx <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmx_extr.csv")
+```
+
+```{r}
+#calculate anomalies
+#get total/average climate variable during projection cycle for each tree
+val_clim_red <- val_clim %>%
+  mutate(ppt_an = ppt_Jan+ppt_Feb+ppt_Mar+ppt_Apr+ppt_May+ppt_Jun
+         +ppt_Jul+ppt_Aug+ppt_Sep+ppt_Oct+ppt_Nov+ppt_Dec,
+         tmx_an = (tmax_Jan+tmax_Feb+tmax_Mar+tmax_Apr+tmax_May+tmax_Jun
+         +tmax_Jul+tmax_Aug+tmax_Sep+tmax_Oct+tmax_Nov+tmax_Dec)/12) %>%
+  select(TRE_CN,Year,ppt_an,tmx_an)
+pred_an_full <- left_join(pred_an_full,val_clim_red)
+
+#get 30 year normals
+pred_an_full$n_ppt <- n_ppt$normalspptNormals[match(pred_an_full$TRE_CN,n_ppt$TRE_CN)]
+pred_an_full$n_tmx <- n_tmx$normalstmxNormals[match(pred_an_full$TRE_CN,n_tmx$TRE_CN)]
+
+#calculate anomalies
+pred_an_full<- pred_an_full %>%
+  group_by(TRE_CN) %>%
+  mutate(ppt_an_m = mean(ppt_an),
+         tmx_an_m = mean(tmx_an),
+         ppt_diff_av = mean(ppt_an) - n_ppt,
+         ppt_av_diff = mean(ppt_an - n_ppt),
+         tmx_diff_av = mean(tmx_an) - n_tmx,
+         tmx_av_diff = mean(tmx_an - n_tmx))
+length(unique(pred_an_full$TRE_CN[pred_an_full$ppt_diff_av == pred_an_full$ppt_av_diff]))
+
+#determine association with residuals
+pred_fan_fmy <- pred_an_full %>%
+  filter(Year == fMEASYEAR) %>%
+  mutate(diff = DIA - fDIA)
+
+#plot
+pred_fan_fmy$SPCD <- as.factor(pred_fan_fmy$SPCD)
+#map, mat
+ggplot(data = pred_fan_fmy, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_fan_fmy, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  theme_minimal()
+#anomalies with 30 yr normals
+ggplot(data = pred_fan_fmy, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+ggplot(data = pred_fan_fmy, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+```
+
+
 #### Reduced
 
 ```{r}
@@ -1968,6 +2077,55 @@ hist(pred_an_fmy$diff, breaks = 50, main = "Histogram",xlab= "Residuals")
 qqnorm(pred_an_fmy$diff)
 qqline(pred_an_fmy$diff)
 plot(pred_an_fmy$DIA,pred_an_fmy$diff, xlab= "predicted", ylab = "residuals")
+```
+
+```{r}
+#calculate anomalies
+#get total/average climate variable during projection cycle for each tree
+pred_an <- left_join(pred_an,val_clim_red)
+
+#get 30 year normals
+pred_an$n_ppt <- n_ppt$normalspptNormals[match(pred_an$TRE_CN,n_ppt$TRE_CN)]
+pred_an$n_tmx <- n_tmx$normalstmxNormals[match(pred_an$TRE_CN,n_tmx$TRE_CN)]
+
+#calculate anomalies
+pred_an<- pred_an %>%
+  group_by(TRE_CN) %>%
+  mutate(ppt_an_m = mean(ppt_an),
+         tmx_an_m = mean(tmx_an),
+         ppt_diff_av = mean(ppt_an) - n_ppt,
+         ppt_av_diff = mean(ppt_an - n_ppt),
+         tmx_diff_av = mean(tmx_an) - n_tmx,
+         tmx_av_diff = mean(tmx_an - n_tmx))
+
+#determine association with residuals
+pred_an_fmy <- pred_an %>%
+  filter(Year == fMEASYEAR) %>%
+  mutate(diff = DIA - fDIA)
+#plot
+pred_an_fmy$SPCD <- as.factor(pred_an_fmy$SPCD)
+#map, mat
+ggplot(data = pred_an_fmy, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_an_fmy, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  theme_minimal()
+#anomalies with 30 yr normals
+ggplot(data = pred_an_fmy, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_an_fmy, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
 ```
 
 ## Climate
@@ -2041,6 +2199,56 @@ plot(pred_fclim_fmy$DIA,pred_fclim_fmy$diff, xlab= "predicted", ylab = "residual
 ```
 
 
+```{r}
+#calculate anomalies
+#get total/average climate variable during projection cycle for each tree
+pred_clim_full <- left_join(pred_clim_full,val_clim_red)
+
+#get 30 year normals
+pred_clim_full$n_ppt <- n_ppt$normalspptNormals[match(pred_clim_full$TRE_CN,n_ppt$TRE_CN)]
+pred_clim_full$n_tmx <- n_tmx$normalstmxNormals[match(pred_clim_full$TRE_CN,n_tmx$TRE_CN)]
+
+#calculate anomalies
+pred_clim_full <- pred_clim_full %>%
+  group_by(TRE_CN) %>%
+  mutate(ppt_an_m = mean(ppt_an),
+         tmx_an_m = mean(tmx_an),
+         ppt_diff_av = mean(ppt_an) - n_ppt,
+         ppt_av_diff = mean(ppt_an - n_ppt),
+         tmx_diff_av = mean(tmx_an) - n_tmx,
+         tmx_av_diff = mean(tmx_an - n_tmx))
+
+#determine association with residuals
+pred_fclim_fmy <- pred_clim_full %>%
+  filter(Year == fMEASYEAR) %>%
+  mutate(diff = DIA - fDIA)
+
+#plot
+pred_fclim_fmy$SPCD <- as.factor(pred_fclim_fmy$SPCD)
+#map, mat
+ggplot(data = pred_fclim_fmy, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_fclim_fmy, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  theme_minimal()
+#anomalies with 30 yr normals
+ggplot(data = pred_fclim_fmy, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_fclim_fmy, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+```
+
 #### Reduced
 
 ```{r}
@@ -2051,6 +2259,56 @@ hist(pred_rclim_fmy$diff, breaks = 50, main = "Histogram",xlab= "Residuals")
 qqnorm(pred_rclim_fmy$diff)
 qqline(pred_rclim_fmy$diff)
 plot(pred_rclim_fmy$DIA,pred_rclim_fmy$diff, xlab= "predicted", ylab = "residuals")
+```
+
+```{r}
+#calculate anomalies
+#get total/average climate variable during projection cycle for each tree
+pred_clim <- left_join(pred_clim,val_clim_red)
+
+#get 30 year normals
+pred_clim$n_ppt <- n_ppt$normalspptNormals[match(pred_clim$TRE_CN,n_ppt$TRE_CN)]
+pred_clim$n_tmx <- n_tmx$normalstmxNormals[match(pred_clim$TRE_CN,n_tmx$TRE_CN)]
+
+#calculate anomalies
+pred_clim <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  mutate(ppt_an_m = mean(ppt_an),
+         tmx_an_m = mean(tmx_an),
+         ppt_diff_av = mean(ppt_an) - n_ppt,
+         ppt_av_diff = mean(ppt_an - n_ppt),
+         tmx_diff_av = mean(tmx_an) - n_tmx,
+         tmx_av_diff = mean(tmx_an - n_tmx))
+
+#determine association with residuals
+pred_rclim_fmy <- pred_clim %>%
+  filter(Year == fMEASYEAR) %>%
+  mutate(diff = DIA - fDIA)
+
+#plot
+pred_rclim_fmy$SPCD <- as.factor(pred_rclim_fmy$SPCD)
+#map, mat
+ggplot(data = pred_rclim_fmy, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_rclim_fmy, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  theme_minimal()
+#anomalies with 30 yr normals
+ggplot(data = pred_rclim_fmy, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = pred_rclim_fmy, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
 ```
 
 ## current FVS growth model
@@ -2090,7 +2348,7 @@ length(unique(fvs_obs$PLT_CN))
 
 fvs_pred <- fvs_red %>%
   filter(DG > 0) %>%
-  select(-c("PtBAL","PctCr","PrdLen"))
+  select(-c("PtBAL","PrdLen"))
 dim(fvs_pred) 
 length(unique(fvs_pred$PLT_CN))
 
@@ -2098,6 +2356,7 @@ length(unique(fvs_pred$PLT_CN))
 colnames(fvs_obs)[colnames(fvs_obs)=="Year"] <- "MEASYEAR"
 colnames(fvs_pred)[colnames(fvs_pred)=="Year"] <- "fMEASYEAR"
 colnames(fvs_pred)[colnames(fvs_pred)=="DBH"] <- "eDBH"
+colnames(fvs_pred)[colnames(fvs_pred)=="PctCr"] <- "CR2"
 
 #merge to get first pred (median)
 #not mean of tripling
@@ -2150,6 +2409,55 @@ summary(fit_fvs_dg)
 sqrt(mean(fit_fvs_dg$residuals^2))
 ```
 
+```{r}
+#calculate anomalies
+#get total/average climate variable during projection cycle for each tree
+for(i in 1:nrow(fvs_check_red)){
+  TRE_CN <- fvs_check_red$TRE_CN[i]
+  ppt_an_tre <- pred_clim$ppt_an[pred_clim$TRE_CN==TRE_CN]
+  tmx_an_tre <- pred_clim$tmx_an[pred_clim$TRE_CN==TRE_CN]
+  fvs_check_red$ppt_an_m[i] <- mean(ppt_an_tre)
+  fvs_check_red$tmx_an_m[i] <- mean(tmx_an_tre)
+}
+
+#get 30 year normals
+fvs_check_red$n_ppt <- n_ppt$normalspptNormals[match(fvs_check_red$TRE_CN,n_ppt$TRE_CN)]
+fvs_check_red$n_tmx <- n_tmx$normalstmxNormals[match(fvs_check_red$TRE_CN,n_tmx$TRE_CN)]
+
+#get anomalies
+fvs_check_red$ppt_av_diff <- pred_rclim_fmy$ppt_av_diff[match(fvs_check_red$TRE_CN,pred_rclim_fmy$TRE_CN)]
+fvs_check_red$tmx_av_diff <- pred_rclim_fmy$tmx_av_diff[match(fvs_check_red$TRE_CN,pred_rclim_fmy$TRE_CN)]
+
+#determine association with residuals
+fvs_check_red <- fvs_check_red %>%
+  mutate(diff = DIA - fDIA)
+
+#plot
+#map, mat
+ggplot(data = fvs_check_red, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=factor(SPCD))) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = fvs_check_red, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=factor(SPCD))) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  theme_minimal()
+#anomalies
+ggplot(data = fvs_check_red, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=factor(SPCD))) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+ggplot(data = fvs_check_red, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=factor(SPCD))) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  theme_minimal()
+```
+
+
 # Predict CR
 
 Predict growth using annualized with tree rings only models for each species.
@@ -2197,10 +2505,35 @@ pred_fan_cri <- val_an_cri(newdata = val_dset,cr_int = cr_int_df, mod_df = an_al
 ```
 
 ```{r}
+pred_fan_cri <- pred_fan_cri %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fancri_fmy <- pred_fan_cri %>%
+  filter(Year == fMEASYEAR)
+fit_fan_cri <- lm(fDIA~DIA, data = pred_fancri_fmy)
+summary(fit_fan_cri)
+sqrt(mean(fit_fan_cri$residuals^2))
+```
+
+```{r}
 pred_an_cri <- val_an_cri(newdata = val_dset,cr_int = cr_int_df,mod_df = an_red_df, mod_pp = an_red_pp, 
                               mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
                               bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df)
 ```
+
+```{r}
+pred_an_cri <- pred_an_cri %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_ancri_fmy <- pred_an_cri %>%
+  filter(Year == fMEASYEAR)
+fit_an_cri <- lm(fDIA~DIA, data = pred_ancri_fmy)
+summary(fit_an_cri)
+sqrt(mean(fit_an_cri$residuals^2))
+```
+
 
 Predict growth using annualized with tree rings and climate models for each species.
 
@@ -2212,11 +2545,37 @@ pred_fclim_cri <- val_clim_cri(newdata = val_dset,cr_int = cr_int_df, mod_df = c
 ```
 
 ```{r}
+pred_fclim_cri <- pred_fclim_cri %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fclimcri_fmy <- pred_fclim_cri %>%
+  filter(Year == fMEASYEAR)
+fit_fclim_cri <- lm(fDIA~DIA, data = pred_fclimcri_fmy)
+summary(fit_fclim_cri)
+sqrt(mean(fit_fclim_cri$residuals^2))
+```
+
+
+```{r}
 pred_clim_cri <- val_clim_cri(newdata = val_dset,cr_int = cr_int_df,mod_df = clim_red_df, 
                               mod_pp = clim_red_pp, mod_es = clim_red_es,sp_stats = sp_stats,
                               nonfocal = non_focal, bratio = bratio_df ,ccf_df = ccf_df,
                               CR_WEIB_df = CR_WEIB_df, climate = val_clim)
 ```
+
+```{r}
+pred_clim_cri <- pred_clim_cri %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_climcri_fmy <- pred_clim_cri %>%
+  filter(Year == fMEASYEAR)
+fit_clim_cri <- lm(fDIA~DIA, data = pred_climcri_fmy)
+summary(fit_clim_cri)
+sqrt(mean(fit_clim_cri$residuals^2))
+```
+
 
 ```{r}
 #save
