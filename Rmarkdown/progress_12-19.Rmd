@@ -21,10 +21,10 @@ library(lmerTest)
 
 ```{r include=FALSE}
 #load data
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/incr_calcov.Rdata")
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_df_z.Rdata")
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_pp_z.Rdata")
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/glmm_es_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/incr_calcov.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_df_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_pp_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_es_z.Rdata")
 #load packages
 library(corrplot)
 ```
@@ -68,8 +68,8 @@ corrplot.mixed(E,title="Englemann spruce",mar = c(0,0,1,0))
 ### BAL
 
 ```{r include=FALSE}
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/density_data.Rdata")
-load(file = "/home/giebink/Documents/Masters/UT/UT_FVS/data/formatted/per_cov.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/density_data.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/per_cov.Rdata")
 ```
 
 Below are the calcuations for BAL. Basal area per acre is summed on a particular plot for a particular year for all trees larger than the subject tree.
