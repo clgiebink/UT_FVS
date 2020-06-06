@@ -2025,7 +2025,9 @@ length(unique(pred_an_full$TRE_CN[pred_an_full$ppt_diff_av == pred_an_full$ppt_a
 pred_fan_fmy <- pred_an_full %>%
   filter(Year == fMEASYEAR) %>%
   mutate(diff = DIA - fDIA)
+```
 
+```{r}
 #plot
 pred_fan_fmy$SPCD <- as.factor(pred_fan_fmy$SPCD)
 #map, mat
@@ -2033,11 +2035,15 @@ ggplot(data = pred_fan_fmy, aes(x = ppt_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Precipitation") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_fan_fmy, aes(x = tmx_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Max Temperature") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 #anomalies with 30 yr normals
 ggplot(data = pred_fan_fmy, aes(x = ppt_av_diff,y = diff)) +
@@ -2055,6 +2061,27 @@ ggplot(data = pred_fan_fmy, aes(x = tmx_av_diff,y = diff)) +
                                  "93" = "gold1")) +
   theme_minimal()
 
+#density
+for(i in 1:nrow(pred_fan_fmy)){
+  TRE_CN <- pred_fan_fmy$TRE_CN[i]
+  pred_fan_fmy$SDI_1[i] <- val_dset$SDI[val_dset$TRE_CN == TRE_CN]
+}
+ggplot(data = pred_fan_fmy, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#forest code
+ggplot(data = pred_fan_fmy, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
 ```
 
 
@@ -2102,6 +2129,9 @@ pred_an<- pred_an %>%
 pred_an_fmy <- pred_an %>%
   filter(Year == fMEASYEAR) %>%
   mutate(diff = DIA - fDIA)
+```
+
+```{r}
 #plot
 pred_an_fmy$SPCD <- as.factor(pred_an_fmy$SPCD)
 #map, mat
@@ -2109,22 +2139,52 @@ ggplot(data = pred_an_fmy, aes(x = ppt_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Precipitation") +
   ylab("Residual") +
+   scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_an_fmy, aes(x = tmx_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Max Temperature") +
   ylab("Residual") +
+   scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 #anomalies with 30 yr normals
 ggplot(data = pred_an_fmy, aes(x = ppt_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Precipitation - 30 yr Normal") +
   ylab("Residual") +
+   scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_an_fmy, aes(x = tmx_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Max Temperature - 30 yr Normal") +
   ylab("Residual") +
+   scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#density
+for(i in 1:nrow(pred_an_fmy)){
+  TRE_CN <- pred_an_fmy$TRE_CN[i]
+  pred_an_fmy$SDI_1[i] <- val_dset$SDI[val_dset$TRE_CN == TRE_CN]
+}
+ggplot(data = pred_an_fmy, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#forest code
+ggplot(data = pred_an_fmy, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ```
 
@@ -2222,7 +2282,9 @@ pred_clim_full <- pred_clim_full %>%
 pred_fclim_fmy <- pred_clim_full %>%
   filter(Year == fMEASYEAR) %>%
   mutate(diff = DIA - fDIA)
+```
 
+```{r}
 #plot
 pred_fclim_fmy$SPCD <- as.factor(pred_fclim_fmy$SPCD)
 #map, mat
@@ -2230,22 +2292,52 @@ ggplot(data = pred_fclim_fmy, aes(x = ppt_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Precipitation") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_fclim_fmy, aes(x = tmx_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Max Temperature") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 #anomalies with 30 yr normals
 ggplot(data = pred_fclim_fmy, aes(x = ppt_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Precipitation - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_fclim_fmy, aes(x = tmx_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Max Temperature - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#density
+for(i in 1:nrow(pred_fclim_fmy)){
+  TRE_CN <- pred_fclim_fmy$TRE_CN[i]
+  pred_fclim_fmy$SDI_1[i] <- val_dset$SDI[val_dset$TRE_CN == TRE_CN]
+}
+ggplot(data = pred_fclim_fmy, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#forest code
+ggplot(data = pred_fclim_fmy, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ```
 
@@ -2284,7 +2376,9 @@ pred_clim <- pred_clim %>%
 pred_rclim_fmy <- pred_clim %>%
   filter(Year == fMEASYEAR) %>%
   mutate(diff = DIA - fDIA)
+```
 
+```{r}
 #plot
 pred_rclim_fmy$SPCD <- as.factor(pred_rclim_fmy$SPCD)
 #map, mat
@@ -2292,22 +2386,52 @@ ggplot(data = pred_rclim_fmy, aes(x = ppt_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Precipitation") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_rclim_fmy, aes(x = tmx_an_m,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Mean Annual Max Temperature") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 #anomalies with 30 yr normals
 ggplot(data = pred_rclim_fmy, aes(x = ppt_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Precipitation - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = pred_rclim_fmy, aes(x = tmx_av_diff,y = diff)) +
   geom_point(aes(color=SPCD)) +
   xlab("Average Annual Max Temperature - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#density
+for(i in 1:nrow(pred_rclim_fmy)){
+  TRE_CN <- pred_rclim_fmy$TRE_CN[i]
+  pred_rclim_fmy$SDI_1[i] <- val_dset$SDI[val_dset$TRE_CN == TRE_CN]
+}
+ggplot(data = pred_rclim_fmy, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#forest code
+ggplot(data = pred_rclim_fmy, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ```
 
@@ -2384,8 +2508,8 @@ fvs_check <- fvs_check %>%
   filter(fSTATUSCD == 1)
 length(unique(fvs_check$CN)) #785
 fvs_check_red <- fvs_check %>%
-  mutate(nTRE_CN = as.numeric(CN)) %>%
-  filter(nTRE_CN %in% val_dset$TRE_CN)
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% val_dset$TRE_CN)
 length(unique(fvs_check_red$CN)) #710
 ```
 
@@ -2430,31 +2554,156 @@ fvs_check_red$tmx_av_diff <- pred_rclim_fmy$tmx_av_diff[match(fvs_check_red$TRE_
 
 #determine association with residuals
 fvs_check_red <- fvs_check_red %>%
-  mutate(diff = DIA - fDIA)
+  mutate(diff = eDBH - fDIA)
+```
 
+```{r}
 #plot
 #map, mat
 ggplot(data = fvs_check_red, aes(x = ppt_an_m,y = diff)) +
   geom_point(aes(color=factor(SPCD))) +
   xlab("Mean Annual Precipitation") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = fvs_check_red, aes(x = tmx_an_m,y = diff)) +
   geom_point(aes(color=factor(SPCD))) +
   xlab("Mean Annual Max Temperature") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 #anomalies
 ggplot(data = fvs_check_red, aes(x = ppt_av_diff,y = diff)) +
   geom_point(aes(color=factor(SPCD))) +
   xlab("Average Annual Precipitation - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
 ggplot(data = fvs_check_red, aes(x = tmx_av_diff,y = diff)) +
   geom_point(aes(color=factor(SPCD))) +
   xlab("Average Annual Max Temperature - 30 yr Normal") +
   ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
   theme_minimal()
+
+#density
+for(i in 1:nrow(fvs_check_red)){
+  TRE_CN <- fvs_check_red$TRE_CN[i]
+  fvs_check_red$SDI_1[i] <- val_dset$SDI[val_dset$TRE_CN == TRE_CN]
+}
+ggplot(data = fvs_check_red, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=factor(SPCD))) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()
+
+#forest code
+# ggplot(data = fvs_check_red, aes(x = FVS_LOC_CD,y = diff)) +
+#   geom_point(aes(color=factor(SPCD))) +
+#   xlab("Forest Code") +
+#   ylab("Residual") +
+#   scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+#                                  "93" = "gold1")) +
+#   theme_minimal()
+```
+
+```{r}
+hist(pred_fan_fmy$diff,breaks = 50,
+     xlab = "Residuals",main = "Full: Tree-ring")
+hist(pred_an_fmy$diff,breaks = 50,
+     xlab = "Residuals",main = "Reduced: Tree-ring")
+hist(pred_fclim_fmy$diff,breaks = 50,
+     xlab = "Residuals",main = "Full: Tree-ring + Climate")
+hist(pred_rclim_fmy$diff,breaks = 50,
+     xlab = "Residuals",main = "Reduced: Tree-ring + Climate")
+hist(fvs_check_red$diff,breaks = 50,
+     xlab = "Residuals",main = "FVS")
+```
+
+
+```{r}
+pred_fan_plot <- pred_fan_fmy %>%
+  mutate(model = "Full: Tree-rings") %>%
+  select(model,TRE_CN,SPCD,diff,ppt_an_m,tmx_an_m,ppt_av_diff,tmx_av_diff,SDI_1,FVS_LOC_CD)
+pred_an_plot <- pred_an_fmy %>%
+  mutate(model = "Reduced: Tree-rings") %>%
+  select(model,TRE_CN,SPCD,diff,ppt_an_m,tmx_an_m,ppt_av_diff,tmx_av_diff,SDI_1,FVS_LOC_CD)
+pred_fclim_plot <- pred_fclim_fmy %>%
+  mutate(model = "Full: Tree-rings + Climate") %>%
+  select(model,TRE_CN,SPCD,diff,ppt_an_m,tmx_an_m,ppt_av_diff,tmx_av_diff,SDI_1,FVS_LOC_CD)
+pred_rclim_plot <- pred_rclim_fmy %>%
+  mutate(model = "Reduced: Tree-rings + Climate") %>%
+  select(model,TRE_CN,SPCD,diff,ppt_an_m,tmx_an_m,ppt_av_diff,tmx_av_diff,SDI_1,FVS_LOC_CD)
+fvs_plot <- fvs_check_red %>%
+  mutate(model = "FVS",
+         SPCD = factor(SPCD)) %>%
+  select(model,TRE_CN,SPCD,diff,ppt_an_m,tmx_an_m,ppt_av_diff,tmx_av_diff,SDI_1)
+res_pmod_plot <- bind_rows(list(pred_fan_plot,pred_an_plot,pred_fclim_plot,pred_rclim_plot))
+res_mod_plot <- bind_rows(list(pred_fan_plot,pred_an_plot,pred_fclim_plot,pred_rclim_plot,fvs_plot))
+
+
+#plot
+#map, mat
+ggplot(data = res_mod_plot, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+ggplot(data = res_mod_plot, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+#anomalies
+ggplot(data = res_mod_plot, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+ggplot(data = res_mod_plot, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+#density
+ggplot(data = res_mod_plot, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+
+#forest code
+ggplot(data = res_pmod_plot, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
 ```
 
 
