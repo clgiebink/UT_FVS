@@ -12,6 +12,12 @@ plot <- read.csv("./data/raw/UT_PLOT.csv",header=T)
 tree <- read.csv("./data/raw/UT_TREE.csv",header = T)
 cond <- read.csv("./data/raw/UT_COND.csv",header = T)
 
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SUBP, SPCD, PREV_TRE_CN, DIA, UNCRCD FROM TREE")) %>%
+  collect()
+
 # Get trees
 # tree: "TRE_CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","UNCRCD","SITREE","TPA_UNADJ"
 ##also grab previous tree CN?
@@ -25,6 +31,8 @@ val_dset <- tree %>%
 val_dset$fDIA <- tree$DIA[match(val_dset$CN,tree$PREV_TRE_CN)]
 #get status (dead or alive) of trees at remeasurement
 val_dset$fSTATUSCD <- tree$STATUSCD[match(val_dset$CN,tree$PREV_TRE_CN)]
+#get future crown ratio to interpolate later
+val_dset$fCR <- TREE$UNCRCD[match(val_dset$TRE_CN,TREE$PREV_TRE_CN)]
 #filter for trees that were remeasured
 #trees can have a PREV_TRE_CN of NA if first measurement
 val_dset <- val_dset %>%
