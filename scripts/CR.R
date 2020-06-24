@@ -335,3 +335,142 @@ summary(cr_reg)
 #(Intercept) 55.77157    2.12068  26.299  < 2e-16 ***
 #UNCRCD       0.07914    0.02568   3.081  0.00212 **  
 plot(valcr_check$UNCRCD,valcr_check$CR_weib)
+
+
+#FVS check ----
+
+#original code Mark Castle
+library(RSQLite)
+library(tidyverse)
+#create FVS-ready database for calibration data set
+
+#Read in CSV containing validation plots and years
+load("./data/formatted/data_all.Rdata")
+cal_plt <- data_all %>%
+  ungroup() %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  dplyr::select(PLT_CN,MEASYEAR) %>%
+  distinct()
+
+
+#Remove row names column
+cal_plt$X<-NULL;head(cal_plt)
+
+#Open DB connection
+con <- dbConnect(SQLite(), "./data/raw/FIADB.db")
+
+#Extract FVS_GroupAddFilesAndKeywords table
+fvsAddKey<-dbReadTable(con, 'FVS_GROUPADDFILESANDKEYWORDS')
+
+#Extract FVS_PlotInit_Plot table
+fvsPlotInitPlot<-dbReadTable(con, 'FVS_PLOTINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitCond<-dbReadTable(con, 'FVS_STANDINIT_COND')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitPlot<-dbReadTable(con, 'FVS_TREEINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitCond<-dbReadTable(con, 'FVS_TREEINIT_COND')
+
+#Disconnect from input database
+dbDisconnect(con)
+
+#Rename  PLT_CN header in cal_plt
+names(cal_plt)[names(cal_plt)=="PLT_CN"]<-"STAND_CN";head(cal_plt)
+
+#Subset FIA utah data based on the plots in cal_plt
+fvsPlotInitPlot<-fvsPlotInitPlot[fvsPlotInitPlot$STAND_CN %in% cal_plt$STAND_CN,]
+fvsStandInitPlot<-fvsStandInitPlot[fvsStandInitPlot$STAND_CN %in% cal_plt$STAND_CN,]
+fvsTreeInitPlot<-fvsTreeInitPlot[fvsTreeInitPlot$STAND_CN %in% cal_plt$STAND_CN,]
+
+#Merge inventory years to FVSPlotInitPlot and FVSStandInitPlot
+fvsPlotInitPlot<-merge(fvsPlotInitPlot, cal_plt, by="STAND_CN", all.x = T);head(fvsPlotInitPlot)
+fvsStandInitPlot<-merge(fvsStandInitPlot, cal_plt, by="STAND_CN", all.x = T);head(fvsStandInitPlot)
+
+#Create group label based on inventory years
+fvsPlotInitPlot$NewGroup<-fvsPlotInitPlot$MEASYEAR;head(fvsPlotInitPlot)
+fvsStandInitPlot$NewGroup<-fvsStandInitPlot$MEASYEAR;head(fvsStandInitPlot)
+
+#Add NewGroup to GROUPS column
+fvsPlotInitPlot$GROUPS<-paste(fvsPlotInitPlot$GROUPS, fvsPlotInitPlot$NewGroup, sep = " ");head(fvsPlotInitPlot$GROUPS)
+fvsStandInitPlot$GROUPS<-paste(fvsStandInitPlot$GROUPS, fvsStandInitPlot$NewGroup, sep = " ");head(fvsStandInitPlot$GROUPS)
+
+#Create new UT DB
+conn <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_cal.db")
+
+#Write each of the neccesary FVS tables to DB
+dbWriteTable(conn, "FVS_GROUPADDFILESANDKEYWORDS", fvsAddKey)
+dbWriteTable(conn, "FVS_PLOTINIT_PLOT", fvsPlotInitPlot)
+dbWriteTable(conn, "FVS_STANDINIT_COND", fvsStandInitCond)
+dbWriteTable(conn, "FVS_STANDINIT_PLOT", fvsStandInitPlot)
+dbWriteTable(conn, "FVS_TREEINIT_COND", fvsTreeInitCond)
+dbWriteTable(conn, "FVS_TREEINIT_PLOT", fvsTreeInitPlot)
+
+cal_treelist <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/fvs_cal.csv")
+length(unique(cal_treelist$StandID)) #250
+cal_treelist$SpeciesFIA <- as.numeric(cal_treelist$SpeciesFIA)
+cal_red <- cal_treelist %>%
+  select(StandID,Year,PrdLen,TreeId,TreeIndex,SpeciesFIA,DBH,DG,PctCr,PtBAL,ActPt) %>%
+  filter(SpeciesFIA %in% c(93,122,202)) %>%
+  filter(DBH >= 1)
+length(unique(cal_red$StandID)) #248
+
+library(dbplyr)
+library(RSQLite)
+cal_fvsred_db <- dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/FVS_cal.db")
+#Extract FVS_StandInit_Plot table
+fvsStandInitPlot<-dbReadTable(cal_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
+std2plt <- fvsStandInitPlot %>%
+  select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID)) #63
+
+cal_red$STAND_CN <- std2plt$STAND_CN[match(cal_red$StandID,std2plt$STAND_ID)]
+length(unique(cal_red$STAND_CN)) #248
+
+cal_measyr <- cal_red %>%
+  filter(DG == 0) %>%
+  select(-DG)
+length(unique(cal_measyr$STAND_CN)) #247
+colnames(cal_measyr)[colnames(cal_measyr)=="Year"] <- "MEASYEAR"
+colnames(cal_measyr)[colnames(cal_measyr)=="SpeciesFIA"] <- "SPCD"
+colnames(cal_measyr)[colnames(cal_measyr)=="ActPt"] <- "SUBP"
+cal_measyr$PLT_CN <- as.numeric(cal_measyr$STAND_CN)
+
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FIADB.db")
+TREE <- dbReadTable(UT_FIA, 'TREE')
+TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, CR FROM TREE")) %>%
+  collect()
+colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
+colnames(TREE_red)[colnames(TREE_red)=="PLT_CN"] <- "STAND_CN"
+TREE_red$TRE_CN <- as.numeric(TREE_red$CN)
+
+cal_measyr <- left_join(cal_measyr,TREE_red)
+
+load("./data/formatted/data_all.Rdata")
+data_sp <- data_all %>%
+  ungroup() %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  filter(Year == MEASYEAR) %>%
+  select(PLT_CN,TRE_CN,SPCD,SUBP_t,MEASYEAR,DIA_C,CR_weib)
+
+colnames(data_sp)[colnames(data_sp)=="SUBP_t"] <- "SUBP"
+colnames(data_sp)[colnames(data_sp)=="DIA_C"] <- "DBH"
+
+cr_check <- left_join(data_sp,cal_measyr, by = c("PLT_CN","TRE_CN", "DBH"))
+length(unique(fvs_check$CN)) #999
+#filter for trees that are alive at remeasurement
+fvs_check <- fvs_check %>%
+  filter(fSTATUSCD == 1)
+length(unique(fvs_check$CN)) #785
+fvs_check_red <- fvs_check %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% val_dset$TRE_CN)
+length(unique(fvs_check_red$CN))
