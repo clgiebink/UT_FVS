@@ -474,3 +474,151 @@ fvs_check_red <- fvs_check %>%
   mutate(TRE_CN = as.numeric(CN)) %>%
   filter(TRE_CN %in% val_dset$TRE_CN)
 length(unique(fvs_check_red$CN))
+
+# bound ----
+
+crw_bound <- function(data,CR_WEIB_df){
+  #by tree
+  data$CR_fvs <- NA
+  data_empty <- data[F,]
+  for(t in unique(data$TRE_CN)){
+    #make dataframe
+    tre_df <- data %>%
+      filter(TRE_CN == t) %>%
+      arrange(Year)
+    Species <- tre_df$SPCD[1]
+    
+    #SDI - is SDI of stand (Stage 1968)
+    #SDI max values for each species were pulled from UT Variant overview
+    SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species]
+    #parameters true for same species
+    d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+    d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+    #Parameters of Weibull distribution: A,B,C
+    a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+    b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+    b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+    c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+    c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+    
+    N <- which(tre_df$Year == tre_df$MEASYEAR[1]) #next step is to allow N to be ring width year -1
+    if(length(N) == 0){
+      N <- which(tre_df$Year + 1 == tre_df$MEASYEAR[1])
+    }
+    if(length(N) > 0){
+      Curr_row <- N-1 #each time through subtract 1 and move down one row
+      tre_df$CR_fvs[N] <- tre_df$CR[N] #dbh when year of ring width and measure year are equal
+      while (Curr_row > 0) { #loop will stop when it gets to the end of data for that tree
+        #Calculate relative density
+        RD <- tre_df$SDI[Curr_row]/SDIMAX
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        ACR <- d0 + d1 * RD * 100
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (tre_df$CCF[Curr_row]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- tre_df$num_t[Curr_row]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- tre_df$rank_pltyr[Curr_row]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        CR_weib <- X * 10
+        
+        CR_1 <- tre_df$CR_fvs[Curr_row+1] #or CR_fvs[N] for the first round
+        #bound to 1% change per year
+        cr_bound1 <- tre_df$CR_fvs[Curr_row+1] * .01
+        tre_df$CR_fvs[Curr_row] <- ifelse(CR_1 > CR_weib, 
+                                          CR_1 - cr_bound1,
+                                          CR_1 + cr_bound1)
+        
+        #loop will stop when it gets to the end of data for that tree
+        #continue loop for next row until curr_row>0
+        Curr_row = Curr_row - 1 
+      }
+    }
+    data_empty <- bind_rows(data_empty,tre_df)
+  }
+  return(data_empty)
+}
+
+load("./data/formatted/data_all.Rdata")
+length(unique(data_all$TRE_CN)) #568
+unique(data_all$SPCD)
+#[1] 106 202 122  93  15  65 108  19  96 133 321  NA
+
+data_sp <- data_all %>%
+  filter(SPCD %in% c(93,122,202))
+
+data_test <- crw_bound(data = data_sp, CR_WEIB_df = CR_WEIB_df)
+
+for(i in 1:nrow(glmm_df_z)){
+  TRE_CN <- glmm_df_z$TRE_CN[i]
+  Year <- glmm_df_z$Year[i]
+  glmm_df_z$CR_fvs[i] <- data_test$CR_fvs[data_test$TRE_CN == TRE_CN
+                                          & data_test$Year == Year]
+}
+
+cr_mn_df <- mean(glmm_df_z$CR_fvs)
+cr_sd_df <- sd(glmm_df_z$CR_fvs)
+
+for(i in 1:nrow(glmm_df_z)){
+  glmm_df_z$z.CR_fvs[i] <- (glmm_df_z$CR_fvs[i]-cr_mn_df)/cr_sd_df
+}
+
+save(glmm_df_z, file = "./data/formatted/glmm_df_z.Rdata")
+
+for(i in 1:nrow(glmm_pp_z)){
+  TRE_CN <- glmm_pp_z$TRE_CN[i]
+  Year <- glmm_pp_z$Year[i]
+  glmm_pp_z$CR_fvs[i] <- data_test$CR_fvs[data_test$TRE_CN == TRE_CN
+                                          & data_test$Year == Year]
+}
+
+cr_mn_pp <- mean(glmm_pp_z$CR_fvs)
+cr_sd_pp <- sd(glmm_pp_z$CR_fvs)
+
+for(i in 1:nrow(glmm_pp_z)){
+  glmm_pp_z$z.CR_fvs[i] <- (glmm_pp_z$CR_fvs[i]-cr_mn_pp)/cr_sd_pp
+}
+
+save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
+
+for(i in 1:nrow(glmm_es_z)){
+  TRE_CN <- glmm_es_z$TRE_CN[i]
+  Year <- glmm_es_z$Year[i]
+  glmm_es_z$CR_fvs[i] <- data_test$CR_fvs[data_test$TRE_CN == TRE_CN
+                                          & data_test$Year == Year]
+}
+
+cr_mn_es <- mean(glmm_es_z$CR_fvs)
+cr_sd_es <- sd(glmm_es_z$CR_fvs)
+
+for(i in 1:nrow(glmm_es_z)){
+  glmm_es_z$z.CR_fvs[i] <- (glmm_es_z$CR_fvs[i]-cr_mn_es)/cr_sd_es
+}
+
+save(glmm_es_z, file = "./data/formatted/glmm_es_z.Rdata")
+
+#explore
+cr_df_ex <- glmm_df_z %>%
+  select(TRE_CN,Year,CR,CR_weib,CR_fvs)
