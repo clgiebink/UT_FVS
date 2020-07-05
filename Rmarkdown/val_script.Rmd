@@ -85,6 +85,82 @@ clim_red_df <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = glmm_df_z)
+#Constand CR
+an_mod_df <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR+
+                    #climate
+                    #competition/density
+                    z.SDI+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.solrad_MayAug+
+                    #random effects
+                    # (1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
+                   (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = glmm_df_z)
+clim_mod_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = glmm_df_z)
+#cr fvs
+clim_crfvs_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR_fvs+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = glmm_df_z)
+```
+
+```{r}
+library(r2glmm)
+r2beta(an_al_df)
+r2beta(an_red_df)
+r2beta(clim_al_df)
+r2beta(clim_red_df)
+r2beta(clim_mod_df)
+r2beta(clim_crfvs_df)
+```
+
+```{r}
+#plot r2
+r2_weib_df <- as.data.frame(r2beta(clim_red_df))
+r2_weib_df$model <- "Weibull estimation"
+r2_cr_df <- as.data.frame(r2beta(clim_mod_df))
+r2_cr_df$model <- "Constant observation"
+r2_crw_df <- as.data.frame(r2beta(clim_crfvs_df))
+r2_crw_df$model <- "Weibull bounded"
+r2_df <- bind_rows(r2_weib_df,r2_cr_df)
+r2_df <- bind_rows(r2_df,r2_crw_df)
+```
+
+```{r}
+ggplot(data = r2_df,aes(color = model)) + 
+  geom_pointrange(data = r2_df,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) + 
+  geom_point()
 ```
 
 ### Ponderosa pine
@@ -151,6 +227,47 @@ clim_red_pp <- lmer(log(dds)~
                        (1+z.DIA_C|TRE_CN)+(1|Year),
                      control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                      data = glmm_pp_z)
+#constant CR
+clim_mod_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #z.CR+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = glmm_pp_z)
+#cr fvs
+clim_crfvs_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.CR_fvs+I(z.CR_fvs^2)+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.CCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = glmm_pp_z)
+```
+
+```{r}
+r2beta(an_al_pp)
+r2beta(an_red_pp)
+r2beta(clim_al_pp)
+r2beta(clim_red_pp)
+AIC(clim_red_pp)
+r2beta(clim_mod_pp)
+r2beta(clim_crfvs_pp)
+AIC(clim_mod_pp)
 ```
 
 ### Engelmann spruce
@@ -216,7 +333,79 @@ clim_red_es <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = glmm_es_z)
+#constant CR
+an_mod_es <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    z.CR+
+                    #climate
+                    #competition/density
+                    z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = glmm_es_z)
+clim_mod_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = glmm_es_z)
+# cr fvs
+clim_crfvs_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR_fvs+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = glmm_es_z)
 ```
+
+```{r}
+r2beta(an_al_es)
+r2beta(an_red_es)
+r2beta(clim_al_es)
+r2beta(clim_red_es)
+r2beta(clim_mod_es)
+r2beta(clim_crfvs_es)
+```
+
+```{r}
+#plot r2
+r2_weib_es <- as.data.frame(r2beta(clim_red_es))
+r2_weib_es$model <- "Weibull estimation"
+r2_cr_es <- as.data.frame(r2beta(clim_mod_es))
+r2_cr_es$model <- "Constant observation"
+r2_crw_es <- as.data.frame(r2beta(clim_crfvs_es))
+r2_crw_es$model <- "Weibull bounded"
+r2_es <- bind_rows(r2_weib_es,r2_cr_es)
+r2_es <- bind_rows(r2_es,r2_crw_es)
+```
+
+```{r}
+ggplot(data = r2_es,aes(color = model)) + 
+  geom_pointrange(data = r2_es,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+ggplot(data = r2_es,aes(x = Effect, y = Rsq, color = model)) + 
+  geom_point()
+```
+
 
 ## Validation
 
@@ -228,19 +417,19 @@ Validate models by using them to predict growth and compare to observed values. 
 #data frames to standardize covariates in the model
 df_stats <- glmm_df_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_FebJul) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 pp_stats <- glmm_pp_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_JunAug) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 es_stats <- glmm_es_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_pAug) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
@@ -1574,7 +1763,7 @@ val_an_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
 ```
 
 ```{r}
-val_clim_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
+val_clim_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,climate) {
   #parameters:
   #newdata - validataion trees from FIADB
   newdata_rep <- newdata %>%
@@ -1583,7 +1772,7 @@ val_clim_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
                   TPA_UNADJ, DESIGNCD, tCONDID, census_int,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
                   FVS_LOC_CD,SDImax,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA,
-                  CR_weib) %>%
+                  CR) %>%
     mutate(Year = NA,
            DIA = NA,
            CCF = NA,
@@ -1667,7 +1856,7 @@ val_clim_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_weib[i] = unlist((plt_yr_df[i,"CR_weib"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"])
+        plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
         plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
@@ -1909,18 +2098,32 @@ hist((val_dset$CR_weib - val_dset$fCR), breaks = 50,
 ##fvs
 hist((fvs_check_red$PctCr - fvs_check_red$CR2), breaks = 50,
      xlab = "CR(start) - CR(end)", main = "FVS")
+
+val_dset$PctCR <- fvs_check_red$PctCr[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
+plot(val_dset$CR_weib,val_dset$PctCR,
+     xlab = "Observed CR", ylab = "FVS CR")
+
+
 ```
 
 ```{r}
 #bal
-pred_clim_1 <- pred_clim %>%
-  group_by(TRE_CN) %>%
-  filter(Year == MEASYEAR)
+val_dset$PtBAL <- fvs_check_red$PtBAL[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
 
-pred_clim_1$PtBAL <- fvs_check_red$PtBAL[match(pred_clim_1$TRE_CN,fvs_check_red$nTRE_CN)]
+val_dset$BAL <- density_val$BAL[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Plot-level")
 
-plot(pred_clim_1$BAL,pred_clim_1$PtBAL,
-     xlab = "My BAL", ylab = "FVS BAL")
+val_dset$BAL_s <- density_val$BAL_s[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL_s,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Subplot/point-level")
+
+val_dset$BAL_sc <- density_val$BAL_sc[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL_sc,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Subplot/point-level & Scaled")
 ```
 
 
@@ -2488,7 +2691,7 @@ fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
 #tree index > 2000 means trees died in projection?
 
 #validation dataset for future observations
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FS_FIADB_STATECD_49.db")
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FIADB.db")
 TREE <- dbReadTable(UT_FIA, 'TREE')
 TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
   collect()
@@ -2706,6 +2909,181 @@ ggplot(data = res_pmod_plot, aes(x = FVS_LOC_CD,y = diff)) +
   facet_wrap(~model)
 ```
 
+```{r}
+#by species
+res_df_plot <- res_mod_plot %>%
+  filter(SPCD == 202)
+res_pp_plot <- res_mod_plot %>%
+  filter(SPCD == 122)
+res_es_plot <- res_mod_plot %>%
+  filter(SPCD == 93)
+
+#plot
+#map
+ggplot(data = res_df_plot, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+ggplot(data = res_pp_plot, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+ggplot(data = res_es_plot, aes(x = ppt_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Precipitation") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+#mat
+ggplot(data = res_df_plot, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+ggplot(data = res_pp_plot, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+ggplot(data = res_es_plot, aes(x = tmx_an_m,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Mean Annual Max Temperature") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+#anomalies
+#precip
+ggplot(data = res_df_plot, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+ggplot(data = res_pp_plot, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+ggplot(data = res_es_plot, aes(x = ppt_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Precipitation - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal()+
+  facet_wrap(~model)
+
+#temp
+ggplot(data = res_df_plot, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+ggplot(data = res_pp_plot, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+ggplot(data = res_es_plot, aes(x = tmx_av_diff,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Average Annual Max Temperature - 30 yr Normal") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+#density
+ggplot(data = res_df_plot, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+ggplot(data = res_pp_plot, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+ggplot(data = res_es_plot, aes(x = SDI_1,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Density (SDI)") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+
+
+#forest code
+ggplot(data = res_pmod_plot, aes(x = FVS_LOC_CD,y = diff)) +
+  geom_point(aes(color=SPCD)) +
+  geom_smooth(method = 'lm',formula = y~x, se=F)+
+  xlab("Forest Code") +
+  ylab("Residual") +
+  scale_colour_manual(values = c("202" = "purple4", "122" = "turquoise4",
+                                 "93" = "gold1")) +
+  theme_minimal() +
+  facet_wrap(~model)
+```
+
 
 # Predict CR
 
@@ -2737,6 +3115,33 @@ pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_red_df, mod_pp = cl
                               bratio = bratio_df ,ccf_df = ccf_df,CR_WEIB_df = CR_WEIB_df, climate = val_clim)
 ```
 
+```{r}
+pred_clim_cr2 <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
+                              mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal,
+                              bratio = bratio_df ,ccf_df = ccf_df, climate = val_clim)
+```
+
+```{r}
+pred_clim_cr2 <- pred_clim_cr2 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_climcr2_fmy <- pred_clim_cr2 %>%
+  filter(Year == fMEASYEAR)
+par(mfrow=c(1,2))
+plot(pred_climcr2_fmy$DIA,pred_climcr2_fmy$fDIA,
+     xlab = "Predicted", ylab = "Observed",
+     main = "DBH - Reduced: Tree-Rings + Climate")
+plot(pred_climcr2_fmy$DG_pred,pred_climcr2_fmy$DG_obs,
+     xlab = "Predicted", ylab = "Observed",
+     main = "DG - Reduced: Tree-Rings + Climate")
+fit_clim_cr2 <- lm(fDIA~DIA, data = pred_climcr2_fmy)
+summary(fit_clim_cr2)
+sqrt(mean(fit_clim_cr2$residuals^2))
+fit_clim_cr2_dg <- lm(DG_obs~DG_pred, data = pred_climcr2_fmy)
+summary(fit_clim_cr2_dg)
+sqrt(mean(fit_clim_cr2_dg$residuals^2))
+```
 
 Interpolate CR
 ```{r}
