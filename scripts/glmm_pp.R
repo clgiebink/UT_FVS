@@ -74,6 +74,16 @@ clim_check_pp <- glmm_data_pp %>%
 which(glmm_data_pp$RW == 0) #0
 #no missing rings
 
+#site index
+#wrong site species
+#fix
+for(i in 1:nrow(glmm_data_pp)){
+  TRE_CN <- glmm_data_pp$TRE_CN[i]
+  if(TRE_CN %in% si_match$TRE_CN){
+    glmm_data_pp$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
+  }
+}
+
 #distribution of the response variable
 hist(glmm_data_pp$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
 hist(glmm_data_pp$dds,breaks = 100, main = "Histogram of DDS (in)", xlab = "Increment") 
@@ -234,15 +244,14 @@ glmm_pp_z <- stdize(as.data.frame(glmm_data_pp),append=TRUE)
 #remove missing data
 glmm_pp_z <- glmm_pp_z %>%
   filter(!is.na(z.wateryr))
-save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
 
 #site index incorrect
 #either reduce or calculate with height and age
 glmm_pp_z <- glmm_pp_z %>%
-  filter(TRE_CN %in% data_si_ok$TRE_CN)
+  filter(!(TRE_CN %in% cal_si$TRE_CN))
 length(unique(glmm_pp_z$TRE_CN))
-#87 -> 73
-
+#87 -> 81
+save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
 
 #ccf insignificant in current lm
 old_fvs <- lm(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+

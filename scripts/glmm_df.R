@@ -90,6 +90,14 @@ si_plot <- glmm_data_df$PLT_CN[is.na(glmm_data_df$SICOND)]
 miss_si_df <- glmm_data_df %>%
   filter(PLT_CN %in% si_plot)
 #only the 2 trees
+#wrong site species
+#fix
+for(i in 1:nrow(glmm_data_df)){
+  TRE_CN <- glmm_data_df$TRE_CN[i]
+  if(TRE_CN %in% si_match$TRE_CN){
+    glmm_data_df$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
+  }
+}
 
 #almost one tree per plot so don't need to have plot as random effect
 length(unique(data_all_df$TRE_CN))
@@ -257,14 +265,14 @@ glmm_df_z <- stdize(as.data.frame(glmm_data_df),append=TRUE)
 glmm_df_z <- glmm_df_z %>%
   filter(!is.na(z.wateryr)) %>%
   filter(!is.na(z.SICOND))
-save(glmm_df_z,file = "./data/formatted/glmm_df_z.Rdata")
 
 #site index incorrect
 #either reduce or calculate with height and age
 glmm_df_z <- glmm_df_z %>%
-  filter(TRE_CN %in% data_si_ok$TRE_CN)
+  filter(!(TRE_CN %in% cal_si$TRE_CN))
 length(unique(glmm_df_z$TRE_CN))
-#136 -> 100
+#136 -> 113
+save(glmm_df_z,file = "./data/formatted/glmm_df_z.Rdata")
 
 #dbh^2 and ccf are insignificant in current lm
 old_fvs <- lm(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+

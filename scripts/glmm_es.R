@@ -73,6 +73,15 @@ glmm_data_es <- glmm_data_es %>%
 which(is.na(glmm_data_es$RW)) #0
 which(glmm_data_es$dds == 0) #0
 
+#site index
+#wrong site species
+#fix
+for(i in 1:nrow(glmm_data_es)){
+  TRE_CN <- glmm_data_es$TRE_CN[i]
+  if(TRE_CN %in% si_match$TRE_CN){
+    glmm_data_es$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
+  }
+}
 
 #distribution of the response variable
 hist(glmm_data_es$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
@@ -216,14 +225,14 @@ library(lmerTest)
 #standardize to encourage convergence
 library(MuMIn)
 glmm_es_z <- stdize(as.data.frame(glmm_data_es),append=TRUE)
-save(glmm_es_z,file = "./data/formatted/glmm_es_z.Rdata")
 
 #site index incorrect
 #either reduce or calculate with height and age
 glmm_es_z <- glmm_es_z %>%
-  filter(TRE_CN %in% data_si_ok$TRE_CN)
+  filter(!(TRE_CN %in% cal_si$TRE_CN))
 length(unique(glmm_es_z$TRE_CN))
-#95 -> 78
+#95 -> 85
+save(glmm_es_z,file = "./data/formatted/glmm_es_z.Rdata")
 
 #slope^2, dbh^2, and pccf are insignificant in current lm
 old_fvs <- lm(log(dds+0.001)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
