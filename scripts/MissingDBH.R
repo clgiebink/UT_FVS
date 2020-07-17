@@ -1,4 +1,4 @@
-#Back calculate missing DBH
+#Back calculate missing DBH for density calculatons
 #Courtney Giebink
 #clgiebink@gmail.com
 #26 June 2019
@@ -30,7 +30,7 @@ plot_rw <- unique(incr_imputed$PLT_CN) #475
 tree_rw <- unique(incr_imputed$TRE_CN) #568
 miss_data <- tree[(tree$PLT_CN %in% plot_rw) & !(tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","STATUSCD","MORTYR","DIA","TPA_UNADJ")]
 #make sure trees are on the same plot b/c calculating stand variables
-#make sure I'm not including trees with increment data; 508
+#make sure I'm not including trees with increment data
 colnames(miss_data)[colnames(miss_data)=="CN"] <- "TRE_CN"
 colnames(miss_data)[colnames(miss_data)=="DIA"] <- "DIA_t"
 colnames(miss_data)[colnames(miss_data)=="SUBP"] <- "SUBP_t"
@@ -108,9 +108,7 @@ DIA_BAR <- function(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av){
     DIA_1 <- tree_df$DIA_C[Curr_row+1] #or DIA_t[N] for the first round
     BAR_av <- tree_df$BAR_av[Curr_row+1] 
     tree_df$DIA_C[Curr_row] <- sqrt(BAR_av * (DIA_1^2))
-    #if(tree_df$DIA_C[Curr_row] < 1){
-    #  tree_df$DIA_C <- NA
-    #}
+    #allow dbh to be <1 inch
     #continue loop for next row until curr_row>0
     Curr_row = Curr_row - 1 
   }
@@ -121,26 +119,6 @@ miss_data_imputed <- miss_data %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
   mutate(DIA_C = DIA_BAR(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av))
-
-#check
-unique(incr_imputed$TRE_CN[incr_imputed$BAR > abs(1)])
-#NA
-min(miss_data$DIA_C,na.rm = T) #Inf
-length(which(miss_data_imputed$DIA_C <= 1))
-#13791; get rid of these?
-length(which(miss_data_imputed$DIA_C <= 0))
-#0
-unique(incr_percov$CONDID)
-#[1] 1
-miss_data_imputed$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
-unique(miss_data_imputed$CONDID)
-#[1] 1
-miss_data_imputed$tCONDID <- tree$CONDID[match(miss_data_imputed$TRE_CN,tree$CN)]
-unique(miss_data_imputed$tCONDID)
-#1
-
-#filter for not dead trees
-length(unique(miss_data_imputed$TRE_CN)) #8025
 
 save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
 
@@ -153,6 +131,26 @@ density_data <- bind_rows(incr_imputed,miss_data_imputed)
 
 save(density_data,file = "./data/formatted/density_data.Rdata")
 
+#check ----
+unique(incr_imputed$TRE_CN[incr_imputed$BAR > abs(1)])
+#NA
+min(miss_data$DIA_C,na.rm = T) #Inf
+length(which(miss_data_imputed$DIA_C <= 1))
+#13791; get rid of these? no
+length(which(miss_data_imputed$DIA_C <= 0))
+#0
+unique(incr_percov$CONDID)
+#[1] 1
+miss_data_imputed$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
+unique(miss_data_imputed$CONDID)
+#[1] 1
+miss_data_imputed$tCONDID <- tree$CONDID[match(miss_data_imputed$TRE_CN,tree$CN)]
+unique(miss_data_imputed$tCONDID)
+#1
+
+length(unique(miss_data_imputed$TRE_CN)) #8025
+
+#check density data
 trees_plot <- density_data %>%
   group_by(PLT_CN) %>%
   summarise(trees_plot <- length(unique(TRE_CN)))
@@ -162,6 +160,7 @@ min(trees_plot[,2])
 max(trees_plot[,2])
 # 66
 
+#check BAR method
 ##what about the species (SPCD) that don't have increment data to calculate BAR?
 #can we use an average BAR accross species?
 hist(incr_imputed$BAR, breaks = 50) #also per species
