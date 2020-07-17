@@ -130,8 +130,8 @@ data_check2 <- data_check %>%
 #no match
 
 # second - site base age and site species
-data_all$SISP <- cond$SISP[match(data_all$PLT_CN, cond$PLT_CN)]
-data_all$SIBASE <- cond$SIBASE[match(data_all$PLT_CN, cond$PLT_CN)]
+data_all$SISP <- COND$SISP[match(data_all$PLT_CN, COND$PLT_CN)]
+data_all$SIBASE <- COND$SIBASE[match(data_all$PLT_CN, COND$PLT_CN)]
 data_check <- data_all %>%
   filter(SPCD %in% c(93,122,202)) %>%
   ungroup() %>%
@@ -141,7 +141,7 @@ colnames(data_check)[colnames(data_check)=="SISP"] <- "SISP_cond"
 colnames(data_check)[colnames(data_check)=="SIBASE"] <- "SIBS_cond"
 data_si_test <- left_join(data_check, SITREE, by = c("PLT_CN","SUBP_t","SPCD"))
 
-cal_si <- data_si_test %>%
+cal_si <- data_check %>%
   filter(SPCD != SISP)
 write.csv(cal_si, file = "./data/formatted/cal_si.csv")
 
@@ -149,6 +149,26 @@ data_si_ok <- data_check %>%
   filter(SPCD == SISP) #%>%
   #group_by(SPCD) %>%
   #summarise(n=n())
+
+#after sending to John
+#load data with matched SI
+cal_si_fx <- read_csv(file = "./data/raw/Supplemental_SI.csv")
+si_match <- cal_si_fx %>%
+  select(TRE_CN,SITREE) %>%
+  group_by(TRE_CN) %>%
+  summarise(SICOND = mean(SITREE, na.rm =T))
+
+for(i in 1:nrow(data_all)){
+  TRE_CN <- data_all$TRE_CN[i]
+  if(TRE_CN %in% si_match$TRE_CN){
+    data_all$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
+  }
+}
+
+#for filtering later
+#take out trees where SI is not fixed
+cal_si <- cal_si %>%
+  filter(!(TRE_CN %in% si_match$TRE_CN))
 
 #make seasonal climate variables
 #refer to climate-growth analysis
