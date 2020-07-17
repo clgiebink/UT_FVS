@@ -7,6 +7,8 @@
 #load the data, long format with trees stacked
 load(file = "./data/formatted/incr_percov")
 length(unique(incr_percov$TRE_CN)) #603
+#add new data, if any
+#from new_rwl.R
 load(file = "./data/formatted/incr_percov2.Rdata")
 length(unique(incr_percov2$TRE_CN)) #67
 
@@ -19,7 +21,7 @@ incr_2cov <- incr_percov2 %>%
   select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
          ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
          DIA_t,CR,TPA_UNADJ)
-
+#merge two data sets
 incr_comb <- incr_1cov %>%
   bind_rows(incr_2cov)
 length(unique(incr_comb$TRE_CN)) #670
@@ -51,17 +53,18 @@ calculateDIA <- function(TRE_CN,DIA_t,MEASYEAR,Year,RW,SPCD){
   }
   Species <- tree_df$SPCD[1]
   if(length(N) > 0 & Species %in% bratio_df$species){
-    Curr_row <- N-1 #each time through subtract 1 and move down one row
+    Curr_row <- N-1 #each time through subtract 1 and move down one row (or back one year)
     tree_df$DIA_C[N] <- tree_df$DIA_t[N] #dbh when year of ring width and measure year are equal
     while (Curr_row > 0 & !is.na(tree_df$DIA_C[Curr_row + 1])) { #loop will stop when it gets to the end of data for that tree
       DIA_1 <- tree_df$DIA_C[Curr_row+1] #or DIA_t[N] for the first round
       RW1 <- tree_df$RW[Curr_row+1] 
-      #TODO convert ring width from mm to inches
+      #convert ring width from mm to inches
       RW1 = RW1 * 0.0393701
       b1 <- bratio_df$b1[bratio_df$species == Species]
       b2 <- bratio_df$b2[bratio_df$species == Species]
       exp <- bratio_df$exp[bratio_df$species == Species]
       tree_df$DIA_C[Curr_row] <- DIA_1 - ((2*RW1)/(b1+b2/(DIA_1^exp)))
+      #stop back calculating for small trees (<1 inch)
       if(tree_df$DIA_C[Curr_row] < 1){
         tree_df$DIA_C[Curr_row] <- NA
       }
@@ -88,7 +91,7 @@ check_data <- check_data[check_data$SPCD == 202,]
 #filter for trees with back calculated DBH
 length(unique(incr_imputed$TRE_CN)) #670
 incr_imputed <- incr_imputed %>%
-  filter(!is.na(DIA_C)) #filter for >5" later
+  filter(!is.na(DIA_C)) #filter for >5" later?
 length(unique(incr_imputed$TRE_CN)) #568
 
 length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 202])) #131, 136
