@@ -14,9 +14,17 @@ cond <- read.csv("./data/raw/UT_COND.csv",header = T)
 
 library(dbplyr)
 library(RSQLite)
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
-TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SUBP, SPCD, PREV_TRE_CN, DIA, UNCRCD FROM TREE")) %>%
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, COUNTYCD, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ, INVYR FROM TREE")) %>%
   collect()
+PLOT <- tbl(UT_FIA, sql("SELECT CN, PREV_PLT_CN, MEASYEAR, DESIGNCD_P2A FROM PLOT")) %>%
+  collect()
+colnames(PLOT)[colnames(PLOT)=="CN"] <- "PLT_CN"
+COND <- tbl(UT_FIA, sql("SELECT PLT_CN, SICOND, SIBASE, SISP FROM COND")) %>%
+  collect()
+
+plt_tre <- left_join(TREE,PLOT)
+
 
 # Get trees
 # tree: "TRE_CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","UNCRCD","SITREE","TPA_UNADJ"
@@ -27,6 +35,7 @@ TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SUBP, SPCD, PREV_TRE_CN, DIA, UNCRCD
 #select relevant tree table attributes
 val_dset <- tree %>%
   select(CN,PLT_CN,STATUSCD,SPCD,SUBP,PREV_TRE_CN,DIA,UNCRCD,TPA_UNADJ)
+val_dset$CR <- TREE$CR[match(val_dset$TRE_CN,TREE$CN)]
 #get DIA at remeasurement
 val_dset$fDIA <- tree$DIA[match(val_dset$CN,tree$PREV_TRE_CN)]
 #get status (dead or alive) of trees at remeasurement
@@ -195,6 +204,16 @@ save(val_dset,file = "./data/formatted/val_dset.Rdata")
 UT_clim_an <- read.csv("./data/raw/climate/UTanPRISM_00_18.csv",header =T)
 #randomize  
 
+#multiple years of measurement?
+TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ FROM TREE")) %>%
+  collect()
+PLOT <- tbl(UT_FIA, sql("SELECT * FROM PLOT")) %>%
+  collect()
+val_ex <- TREE %>%
+  filter(CN %in% PREV_TRE_CN &
+           SPCD %in% c(93,122,202))
+val_ex$MEASYEAR <- PLOT$MEASYEAR[match(val_ex$PLT_CN, PLOT$CN)]
+
 # Density ----
 #for current year
 #fetch trees from same plot in FIADB
@@ -210,10 +229,14 @@ UT_clim_an <- read.csv("./data/raw/climate/UTanPRISM_00_18.csv",header =T)
 #get trees from same plot
 plot_val <- unique(val_dset$PLT_CN)
 tree_val <- unique(val_dset$TRE_CN)
-density_val <- tree[(tree$PLT_CN %in% plot_val),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ","UNCRCD","STATUSCD","DESIGNCD")]
+density_val <- TREE[(TREE$PLT_CN %in% plot_val),]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including validation trees
 colnames(density_val)[colnames(density_val)=="CN"] <- "TRE_CN"
+
+#remove trees that are dead
+density_val <- density_val %>%
+  filter(STATUSCD == 1)
 
 #get DIA at remeasurement
 density_val$fDIA <- tree$DIA[match(density_val$TRE_CN,tree$PREV_TRE_CN)]
@@ -306,6 +329,17 @@ density_val <- density_val %>%
   group_by(PLT_CN) %>%
   #min assigns lowest value to ties (1,2,3,3,5,6)
   mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+#on a subplot
+density_val <- density_val %>%
+  group_by(PLT_CN,SUBP) %>%
+  #min assigns lowest value to ties (1,2,3,3,5,6)
+  mutate(BAL_s = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+#scaled by subplot number
+density_val <- density_val %>%
+  group_by(PLT_CN,SUBP) %>%
+  #min assigns lowest value to ties (1,2,3,3,5,6)
+  mutate(BAL_sc = BAL_s * 4)
+
 
 #site species
 site_sum <- density_val %>%
