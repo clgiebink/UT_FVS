@@ -14,7 +14,7 @@ subp_exam <- density_data %>%
   group_by(PLT_CN,DESIGNCD) %>%
   summarise(subp_des <- length(unique(SUBP_t)))
   
-#expansion factor (TPA) is based on DIA in variale radius plots
+#expansion factor (TPA) is based on DIA in variable radius plots
 #410 is 40 BAF variable radius
 #TPA = (BAF/0.005454*DIA^2)/N
 #if DIA_C timber < 5 and woodland < 3 inches measured on microplots; TPA is 60
@@ -22,7 +22,7 @@ subp_exam <- density_data %>%
 
 density_data <- density_data %>%
   mutate(TPA_C = ifelse(DESIGNCD %in% c(423,424,425),
-                        TPA_UNADJ,
+                        TPA_UNADJ, #constant on fixed radius
                         ifelse(SPCD %in% c(475,322,814,749,321,65,66,106) & DIA_C >= 3,
                                (40/(0.005454*(DIA_C^2)))/5,
                                ifelse(SPCD %in% c(202,122,93,15,108,19,96,133,113,102,746) & DIA_C >= 5,
@@ -48,6 +48,7 @@ ccf_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321,66,475,113
                      dbrk = c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10)) #can add more species later 
 
 #empty vector to hold calculated crown competition factor
+#ccf_t is for the tree and will be used to calculate plot and subplot level ccf
 CCF_t <- vector(mode="numeric", length=nrow(density_data))
 for(i in 1:nrow(density_data)){
   Species <- density_data$SPCD[i]
@@ -74,7 +75,7 @@ for(i in 1:nrow(density_data)){
   density_data$CCF_t[i] <- CCF_t
 }
 
-  #PCCF is the crown competition factor on the inventory point where the tree is established
+#PCCF is the crown competition factor on the inventory point where the tree is established
 #pCCF = the sum of CCF_t on a subplot on a per acre basis
 #subplot given by SUBP
 #TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
