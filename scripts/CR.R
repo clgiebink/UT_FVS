@@ -11,7 +11,8 @@ load('./data/formatted/density_data')
 
 #First need to calcuate SDI
 #Calculations from John Shaw (2000; Stage 1968)
-#SDI = sum((DIA_t/10)^1.6)
+#SDI = sum(TPA * (DIA_t/10)^1.6)
+#FVS uses stage method
 
 density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
@@ -67,7 +68,7 @@ load('./data/formatted/incr_calcov')
 
 #Instead of Reineke SDI (for stand) use
 #Calculations from John Shaw (2000; Stage 1968)
-#SDI = sum((DIA_t/10)^1.6)
+#SDI = sum(TPA*(DIA_t/10)^1.6)
 
 #Crown Competition Factor (CCF - for stand)
 #Refer to variant overview for how to calculate CCF
@@ -109,6 +110,8 @@ CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
 #PI,WJ,GO,PM,UJ,OH
 #CL = lm(HT)
 #CR = CL/HT
+
+# unbounded ----
 
 CR_weib <- vector(mode="numeric", length=nrow(incr_calcov))
 for(i in 1:nrow(incr_calcov)){
@@ -185,14 +188,14 @@ cr_check<- incr_calcov %>%
 
 #Validation ----
 #use validation trees (2000 and after)
-#which have measured uncompacted crown ratio (UNCRCD)
+#which have measured compacted crown ratio (CR)
 
 load(file = './data/formatted/val_dset.Rdata')
 
 #get trees on same plot
 plot_crtest <- unique(val_dset$PLT_CN)
 tree_crtest <- unique(val_dset$TRE_CN)
-plot_data_cr <- tree[(tree$PLT_CN %in% plot_crtest),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ","UNCRCD")]
+plot_data_cr <- tree[(tree$PLT_CN %in% plot_crtest),c("CN","PLT_CN","SUBP","SPCD","DIA","TPA_UNADJ","CR")]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including validation trees
 colnames(plot_data_cr)[colnames(plot_data_cr)=="CN"] <- "TRE_CN"
@@ -329,12 +332,11 @@ save(valcr_check,file = './data/formatted/valcr_check.Rdata')
 write.csv(valcr_check, file = './data/formatted/valcr_check.csv')
 
 #
-cr_reg <- lm(CR_weib~UNCRCD,data = valcr_check)
+cr_reg <- lm(CR_weib~CR,data = valcr_check)
 summary(cr_reg)
 #             Estimate Std. Error t value Pr(>|t|)    
-#(Intercept) 55.77157    2.12068  26.299  < 2e-16 ***
-#UNCRCD       0.07914    0.02568   3.081  0.00212 **  
-plot(valcr_check$UNCRCD,valcr_check$CR_weib)
+
+plot(valcr_check$CR,valcr_check$CR_weib)
 
 
 #FVS check ----
@@ -423,8 +425,6 @@ cal_red <- cal_treelist %>%
   filter(DBH >= 1)
 length(unique(cal_red$StandID)) #248
 
-library(dbplyr)
-library(RSQLite)
 cal_fvsred_db <- dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/FVS_cal.db")
 #Extract FVS_StandInit_Plot table
 fvsStandInitPlot<-dbReadTable(cal_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
