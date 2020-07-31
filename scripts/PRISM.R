@@ -35,19 +35,8 @@ for (i in tmaxFiles) {
   tmaxStack <- stack(tmaxStack, raster(i))
 }
 
-
-#"UT":
-#{
-#  "name": "Utah",
-#  "min_lat": 36.9982,
-#  "max_lat": 41.9993,
-#  "min_lng": -114.0504,
-#  "max_lng": -109.0462
-#}
-
 # Crop climate to extent of Utah
 library(maps)
-
 m <- ggplot2::map_data('state', region = 'Utah')
 
 ut_spat <- SpatialPointsDataFrame(coords = cbind(m$long, m$lat), 
@@ -66,16 +55,18 @@ writeRaster(tmaxStackCropped, paste0(clim.path, "tmaxStack.tif"), overwrite = T)
 
 #original code from Margaret Evans
 #margaret.ekevans@gmail.com
+#updated by Courtney Giebink
 
-#trees with increment cores
-load('./data/formatted/incr_calcov')
+#load trees
+#covariate data
+load('./data/formatted/per_cov.Rdata')
+#time series
+load('./data/formatted/incr_calcov.Rdata')
 #data after tree and stand covariates calculated and filtered
 
 #wide format
+#one tree per row
 final_trees <- per_cov[per_cov$TRE_CN %in% incr_calcov$TRE_CN,]
-#final_trees_DF <- final_trees[final_trees$SPCD == 202,]
-#final_trees_PP <- final_trees[final_trees$SPCD == 122,]
-#final_trees_ES <- final_trees[final_trees$SPCD == 93,]
 
 # Make lat, lon data spatial
 ut_tree_spat <- SpatialPointsDataFrame(coords = cbind(final_trees$LON, final_trees$LAT), 
@@ -83,8 +74,6 @@ ut_tree_spat <- SpatialPointsDataFrame(coords = cbind(final_trees$LON, final_tre
                                        proj4string = CRS("+proj=longlat +datum=NAD83"))
 
 # THE FOLLOWING LINES CAN BE SKIPPED if you've already generated the "ppt_extr.csv" etc. files
-### should be moved to historic.R
-### should be done once for both the survival and growth data, and dead trees subsetted out (one line) for growth analysis
 # Read in PRISM climate stacks
 clim.path <-  "./data/formatted/"
 ppt <- stack(paste(clim.path,"pptStack.tif",sep=''))
@@ -92,14 +81,11 @@ tmax <- stack(paste(clim.path,"tmaxStack.tif",sep=''))
 tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
 
 # raster::extract PRISM data
-ppt.extr <- raster::extract(ppt, ut_tree_spat) # this step takes about 8 minutes each (laptop)
+ppt.extr <- raster::extract(ppt, ut_tree_spat) # this step takes about 30 minutes each (laptop)
 tmin.extr <- raster::extract(tmin, ut_tree_spat)
 tmax.extr <- raster::extract(tmax, ut_tree_spat)
 
 #Jan 1895 - Dec 2000
-# Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
-# note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
-# crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
 ppt.extr <- ppt.extr[, 1:1272] #1895 - 2000
 tmin.extr <- tmin.extr[, 1:1272]
 tmax.extr <- tmax.extr[, 1:1272]
@@ -129,6 +115,7 @@ write.csv(tmax.extr, paste0(processed.path,"tmax_extr.csv"), row.names = F)
 
 #Climate Normals ----
 #5/27/2020
+#for validation data set
 
 #Original code by Michiel Pillet
 #mdpillet@gmail.com
@@ -150,9 +137,7 @@ ppt.normals <- stack(ppt.norm.files)
 tmp.normals <- stack(tmp.norm.files)
 tmx.normals <- stack(tmx.norm.files)
 
-# Validation ----
-
-# Crop normals to extent of BA (for better visualization)
+# Crop normals to extent of UT
 library(maps)
 m <- ggplot2::map_data('state', region = 'Utah')
 ut_spat <- SpatialPointsDataFrame(coords = cbind(m$long, m$lat), 
@@ -171,7 +156,7 @@ writeRaster(TMX.norm, paste0(PRISM.norm.path, "tmxNormals.tif"), overwrite = T)
 #original code from Margaret Evans
 #margaret.ekevans@gmail.com
 
-#new trees w/ LAT & LON
+#validation trees w/ LAT & LON
 val_trees <- val_dset %>%
   dplyr::select(TRE_CN,LON,LAT)
 
@@ -190,7 +175,7 @@ n.ppt.extr <- raster::extract(ppt.norm, val_tree_spat)
 n.tmp.extr <- raster::extract(tmp.norm, val_tree_spat)
 n.tmx.extr <- raster::extract(tmx.norm, val_tree_spat)
 
-# Add sensible column names for raster::extracted climate data
+# Add tre_cn column to link to other dataframes
 n.ppt.extr <- as.data.frame(n.ppt.extr)
 n.ppt.extr$TRE_CN <- val_trees$TRE_CN
 n.tmp.extr <- as.data.frame(n.tmp.extr)
