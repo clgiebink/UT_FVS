@@ -37,6 +37,8 @@ length(unique(incr_calcov$TRE_CN))
 
 save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 
+#unbound ----
+
 ##UT variant guide instructions below:
 
 #dbh>1 (excludes common pinyon)
@@ -60,11 +62,9 @@ save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 #Read in data
 load('./data/formatted/incr_calcov')
 
-#####################################
 #Step 1:
 #Calculate stand density index (RSDI)
 #and crown competition factor (CCF)
-#####################################
 
 #Instead of Reineke SDI (for stand) use
 #Calculations from John Shaw (2000; Stage 1968)
@@ -74,7 +74,6 @@ load('./data/formatted/incr_calcov')
 #Refer to variant overview for how to calculate CCF
 #calculated in CCF.R script
 
-#####################################
 #Step 2:
 #Calculate relative density (RD)
 #Step 3:
@@ -86,7 +85,6 @@ load('./data/formatted/incr_calcov')
 #Step 5:
 #Calculate crown ratio for tree
 #records
-#####################################
 
 #Function for calculating relative density for each species in a stand
 #Maximum stand density index at stand level is weighted average,
@@ -110,8 +108,6 @@ CR_WEIB_df <- data.frame(species=c(93,202,122),#,15,19,96,108,113,475,746
 #PI,WJ,GO,PM,UJ,OH
 #CL = lm(HT)
 #CR = CL/HT
-
-# unbounded ----
 
 CR_weib <- vector(mode="numeric", length=nrow(incr_calcov))
 for(i in 1:nrow(incr_calcov)){
