@@ -24,7 +24,7 @@ For each species, fit 2 growth models: 1) annualized with tree rings and 2) annu
 
 ```{r}
 #load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_df_z.Rdata")
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_df_z.Rdata")
 #tree ring model
 an_al_df <- lmer(log(dds)~
                     #tree variables
@@ -94,7 +94,7 @@ an_mod_df <- lmer(log(dds)~
                     #competition/density
                     z.SDI+ #remove /100 due to standardization
                     #site variables
-                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.SICOND+z.SLOPE+
                     z.solrad_MayAug+
                     #random effects
                     # (1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
@@ -110,7 +110,7 @@ clim_mod_df <- lmer(log(dds)~
                  #competition/density
                  z.SDI+#remove /100 due to standardization
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
                  z.solrad_MayAug+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
@@ -157,6 +157,12 @@ r2_df <- bind_rows(r2_df,r2_crw_df)
 ```
 
 ```{r}
+#write.csv(r2_df,file = "./data/formatted/r2_df.csv")
+#edit effect names and reload
+#r2_df <- read_csv("./data/formatted/r2_df.csv")
+```
+
+```{r}
 ggplot(data = r2_df,aes(color = model)) + 
   geom_pointrange(data = r2_df,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
 ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) + 
@@ -167,7 +173,7 @@ ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) +
 
 ```{r}
 #load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_pp_z.Rdata")
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_pp_z.Rdata")
 #tree ring model
 an_al_pp <- lmer(log(dds)~
                     #tree variables
@@ -222,7 +228,7 @@ clim_red_pp <- lmer(log(dds)~
                        z.CCF+ #remove /100 due to standardization
                        #site variables
                        z.SICOND+z.SLOPE+
-                       z.solrad_MayAug+
+                       #z.solrad_MayAug+
                        #random effects
                        (1+z.DIA_C|TRE_CN)+(1|Year),
                      control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
@@ -270,11 +276,36 @@ r2beta(clim_crfvs_pp)
 AIC(clim_mod_pp)
 ```
 
+```{r}
+#plot r2
+r2_weib_pp <- as.data.frame(r2beta(clim_red_pp))
+r2_weib_pp$model <- "Weibull estimation"
+r2_cr_pp <- as.data.frame(r2beta(clim_mod_pp))
+r2_cr_pp$model <- "Constant observation"
+r2_crw_pp <- as.data.frame(r2beta(clim_crfvs_pp))
+r2_crw_pp$model <- "Weibull bounded"
+r2_pp <- bind_rows(r2_weib_pp,r2_cr_pp)
+r2_pp <- bind_rows(r2_pp,r2_crw_pp)
+```
+
+```{r}
+#write.csv(r2_pp,file = "./data/formatted/r2_pp.csv")
+#edit effect names and reload
+#r2_pp <- read_csv("./data/formatted/r2_pp.csv")
+```
+
+```{r}
+ggplot(data = r2_pp,aes(color = model)) + 
+  geom_pointrange(data = r2_pp,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+ggplot(data = r2_pp,aes(x = Effect, y = Rsq, color = model)) + 
+  geom_point()
+```
+
 ### Engelmann spruce
 
 ```{r}
 #load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_es_z.Rdata")
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_es_z.Rdata")
 #tree ring model
 an_al_es <- lmer(log(dds)~
                     #tree variables
@@ -328,7 +359,7 @@ clim_red_es <- lmer(log(dds)~
                  #competition/density
                  z.BAL+ 
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
@@ -356,7 +387,7 @@ clim_mod_es <- lmer(log(dds)~
                  #competition/density
                  z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
@@ -365,13 +396,13 @@ clim_mod_es <- lmer(log(dds)~
 clim_crfvs_es <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR_fvs+
+                 #z.CR_fvs+
                  #climate
                  z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
                  #competition/density
                  z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
@@ -400,6 +431,12 @@ r2_es <- bind_rows(r2_es,r2_crw_es)
 ```
 
 ```{r}
+#write.csv(r2_es,file = "./data/formatted/r2_es.csv")
+#edit effect names and reload
+#r2_es <- read_csv("./data/formatted/r2_es.csv")
+```
+
+```{r}
 ggplot(data = r2_es,aes(color = model)) + 
   geom_pointrange(data = r2_es,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
 ggplot(data = r2_es,aes(x = Effect, y = Rsq, color = model)) + 
@@ -417,19 +454,19 @@ Validate models by using them to predict growth and compare to observed values. 
 #data frames to standardize covariates in the model
 df_stats <- glmm_df_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,CR_fvs,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_FebJul) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 pp_stats <- glmm_pp_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,CR_fvs,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_JunAug) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 es_stats <- glmm_es_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_weib,CR,CR_fvs,PCCF,CCF,
          cos,sin,solrad_MayAug,ppt_pJunSep,tmax_pAug) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
@@ -1046,9 +1083,9 @@ val_an_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
 
 ```
 
-#### CR interpolate
+#### CR bounded
 
-```{r}
+```{r include=FALSE}
 cr_int <- function(data){
   cr_int_df <- data %>%
     select(TRE_CN,MEASYEAR,fMEASYEAR,census_int,CR_weib,fCR)
@@ -1078,7 +1115,7 @@ save(cr_int_df, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/da
 
 
 ```{r}
-val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df) {
+val_an_crb <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df) {
   #parameters:
   #newdata - validataion trees from FIADB
   newdata_rep <- newdata %>%
@@ -1092,7 +1129,8 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
            CCF = NA,
            PCCF = NA,
            BAL = NA,
-           SDI = NA)
+           SDI = NA,
+           CR_fvs = NA)
   newdata_rep <- newdata_rep %>% 
     group_by(TRE_CN) %>%
     slice(rep(1:n(), each = census_int+1)) %>%
@@ -1108,14 +1146,9 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
       newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
       newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
       newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CR_fvs[i] <- newdata$CR[newdata$TRE_CN == TRE_CN]
     }
   }
-  #join with CR interpolated - cr_int dataframe
-  cr_int <- cr_int %>%
-    select(TRE_CN,Year,CR_int) %>%
-    ungroup()
-  newdata_rep <- full_join(newdata_rep,cr_int)
-  
   #mod_obj - list of model objects for each species
   #sp_stats - list of species statistics (mean and standard deviation) for each covariate
   ##will be used to standardize newdata covariates
@@ -1161,7 +1194,7 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_weib[i] = unlist((plt_yr_df[i,"CR_int"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"])
+        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
         plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
@@ -1268,6 +1301,74 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
       #filter for focal trees
       plt_yr2_df <- density_cal %>%
         filter(TRE_CN %in% plt_yr_df$TRE_CN)
+      
+      #cr
+      for(i in 1:nrow(plt_yr2_df)){
+        #Function arguments:
+        #SPCD - is number code of species of tree record
+        #SDI - is SDI of stand (Stage 1968)
+        Species <- plt_yr2_df$SPCD[i]
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDImax[i]),
+                         CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+                         plt_yr2_df$SDImax[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+        d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+        b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+        b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+        c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+        c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        CR_weib <- X * 10
+        
+        #get CR the year before
+        TRE_CN <- plt_yr2_df$TRE_CN[i]
+        #growthyr is still previous year
+        CR_1 <- plt_df$CR_fvs[plt_df$TRE_CN == TRE_CN & 
+                                plt_df$Year == growthyr] #or CR_fvs[N] for the first round
+        #bound to 1% change per year
+        cr_bound1 <- CR_1 * .01
+        plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_weib, 
+                                          CR_1 - cr_bound1,
+                                          CR_1 + cr_bound1)
+      }
 
       #join with plt_df
       for(i in 1:nrow(plt_df)){
@@ -1278,9 +1379,11 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
           plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
       #add density metrics in
+      
       
       #loop over next year
       growthyr = growthyr + 1
@@ -1297,7 +1400,7 @@ val_an_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bra
 ```
 
 ```{r}
-val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
+val_clim_crb <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
   #parameters:
   #newdata - validataion trees from FIADB
   newdata_rep <- newdata %>%
@@ -1311,7 +1414,8 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
            CCF = NA,
            PCCF = NA,
            BAL = NA,
-           SDI = NA)
+           SDI = NA,
+           CR_fvs = NA)
   newdata_rep <- newdata_rep %>% 
     group_by(TRE_CN) %>%
     slice(rep(1:n(), each = census_int+1)) %>%
@@ -1330,6 +1434,7 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
       newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
       newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
       newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
+      newdata_rep$CR_fvs[i] <- newdata$CR[newdata$TRE_CN == TRE_CN]
     }
     #add climate
     #match over tree and year
@@ -1342,12 +1447,6 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
     newdata_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$TRE_CN == TRE_CN &
                                                     climate$Year == newdata_rep$Year[i]]
   }
-  #join with CR interpolated - cr_int dataframe
-  cr_int <- cr_int %>%
-    select(TRE_CN,Year,CR_int) %>%
-    ungroup()
-  newdata_rep <- full_join(newdata_rep,cr_int)
-  
   
   #mod_obj - list of model objects for each species
   #sp_stats - list of species statistics (mean and standard deviation) for each covariate
@@ -1395,7 +1494,7 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_weib[i] = unlist((plt_yr_df[i,"CR_int"] - para_std[1,"CR_weib"]) / para_std[2,"CR_weib"])
+        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
         plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
@@ -1518,6 +1617,74 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
       plt_yr2_df <- density_cal %>%
         filter(TRE_CN %in% plt_yr_df$TRE_CN)
       
+      #cr
+      for(i in 1:nrow(plt_yr2_df)){
+        #Function arguments:
+        #SPCD - is number code of species of tree record
+        #SDI - is SDI of stand (Stage 1968)
+        Species <- plt_yr2_df$SPCD[i]
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDImax[i]),
+                         CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+                         plt_yr2_df$SDImax[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+        d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+        b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+        b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+        c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+        c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        CR_weib <- X * 10
+        
+        #get CR the year before
+        TRE_CN <- plt_yr2_df$TRE_CN[i]
+        #growthyr is still previous year
+        CR_1 <- plt_df$CR_fvs[plt_df$TRE_CN == TRE_CN & 
+                                plt_df$Year == growthyr] #or CR_fvs[N] for the first round
+        #bound to 1% change per year
+        cr_bound1 <- CR_1 * .01
+        plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_weib, 
+                                          CR_1 - cr_bound1,
+                                          CR_1 + cr_bound1)
+      }
+      
       #join with plt_df
       for(i in 1:nrow(plt_df)){
         TRE_CN <- plt_df$TRE_CN[i]
@@ -1527,6 +1694,7 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
           plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
       #add density metrics in
@@ -1543,7 +1711,6 @@ val_clim_cri <- function(newdata,cr_int,mod_df,mod_pp,mod_es,sp_stats,nonfocal,b
   
   return(pred_df)
 }
-
 ```
 
 #### CR constant
@@ -2426,10 +2593,10 @@ pred_rclim_fmy <- pred_clim %>%
 par(mfrow=c(1,2))
 plot(pred_rclim_fmy$DIA,pred_rclim_fmy$fDIA,
      xlab = "Predicted", ylab = "Observed",
-     main = "DBH - Reduced: Tree-Rings + Climate")
+     main = "DBH")
 plot(pred_rclim_fmy$DG_pred,pred_rclim_fmy$DG_obs,
      xlab = "Predicted", ylab = "Observed",
-     main = "DG - Reduced: Tree-Rings + Climate")
+     main = "DG")
 fit_rclim <- lm(fDIA~DIA,data = pred_rclim_fmy)
 summary(fit_rclim)
 sqrt(mean(fit_rclim$residuals^2))
@@ -3116,25 +3283,25 @@ pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_red_df, mod_pp = cl
 ```
 
 ```{r}
-pred_clim_cr2 <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
+pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
                               mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal,
                               bratio = bratio_df ,ccf_df = ccf_df, climate = val_clim)
 ```
 
 ```{r}
-pred_clim_cr2 <- pred_clim_cr2 %>%
+pred_clim_cr <- pred_clim_cr %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_climcr2_fmy <- pred_clim_cr2 %>%
+pred_climcr2_fmy <- pred_clim_cr %>%
   filter(Year == fMEASYEAR)
 par(mfrow=c(1,2))
 plot(pred_climcr2_fmy$DIA,pred_climcr2_fmy$fDIA,
      xlab = "Predicted", ylab = "Observed",
-     main = "DBH - Reduced: Tree-Rings + Climate")
+     main = "DBH")
 plot(pred_climcr2_fmy$DG_pred,pred_climcr2_fmy$DG_obs,
      xlab = "Predicted", ylab = "Observed",
-     main = "DG - Reduced: Tree-Rings + Climate")
+     main = "DG")
 fit_clim_cr2 <- lm(fDIA~DIA, data = pred_climcr2_fmy)
 summary(fit_clim_cr2)
 sqrt(mean(fit_clim_cr2$residuals^2))
@@ -3142,6 +3309,8 @@ fit_clim_cr2_dg <- lm(DG_obs~DG_pred, data = pred_climcr2_fmy)
 summary(fit_clim_cr2_dg)
 sqrt(mean(fit_clim_cr2_dg$residuals^2))
 ```
+
+
 
 Interpolate CR
 ```{r}
@@ -3212,22 +3381,32 @@ sqrt(mean(fit_fclim_cri$residuals^2))
 
 
 ```{r}
-pred_clim_cri <- val_clim_cri(newdata = val_dset,cr_int = cr_int_df,mod_df = clim_red_df, 
-                              mod_pp = clim_red_pp, mod_es = clim_red_es,sp_stats = sp_stats,
+pred_clim_crb <- val_clim_crb(newdata = val_dset,mod_df = clim_crfvs_df, 
+                              mod_pp = clim_crfvs_pp, mod_es = clim_crfvs_es,sp_stats = sp_stats,
                               nonfocal = non_focal, bratio = bratio_df ,ccf_df = ccf_df,
                               CR_WEIB_df = CR_WEIB_df, climate = val_clim)
 ```
 
 ```{r}
-pred_clim_cri <- pred_clim_cri %>%
+pred_clim_crb <- pred_clim_crb %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_climcri_fmy <- pred_clim_cri %>%
+pred_climcri_fmy <- pred_clim_crb %>%
   filter(Year == fMEASYEAR)
+par(mfrow=c(1,2))
+plot(pred_climcri_fmy$DIA,pred_climcri_fmy$fDIA,
+     xlab = "Predicted", ylab = "Observed",
+     main = "DBH")
+plot(pred_climcri_fmy$DG_pred,pred_climcri_fmy$DG_obs,
+     xlab = "Predicted", ylab = "Observed",
+     main = "DG")
 fit_clim_cri <- lm(fDIA~DIA, data = pred_climcri_fmy)
 summary(fit_clim_cri)
 sqrt(mean(fit_clim_cri$residuals^2))
+fit_clim_cri_dg <- lm(DG_obs~DG_pred, data = pred_climcri_fmy)
+summary(fit_clim_cri_dg)
+sqrt(mean(fit_clim_cri_dg$residuals^2))
 ```
 
 
