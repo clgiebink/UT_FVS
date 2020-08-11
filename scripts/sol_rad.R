@@ -56,7 +56,9 @@ swift_rad <- function(TRE_CN, LAT, SLOPE, ASPECT){
     #Z = arcos(-tan(Y) * tan(D))
     #T = func2
     S <- acos(-tan(sol_rad_df$L1[i]) * tan(D))
+    
     #TODO check undefined
+    #prints undefined S values
     if(is.nan(S)){
       cat("L1[", i, "]=",sol_rad_df$L1[i],"\n")
       cat("D=",D, ", tan(D)=",tan(D), "\n")
@@ -114,13 +116,17 @@ swift_rad <- function(TRE_CN, LAT, SLOPE, ASPECT){
   return(sol_rad_df$R4)
 }
 
+#load data
+load("./data/formatted/data_all.Rdata")
+
+#test function
 sol_rad_test <- data_all %>%
   ungroup()%>%
   filter(SPCD %in% c(93, 122, 202)) %>%
   select(TRE_CN,LAT,SLOPE,tASPECT) %>%
   distinct()%>% #only unique values
   slice(rep(1:n(), each = 365)) %>% #repeat each row 365 times
-  group_by(TRE_CN) %>%
+  group_by(TRE_CN) %>% #loop function over each tree
   mutate(Day = seq(1,365,1),
          R4 = swift_rad(TRE_CN = TRE_CN,LAT = LAT,SLOPE = SLOPE,ASPECT = tASPECT))
 
@@ -131,8 +137,9 @@ solrad_check <- data_all %>%
   filter(SPCD %in% c(93, 122, 202)) %>%
   select(TRE_CN,LAT,SLOPE,tASPECT) %>%
   distinct()%>%
-  mutate(limit = LAT + SLOPE)
+  mutate(limit = LAT + SLOPE) #check paper - this needs to be a certain number or what???
 
+#once the above works...
 #calculate seasonal and annual solar radiation
 seas_solrad <- sol_rad_all %>%
   group_by(TRE_CN) %>%
@@ -146,48 +153,8 @@ seas_solrad <- sol_rad_all %>%
             ttl_seas_SepDec = sum(R4[Day %in% c(244:365)]))
 # 70 trees with NAs
 
-# Notes ----
+# Notes
 
-#func1
-#Z = W - X * cos((J+Y) * 0.986)
-# D = solar declination
-#D = func1
-D = 0.4 - 23.3 * cos((J + 10) * 0.986)
-D = arcsin(0.39785 * sin(278.9709 + 0.9856*J
-                         + 1.9163 * sin(356.6153+0.9856*J)))
-#alternative for radians
-
-
-#func2 calculation of sunrise and sunset times
-#Z = arcos(-tan(Y) * tan(D))
-#T = func2
-T = arcos(-tan(L1) * tan(D))
-#TODO check undefined ----
-
-T7 = T - L2
-T6 = -T - L2
-
-T = arcos(-tan(lat) * tan(D))
-
-T1 = T
-T0 = -T
-
-ifelse(T7 < T1, T3 = T7, T3 = T1)
-ifelse(T6 > T0, T2 = T6, T2 = T0)
-
-#func3(V, W, X, Y) integrated equation
-#Z = R1 + (sin(D) * sin(W) * (X-Y) / 15 + 
-# cos(D) * cos(W) * (sin(X+V) - sin(Y+V)) * 12/pi)
-#R4 is potential solar radiation for mountain slope
-R4 = R1 + (sin(D) * sin(L1) * (T3-T2) / 15 + 
-             cos(D) * cos(L1) * (sin(T3+L2) - sin(T2+L2)) * 12/pi)
-#TODO check for negatives ----
-#may need to use other subroutine
-
-T4 = T2 / 15
-T5 = T3 / 15
-
-#print T4, T5, R4
 #R3 is potential solar radiation for horizontal surface
 R3 = R1 + (sin(D) * sin(L0) * (T1-T0) / 15 + 
              cos(D) * cos(L0) * (sin(T1) - sin(T0)) * 12/pi)
@@ -197,28 +164,27 @@ R3 = R1 + (sin(D) * sin(L0) * (T1-T0) / 15 +
 #F can be used as index of relative energy
 F = R4 / R3
 #continue if R2 input
-
-#loop to other julian dates
   
 #if poleward-facing slope
 #when the sum of the slope inclination plus the absolute value of the latitude of the slope exceeds 66
 
 #solrad ----
 library(solrad)
+load("./data/formatted/incr_calcov.Rdata")
 
-incr_imputed <- incr_imputed %>%
+incr_calcov <- incr_calcov %>%
   mutate(tASPECT = ifelse(is.na(ASPECT) & SLOPE <= 5, 0, ASPECT))
-miss_asp <- unique(incr_imputed$TRE_CN[is.na(incr_imputed$tASPECT)]) 
-asp_check_df <- incr_imputed %>% 
+miss_asp <- unique(incr_calcov$TRE_CN[is.na(incr_calcov$tASPECT)]) 
+asp_check_df <- incr_calcov %>% 
   filter(TRE_CN %in% miss_asp) %>% 
   select(TRE_CN,SPCD,ASPECT,SLOPE) %>% #most are 106 - pinyon
   distinct()
-save(incr_imputed, file = "./data/formatted/incr_imputed.Rdata")
+save(incr_calcov, file = "./data/formatted/incr_calcov.Rdata")
 
-un_tre_cov <- incr_imputed %>%
+un_tre_cov <- incr_calcov %>%
   select(-c(Year,RW,DIA_C)) %>%
   ungroup() %>%
-  distinct()
+  distinct() #same as per_cov
 length(unique(un_tre_cov$TRE_CN)) #568
 save(un_tre_cov, file = "./data/formatted/un_tre_cov.Rdata")
 
@@ -239,7 +205,7 @@ seas_dirad <- function(begin, end, Lat, Lon, Elevation, Slope, Aspect) {
 #MayAug = (121:243)
 #SepDec = (244:365)
 
-incr_imputed <- incr_imputed %>%
+incr_calcov <- incr_calcov %>%
   group_by(TRE_CN) %>%
   mutate(solrad_an = seas_dirad(begin = 1, end = 365, Lat = LAT, Lon = LON, 
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
@@ -249,7 +215,7 @@ incr_imputed <- incr_imputed %>%
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT),
          solrad_SepDec = seas_dirad(begin = 244, end = 365, Lat = LAT, Lon = LON, 
                                     Elevation = ELEV, Slope = SLOPE, Aspect = tASPECT))
-save(incr_imputed,file = "./data/formatted/incr_imputed.Rdata")
+save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 
 #Validation data ----
 
