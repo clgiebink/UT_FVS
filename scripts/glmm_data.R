@@ -32,6 +32,7 @@ for(i in 1:nrow(incr_calcov)){
   #k = 1/BRATIO
   k <- 1/BRATIO
   dib <- incr_calcov$DIA_C[i]/k
+  #don't forget mm to inches
   incr_calcov$dds[i] <- (dib + (2*incr_calcov$RW[i]*0.0393701))^2 - dib^2
 }
 
@@ -92,83 +93,52 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
-#alternative
-load(file = "./data/formatted/clim_all.Rdata")
-data_all <- left_join(incr_calcov,clim_all)
 
-#tranform aspect
+
+#tranform aspect where appropriate
+#Na-> 0 when slope is less than or equal to 5
 data_all <- data_all %>%
-  mutate(tASPECT = ifelse(is.na(ASPECT),0,ASPECT))
+  mutate(tASPECT = ifelse(is.na(ASPECT) & SLOPE <= 5,0,ASPECT)) %>%
+  #NA values will be removed from calibration
+  #APSECT converted to radians for sin and cos transformation
+  mutate(radians = tASPECT * (pi/180)) %>%
+  mutate(sin = sin(radians - 0.7854) * SLOPE,
+         cos = cos(radians - 0.7854) * SLOPE)
 
 save(data_all, file = "./data/formatted/data_all.Rdata")
 
 #check
 length(unique(data_all$TRE_CN)) #568
 
-data_all$tCONDID <- tree$CONDID[match(data_all$TRE_CN,tree$CN)]
-data_check <- data_all %>%
-    filter(SPCD %in% c(93,122,202))
-unique(data_check$tCONDID)
-#1
-
-# Site index check
-# first site tree?
-library(dbplyr)
-library(RSQLite)
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
-SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE, SITREE_EST FROM SITETREE")) %>%
-  collect()
-#data_all$SITREE <- SITREE$SITREE[match(data_all$TRE_CN, SITREE$CN)]
-colnames(SITREE)[colnames(SITREE)=="SUBP"] <- "SUBP_t"
-SITREE$PLT_CN <- as.numeric(SITREE$PLT_CN)
-data_check <- left_join(data_all, SITREE)
-data_check2 <- data_check %>%
-  filter(SPCD %in% c(93,122,202)) %>%
-  ungroup() %>%
-  select(TRE_CN,SICOND,SITREE) %>%
-  distinct()
-#no match
-
-# second - site base age and site species
-data_all$SISP <- COND$SISP[match(data_all$PLT_CN, COND$PLT_CN)]
-data_all$SIBASE <- COND$SIBASE[match(data_all$PLT_CN, COND$PLT_CN)]
-data_check <- data_all %>%
-  filter(SPCD %in% c(93,122,202)) %>%
-  ungroup() %>%
-  select(PLT_CN,SUBP_t,TRE_CN,SPCD,SICOND,SISP,SIBASE) %>%
-  distinct()
-colnames(data_check)[colnames(data_check)=="SISP"] <- "SISP_cond"
-colnames(data_check)[colnames(data_check)=="SIBASE"] <- "SIBS_cond"
-data_si_test <- left_join(data_check, SITREE, by = c("PLT_CN","SUBP_t","SPCD"))
-
-cal_si <- data_check %>%
-  filter(SPCD != SISP)
-write.csv(cal_si, file = "./data/formatted/cal_si.csv")
-
-data_si_ok <- data_check %>%
-  filter(SPCD == SISP) #%>%
-  #group_by(SPCD) %>%
-  #summarise(n=n())
-
+#replace site index where fixed
+#see prac.R (site index check)
+load("./data/formatted/cal_si.csv")
 #after sending to John
 #load data with matched SI
-cal_si_fx <- read_csv(file = "./data/raw/Supplemental_SI.csv")
-si_match <- cal_si_fx %>%
+si_match <- read_csv(file = "./data/raw/Supplemental_SI.csv")
+si_match <- si_match %>%
   select(TRE_CN,SITREE) %>%
   group_by(TRE_CN) %>%
   summarise(SICOND = mean(SITREE, na.rm =T))
 
-for(i in 1:nrow(data_all)){
-  TRE_CN <- data_all$TRE_CN[i]
-  if(TRE_CN %in% si_match$TRE_CN){
-    data_all$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
+fix_si <- function(data,new_si){
+  for(i in 1:nrow(data)){
+    TRE_CN <- data$TRE_CN[i]
+    if(TRE_CN %in% new_si$TRE_CN){
+      data$SICOND[i] <- new_si$SICOND[new_si$TRE_CN == TRE_CN]
+    }
   }
 }
 
-#for filtering later
+data_all <- fix_si(data = data_all, new_si = si_match)
+#fixed 28 trees
+
+#filter later
 #take out trees where SI is not fixed
 cal_si <- cal_si %>%
   filter(!(TRE_CN %in% si_match$TRE_CN))
+save(cal_si,file = "./data/formatted/cal_si.Rdata")
+save(data_all,file = "./data/formatted/data_all.Rdata")
 
 #make seasonal climate variables
 #refer to climate-growth analysis
@@ -344,20 +314,3 @@ data_all_es <- data_all_es %>%
          tmax_pNovApr = (lag(tmax_Nov) + lag(tmax_Dec) + tmax_Jan + tmax_Feb + tmax_Mar + tmax_Apr)/6)
 
 save(data_all_es, file = "./data/formatted/data_all_es.Rdata")
-
-#filtering
-#by species
-#only going back 30 yrs - 1958
-#need response: RW, dds
-#fixed effects: DBH (DIA), CR/CR_weib, PCCF, CCF, BAL, Climate
-#random effect: TRE_CN, Year
-
-# radiation index ----
-#filter all data for solar radiation index
-
-tre_loc <- data_all %>%
-  ungroup() %>%
-  filter(SPCD %in% c(93,122,202)) %>%
-  select(PLT_CN,TRE_CN,LAT,LON,ELEV) %>%
-  distinct()
-write.csv(as.data.frame(tre_loc),"./data/formatted/tre_loc.csv")
