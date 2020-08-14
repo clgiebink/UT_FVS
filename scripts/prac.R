@@ -82,8 +82,13 @@ save(incr_percov,file = "./data/formatted/incr_percov.Rdata")
 dbDisconnect(UT_FIA)
 
 #check
-#condid
-
+#make sure all trees are on one condition - forested (1)
+plt_cal <- unique(incr_percov$PLT_CN)
+cond_id <- cond[,c("PLT_CN","CONDID","COND_STATUS_CD")]
+cond_id <- cond_id %>%
+  filter(PLT_CN %in% plt_cal)
+unique(cond_id$CONDID) #1
+unique(cond_id$COND_STATUS_CD) #1
 
 #site index
 # first site tree?
