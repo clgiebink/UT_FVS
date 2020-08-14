@@ -80,3 +80,61 @@ save(per_cov,file = "./data/formatted/per_cov.Rdata")
 save(incr_percov,file = "./data/formatted/incr_percov.Rdata")
 
 dbDisconnect(UT_FIA)
+
+#check
+#condid
+
+
+#site index
+# first site tree?
+cond_si <- cond[,c("PLT_CN","SICOND","SISP","SIBASE")]
+cond_si$PLT_CN <- as.numeric(cond_si$PLT_CN)
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+sitetree <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE FROM SITETREE")) %>%
+  collect()
+sitetree$PLT_CN <- as.numeric(sitetree$PLT_CN)
+
+#does site species associated with sicond match spcd?
+#is base age (sibase) consistent?
+per_cov_si <- per_cov %>%
+  dplyr::select(PLT_CN,TRE_CN,SUBP,SPCD,SICOND) %>%
+  left_join(.,cond_si) %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  filter(SPCD != SISP)
+
+#can use SITREE to fill missing?
+per_cov_si <- left_join(per_cov_si,SITREE)
+#no match - all NAs
+
+# send to john to find match
+cal_si <- per_cov_si
+write.csv(cal_si, file = "./data/formatted/cal_si.csv")
+
+#after sending to John
+#load data with matched SI
+si_match <- read_csv(file = "./data/raw/Supplemental_SI.csv")
+si_match <- si_match %>%
+  select(TRE_CN,SITREE) %>%
+  group_by(TRE_CN) %>%
+  summarise(SICOND = mean(SITREE, na.rm =T))
+
+fix_si <- function(data,new_si){
+  for(i in 1:nrow(data)){
+    TRE_CN <- data$TRE_CN[i]
+    if(TRE_CN %in% new_si$TRE_CN){
+      data$SICOND[i] <- new_si$SICOND[new_si$TRE_CN == TRE_CN]
+    }
+  }
+}
+
+incr_percov <- fix_si(data = incr_percov, new_si = si_match)
+#fixed 28 trees
+
+#for filtering later
+#take out trees where SI is not fixed
+# cal_si <- cal_si %>%
+#   filter(!(TRE_CN %in% si_match$TRE_CN))
+
+save(incr_percov,file = "./data/formatted/incr_percov.Rdata")
