@@ -1,5 +1,5 @@
 # UT_FVS
-Using FIA tree-ring data to create tree growth models, which will inform forest management tools (FVS).
+Using tree-ring and forest inventory data to create a species-specific tree growth model to inform a widely used forest management tool - the Forest Vegetation Simulator.
 
 ## Project Summary
 
@@ -7,9 +7,9 @@ Globally, forests remove about a third of anthropogenic carbon emissions from th
 
 ## Table of Contents
 
-A. /scripts - code to make a tree ring and forest inventory data set, build growth models, and assess models.
-B. /Rmarkdown - markdown files for each species and validation process.
-C. /images - images for the wiki and from outputs.
+1. /scripts - code to make a tree ring and forest inventory data set, build growth models, and assess models.
+2. /Rmarkdown - markdown files for each species and validation process.
+3. /images - images for the wiki and from outputs.
 
 ## Usage
 
