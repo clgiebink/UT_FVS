@@ -116,30 +116,3 @@ per_cov_si <- left_join(per_cov_si,SITREE)
 # send to john to find match
 cal_si <- per_cov_si
 write.csv(cal_si, file = "./data/formatted/cal_si.csv")
-
-#after sending to John
-#load data with matched SI
-si_match <- read_csv(file = "./data/raw/Supplemental_SI.csv")
-si_match <- si_match %>%
-  select(TRE_CN,SITREE) %>%
-  group_by(TRE_CN) %>%
-  summarise(SICOND = mean(SITREE, na.rm =T))
-
-fix_si <- function(data,new_si){
-  for(i in 1:nrow(data)){
-    TRE_CN <- data$TRE_CN[i]
-    if(TRE_CN %in% new_si$TRE_CN){
-      data$SICOND[i] <- new_si$SICOND[new_si$TRE_CN == TRE_CN]
-    }
-  }
-}
-
-incr_percov <- fix_si(data = incr_percov, new_si = si_match)
-#fixed 28 trees
-
-#for filtering later
-#take out trees where SI is not fixed
-# cal_si <- cal_si %>%
-#   filter(!(TRE_CN %in% si_match$TRE_CN))
-
-save(incr_percov,file = "./data/formatted/incr_percov.Rdata")
