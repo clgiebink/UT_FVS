@@ -7,212 +7,151 @@
 
 # FIA ----
 
-#data from FIADB
-plot <- read.csv("./data/raw/UT_PLOT.csv",header=T)
-tree <- read.csv("./data/raw/UT_TREE.csv",header = T)
-cond <- read.csv("./data/raw/UT_COND.csv",header = T)
-
+#connect to database
 library(dbplyr)
 library(RSQLite)
 UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
-TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, COUNTYCD, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ, INVYR FROM TREE")) %>%
+tree <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, COUNTYCD, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ, INVYR FROM TREE")) %>%
   collect()
-PLOT <- tbl(UT_FIA, sql("SELECT CN, PREV_PLT_CN, MEASYEAR, DESIGNCD_P2A FROM PLOT")) %>%
+colnames(tree)[colnames(tree)=="CN"] <- "TRE_CN"
+plot <- tbl(UT_FIA, sql("SELECT CN, MEASYEAR, LAT, LON, ELEV, DESIGNCD, SUBP_EXAMINE_CD, PREV_PLT_CN FROM PLOT")) %>%
   collect()
-colnames(PLOT)[colnames(PLOT)=="CN"] <- "PLT_CN"
-COND <- tbl(UT_FIA, sql("SELECT PLT_CN, SICOND, SIBASE, SISP FROM COND")) %>%
+colnames(plot)[colnames(plot)=="CN"] <- "PLT_CN"
+cond <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD, SLOPE, ASPECT,SDI_RMRS, SDIMAX_RMRS, SICOND, BALIVE, DSTRBCD1, SIBASE, SISP FROM COND")) %>%
   collect()
 
-plt_tre <- left_join(TREE,PLOT)
+#merge tables to make dataset
+#each row is a tree
+plt_tre <- left_join(tree,plot, by = "PLT_CN")
+val_full <- left_join(plt_tre,cond, by = "PLT_CN")
 
-
-# Get trees
-# tree: "TRE_CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","UNCRCD","SITREE","TPA_UNADJ"
-##also grab previous tree CN?
-# cond: CONDID, SLOPE, ASPECT, SDIMAX_RMRS, SICOND, BALIVE, DSTRBCD1
-# plot: LAT, LON, ELEV, MEASYEAR, DESIGNCD, SUBP_EXAMINE_CD, PREV_MEASYEAR
-
-#select relevant tree table attributes
-val_dset <- tree %>%
-  select(CN,PLT_CN,STATUSCD,SPCD,SUBP,PREV_TRE_CN,DIA,UNCRCD,TPA_UNADJ)
-val_dset$CR <- TREE$CR[match(val_dset$TRE_CN,TREE$CN)]
+#get future data for each tree
 #get DIA at remeasurement
-val_dset$fDIA <- tree$DIA[match(val_dset$CN,tree$PREV_TRE_CN)]
+val_full$fDIA <- tree$DIA[match(val_full$TRE_CN,tree$PREV_TRE_CN)]
 #get status (dead or alive) of trees at remeasurement
-val_dset$fSTATUSCD <- tree$STATUSCD[match(val_dset$CN,tree$PREV_TRE_CN)]
+val_full$fSTATUSCD <- tree$STATUSCD[match(val_full$TRE_CN,tree$PREV_TRE_CN)]
 #get future crown ratio to interpolate later
-val_dset$fCR <- TREE$UNCRCD[match(val_dset$TRE_CN,TREE$PREV_TRE_CN)]
+val_full$fCR <- tree$CR[match(val_full$TRE_CN,tree$PREV_TRE_CN)]
+
+val_full$fMEASYEAR <- plot$MEASYEAR[match(val_full$PLT_CN,plot$PREV_PLT_CN)]
+
+#filter for trees to be used for validation
+
 #filter for trees that were remeasured
 #trees can have a PREV_TRE_CN of NA if first measurement
-val_dset <- val_dset %>%
-  filter(CN %in% PREV_TRE_CN &
+val_red <- val_full %>%
+  filter(TRE_CN %in% PREV_TRE_CN &
            SPCD %in% c(93,122,202)) %>% #filter for focal species
   #filter for alive trees at both remeasurement
   filter(STATUSCD == 1 & fSTATUSCD == 1) %>%
   #filter for trees that that are larger at remeasurement/grew
   filter(DIA <= fDIA)
+#5689 rows
+length(unique(val_red$TRE_CN))
+#4614 trees
+#why are there duplicate trees? - more than one condition?
 
-val_check <- val_dset %>%
-  group_by(SPCD) %>%
-  summarise(null = length(which(is.na(UNCRCD))),
-            full = length(which(!is.na(UNCRCD))),
-            n = n())
-#filter for UNCRCD?
-val_crtest <- val_dset %>%
-  filter(!is.na(UNCRCD))
-length(unique(val_crtest$TRE_CN)) #1082
-save(val_crtest,file = './data/formatted/val_crtest.Rdata')
 
-#filter for SICOND?
-val_sitest <- val_dset %>%
-  filter(!is.na(SICOND))
-val_check <- val_sitest %>%
-  group_by(SPCD) %>%
-  summarise(n = n())
-val_sicheck <- val_dset %>%
-  select(PLT_CN,SUBP,TRE_CN,SPCD,SICOND)
-cond_si <- cond %>%
-  select(PLT_CN,SICOND,SISP,SIBASE) %>%
-  filter(PLT_CN %in% plt_val) #102
-length(unique(cond_si$PLT_CN)) #85
-val_sicheck <- left_join(val_sicheck,cond_si)
+#summarize dataset
+#find NAs, etc
+summary(val_red)
+#site index has NA
+
+#filter for SICOND
+#Species associated with SICOND (aka SISP) doesn't always match SPCD
 library(dbplyr)
 library(RSQLite)
 UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
 SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE FROM SITETREE")) %>%
   collect()
-#data_all$SITREE <- SITREE$SITREE[match(data_all$TRE_CN, SITREE$CN)]
-SITREE$PLT_CN <- as.numeric(SITREE$PLT_CN)
-val_si_test <- left_join(val_sicheck, SITREE, by = c("PLT_CN","SPCD")) %>%
+#filter trees for SI
+val_si_check <- val_red %>%
+  select(PLT_CN,SUBP,TRE_CN,SPCD,SICOND,SISP,SIBASE) %>%
+  distinct() #for some reason there are duplicate trees - more than one condition?
+#join with SITREE table
+val_si_check <- left_join(val_si_check, SITREE, by = c("PLT_CN","SPCD")) %>%
   distinct()
-#get rid of trees where sitesp is the same as spcd
-val_si_plt <- val_si_test %>%
-  filter(SPCD != SISP)
 #calculate average site index per species per plot
-val_si_plt <- val_si_plt %>%
+val_si_plt <- val_si_check %>%
   dplyr::select(PLT_CN,SPCD,SITREE) %>%
   group_by(PLT_CN,SPCD) %>%
   summarise(mean = mean(SITREE,na.rm=TRUE))
 #replace in validation dataset
-val_dset <- val_dset %>%
+val_red <- val_red %>%
   mutate(SICOND_c = ifelse(SPCD == SISP,
                            SICOND,
                            val_si_plt$mean[val_si_plt$PLT_CN == PLT_CN &
                                                val_si_plt$SPCD == SPCD])) %>%
   filter(!is.na(SICOND_c))
+#3457 rows
+length(unique(val_red$TRE_CN))
+#3368 trees (reduced by 1246)
 
-colnames(val_dset)[colnames(val_dset)=="CN"] <- "TRE_CN"
+#Condition
+#CONDID is the unique number assigned to each condition on a plot (1,2,etc)
+#CON_STATUS_CD is the number associated with the type of land
+##1 = forest land
+##2 = nonforested land
+##3 = noncensus water
+##4 = census water
+##5 = non sampled forest land
 
-val_dset$CONDID <- cond$CONDID[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$SISP <- cond$SISP[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$ASPECT <- cond$ASPECT[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$SLOPE <- cond$SLOPE[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$SDI <- cond$SDI_RMRS[match(val_dset$PLT_CN, cond$PLT_CN)]
-#all SDI are NA, need to calculate SDI
-val_dset$SDImax <- cond$SDIMAX_RMRS[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$SICOND <- cond$SICOND[match(val_dset$PLT_CN, cond$PLT_CN)]
-val_dset$DSTRBCD1 <- cond$DSTRBCD1[match(val_dset$PLT_CN, cond$PLT_CN)]
+#find plots with multiple conditions
+plt_val <- val_red$PLT_CN
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+cond_red <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD FROM COND")) %>%
+  collect() %>%
+  filter(PLT_CN %in% plt_val)
+#summarize to find how many unique conditions on each plot
+val_cond_plt <- cond_red %>%
+  group_by(PLT_CN) %>%
+  summarise(n_cond = length(unique(CONDID)), #number of conditions
+            n_stat = length(unique(COND_STATUS_CD)), 
+            max_stat = max(COND_STATUS_CD)) #maximum condition status code on the plot
+#don't keep plots with greater than 2 condition status (don't keep 3 - 5)
+val_cond_plt <- val_cond_plt %>%
+  filter(max_stat <= 2)
+#filter
+length(unique(val_red$TRE_CN)) #3368
+val_red <- val_red %>%
+  filter(PLT_CN %in% val_cond_plt$PLT_CN)
+length(unique(val_red$TRE_CN)) #3042
+#no duplicates
 
-#BALIVE 
-#val_dset$BALIVE <- apply(X = grData_remeas[, c("PREV_PLT_CN", "PREV_CONDID")], 
-#                              MARGIN = 1, # applies function to each row in grData_remeas
-#                              FUN = function(x, conds.df) {
-#                                conds.df$BALIVE[conds.df$PLT_CN %in% x["PREV_PLT_CN"] &
-#                                                  conds.df$CONDID %in% x["PREV_CONDID"]]
-#                              },
-#                              conds.df = conds)
-#grData_remeas[is.nan(grData_remeas$BALIVE), "BALIVE"] <- NA
-val_dset$BALIVE <- cond$BALIVE[match(val_dset$PLT_CN, cond$PLT_CN)]
+#how many more trees on plots with multiple conditions?
+val_cond_tre <- val_red %>%
+  select(PLT_CN,TRE_CN) %>%
+  filter(PLT_CN %in% val_cond_plt$PLT_CN[val_cond_plt$n_cond == 2])
+#506 trees
 
-val_dset$LAT <- plot$LAT[match(val_dset$PLT_CN, plot$CN)]
-val_dset$LON <- plot$LON[match(val_dset$PLT_CN, plot$CN)]
-val_dset$ELEV <- plot$ELEV[match(val_dset$PLT_CN, plot$CN)]
-val_dset$MEASYEAR <- plot$MEASYEAR[match(val_dset$PLT_CN, plot$CN)]
-val_dset$DESIGNCD <- plot$DESIGNCD[match(val_dset$PLT_CN, plot$CN)]
-val_dset$SUBP_EXAM <- plot$SUBP_EXAMINE_CD[match(val_dset$PLT_CN, plot$CN)]
-val_dset$fMEASYEAR <- plot$MEASYEAR[match(val_dset$PLT_CN, plot$PREV_PLT_CN)]
+#try filter with only 1 condition on plot, which is forest land
+val_cond_plt <- val_cond_plt %>%
+  filter(n_cond == 1 & max_stat ==1)
+val_red2 <- val_red %>%
+  filter(PLT_CN %in% val_cond_plt$PLT_CN)
+length(unique(val_red2$TRE_CN)) #2536 (total reduction is 832)
 
-val_measyr <- val_dset %>%
-  select(MEASYEAR,fMEASYEAR) %>%
-  distinct()
+#disturbance
+val_dist <- val_red2 %>%
+  select(TRE_CN,DSTRBCD1) %>%
+  group_by(DSTRBCD1) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
+#2633 trees (reduce by 409)
+#2194 (reduce by 342)
 
 #filter no disturbance at start of projection cycle
+
+
 #TODO filter      no disturbance at end?
 val_dset <- val_dset %>%
   filter(DSTRBCD1 == 0) %>%
   filter(!is.na(UNCRCD)) %>%
   filter(!is.na(SICOND))
 
-# explore?
-unique(val_dset$CONDID)
-# 1
-val_dset$tCONDID <- tree$CONDID[match(val_dset$TRE_CN, tree$CN)]
-unique(val_dset$tCONDID)
-# 1 2
-#status code
-cond_red <- cond %>%
-  select(PLT_CN,CONDID,COND_STATUS_CD,DSTRBCD1,DSTRBCD2,TRTCD1,TRTCD2) %>%
-  filter(PLT_CN %in% plt_val) %>%
-  distinct()
-
-library(dbplyr)
-library(RSQLite)
-  
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
-subplt <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SUBP_STATUS_CD, MICRCOND, SUBPCOND, MACRCOND FROM SUBPLOT")) %>%
-  collect()
-subplt$PLT_CN <- as.numeric(subplt$PLT_CN)
-cond_red <- left_join(cond_red,subplt, by = "PLT_CN")
-sub_cond <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, CONDID, MICRCOND_PROP, SUBPCOND_PROP,
-                            MACRCOND_PROP, NONFR_INCL_PCT_SUBP, NONFR_INCL_PCT_MACRO FROM SUBP_COND")) %>%
-  collect()
-colnames(sub_cond)[colnames(sub_cond)=="CONDID"] <- "CONDID2"
-sub_cond$PLT_CN <- as.numeric(sub_cond$PLT_CN)
-cond_red <- left_join(cond_red,sub_cond, by = c("PLT_CN","SUBP"))
-
-condid1 <- cond_red$PLT_CN[cond_red$CONDID!=1]
-
-tre_cond <- val_dset %>%
-  select(PLT_CN,TRE_CN,SUBP,CONDID,tCONDID) %>%
-  filter(tCONDID != 1)
-tre_cd_jn <- cond_red %>%
-  select(PLT_CN,SUBP,SUBP_STATUS_CD,MICRCOND,MICRCOND_PROP,SUBPCOND,SUBPCOND_PROP)
-tre_cond2 <- left_join(tre_cond,tre_cd_jn, by = c("PLT_CN","SUBP"))
-
-plt_red <- unique(tre_cond$PLT_CN)
-plt_cond <- tree[(tree$PLT_CN %in% plt_red),c("CN","PLT_CN","SUBP","SPCD","TPA_UNADJ","STATUSCD","CONDID")]
-plt_cond$COND_STATUS_CD <- cond$COND_STATUS_CD[match(plt_cond$PLT_CN, cond$PLT_CN)]
-colnames(plt_cond)[colnames(plt_cond)=="CN"] <- "TRE_CN"
-plt_cond2 <- left_join(plt_cond,tre_cd_jn, by = c("PLT_CN","SUBP")) %>%
-  distinct()
-
-plt_cond_ex <- plt_cond2 %>%
-  filter(PLT_CN == plt_red[1])
-write.csv(plt_cond_ex,file = "./data/formatted/plt_cond_ex.csv")
-
-#filter for condid = 1 on a plot
-val_dset <- val_dset %>%
-  filter(!PLT_CN %in% condid1)
-
-# Calculate census interval
-
 #all available trees
 save(val_dset,file = "./data/formatted/val_dset.Rdata")
-
-# Val trees ----
-#choose based on years of growth? climate conditions
-UT_clim_an <- read.csv("./data/raw/climate/UTanPRISM_00_18.csv",header =T)
-#randomize  
-
-#multiple years of measurement?
-TREE <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ FROM TREE")) %>%
-  collect()
-PLOT <- tbl(UT_FIA, sql("SELECT * FROM PLOT")) %>%
-  collect()
-val_ex <- TREE %>%
-  filter(CN %in% PREV_TRE_CN &
-           SPCD %in% c(93,122,202))
-val_ex$MEASYEAR <- PLOT$MEASYEAR[match(val_ex$PLT_CN, PLOT$CN)]
 
 # Density ----
 #for current year
@@ -229,7 +168,7 @@ val_ex$MEASYEAR <- PLOT$MEASYEAR[match(val_ex$PLT_CN, PLOT$CN)]
 #get trees from same plot
 plot_val <- unique(val_dset$PLT_CN)
 tree_val <- unique(val_dset$TRE_CN)
-density_val <- TREE[(TREE$PLT_CN %in% plot_val),]
+density_val <- tree[(tree$PLT_CN %in% plot_val),]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including validation trees
 colnames(density_val)[colnames(density_val)=="CN"] <- "TRE_CN"
@@ -329,36 +268,120 @@ density_val <- density_val %>%
   group_by(PLT_CN) %>%
   #min assigns lowest value to ties (1,2,3,3,5,6)
   mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-#on a subplot
-density_val <- density_val %>%
-  group_by(PLT_CN,SUBP) %>%
-  #min assigns lowest value to ties (1,2,3,3,5,6)
-  mutate(BAL_s = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-#scaled by subplot number
-density_val <- density_val %>%
-  group_by(PLT_CN,SUBP) %>%
-  #min assigns lowest value to ties (1,2,3,3,5,6)
-  mutate(BAL_sc = BAL_s * 4)
 
-
-#site species
-site_sum <- density_val %>%
-  group_by(PLT_CN,SPCD) %>%
-  summarise(BA_sp = sum(BA_pa,na.rm = T)) %>%
-  ungroup() %>%
-  group_by(PLT_CN) %>%
-  filter(BA_sp == max(BA_sp))
-density_val$site_sp <- site_sum$SPCD[match(density_val$PLT_CN, site_sum$PLT_CN)]
-unique(density_val$site_sp)
-#[1] 108  93  65 122 202  15  19 814 749  66 113 106 746 475
-#93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,66=RM,106=PI,108=LP,113=LM,
-#475=MC,746=AS,749=NC:narrowleaf cottonwood,814=GO:Gambel oak
-
-
+#CR
+#see CR.R
 #filter for focal trees
 val_dset <- density_val %>%
-  select(TRE_CN,CCF,PCCF,BAL,site_sp) %>%
+  select(TRE_CN,CCF,PCCF,BAL) %>%
   right_join(.,val_dset)
+
+#First need to calcuate SDI
+#Calculations from John Shaw (2000; Stage 1968)
+#SDI = sum((DIA_t/10)^1.6)
+#then number of trees on a plot
+#rank in the diameter distribution
+val_dset <- val_dset %>%
+  group_by(PLT_CN) %>%
+  mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6),
+         num_t = length(unique(TRE_CN)),
+         rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
+
+crw_bound <- function(data,CR_WEIB_df){
+  #by tree
+  data$CR_fvs <- NA
+  data_empty <- data[F,]
+  for(t in unique(data$TRE_CN)){
+    #make dataframe
+    tre_df <- data %>%
+      filter(TRE_CN == t) %>%
+      arrange(Year)
+    Species <- tre_df$SPCD[1]
+    
+    #only focal species
+    if(Species %in% CR_WEIB_df$species){
+      
+      #SDI max values for each species were pulled from UT Variant overview
+      ifelse(is.na(tre_df$SDIMAX_RMRS[1]),
+             SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+             SDIMAX <- tre_df$SDIMAX_RMRS[1])
+      #parameters true for same species
+      d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+      d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+      #Parameters of Weibull distribution: A,B,C
+      a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+      b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+      b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+      c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+      c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+      
+      N <- which(tre_df$Year == tre_df$MEASYEAR[1]) #next step is to allow N to be ring width year -1
+      if(length(N) == 0){
+        N <- which(tre_df$Year + 1 == tre_df$MEASYEAR[1])
+      }
+      if(length(N) > 0){
+        Curr_row <- N-1 #each time through subtract 1 and move down one row
+        tre_df$CR_fvs[N] <- tre_df$CR[N] #dbh when year of ring width and measure year are equal
+        while (Curr_row > 0) { #loop will stop when it gets to the end of data for that tree
+          #Calculate relative density
+          #SDI - is SDI of stand (Stage 1968)
+          RD <- tre_df$SDI[Curr_row]/SDIMAX
+          #Calculate average stand crown ratio (ACR) for each species in the stand
+          ACR <- d0 + d1 * RD * 100
+          #A parameter
+          WEIBA <-a0
+          #B parameter
+          WEIBB <- b0 + b1*ACR
+          #C parameter
+          WEIBC <- c0 + c1*ACR
+          
+          #Function arguments:
+          
+          #CCF - crown competition factor of stand
+          #rank_pltyr - tree's rank in diameter distribution by plot by year
+          #N  - number of records in the stand by year
+          
+          #Calculate scale parameter
+          SCALE = (1.0 - .00167 * (tre_df$CCF[Curr_row]-100.0))
+          if(SCALE < 0.3){SCALE = 0.3}
+          if(SCALE > 1.0){SCALE = 1.0}
+          
+          N <- tre_df$num_t[Curr_row]
+          #X is tree's rank in diameter distribution
+          #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+          Y <- tre_df$rank_pltyr[Curr_row]/N * SCALE
+          if(Y < 0.05){Y = 0.05}
+          if(Y > 0.95){Y = 0.95}
+          #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+          
+          #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+          X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+          #X = a tree’s crown ratio expressed as a percent / 10
+          CR_weib <- X * 10
+          
+          CR_1 <- tre_df$CR_fvs[Curr_row+1] #or CR_fvs[N] for the first round
+          #bound to 1% change per year
+          cr_bound1 <- tre_df$CR_fvs[Curr_row+1] * .01
+          tre_df$CR_fvs[Curr_row] <- ifelse(CR_1 > CR_weib, 
+                                            CR_1 - cr_bound1,
+                                            CR_1 + cr_bound1)
+          
+          #loop will stop when it gets to the end of data for that tree
+          #continue loop for next row until curr_row>0
+          Curr_row = Curr_row - 1 
+        }
+      }
+      data_empty <- bind_rows(data_empty,tre_df)
+    }
+    else {
+      data_empty <- bind_rows(data_empty,tre_df)
+    }
+  }
+  return(data_empty)
+}
+
+val_dset <- crw_bound(data = val_dset, CR_WEIB_df)
+
 
 # Current FVS ----
 #grow focal trees
@@ -375,119 +398,80 @@ PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
   collect()
 val_dset$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(val_dset$PLT_CN, PLOTGEOM$CN)]
 
-b1_df <- data.frame(species = c(202, 93, 122),
-                    loc_401 = c(0.192136,0.011943,-0.13235), #Ashley
-                    loc_407 = c(-0.064516,0.011943,-0.460129), #Dixie
-                    loc_408 = c(-0.064516,0.011943,-0.460129), #Fishlake
-                    loc_409 = c(-0.064516,0.011943,-0.460129), #Humbolt
-                    loc_417 = c(-0.064516,0.011943,-0.460129), #Toiyabe
-                    loc_410 = c(-0.064516,0.265071,-0.302309), #MantiLaSal
-                    loc_418 = c(0.477698,-0.094861,-0.302309), #Uinta
-                    loc_419 = c(0.589169,0.796948,-0.302309), #Wasatch
-                    loc_404 = c(0.589169,0.796948,-0.302309)) #Cache
+#FVS ready data
 
-#b2 is species specific site index
-#left column is based off of what species has the greatest basal area of the stand
+plt_measyr <- val_dset %>%
+  select(PLT_CN,MEASYEAR,fMEASYEAR) %>%
+  distinct()
 
-#site species coefficient
-b2_df <- data.frame(species = c(202, 93, 122),
-                    ss_rest = c(0.010968,0.015133,0.019282), #WB, LM, LP , PI, WJ, GO, PM, RM, UJ, GB, NC, FC, MC, BI, BE, OH 
-                    ss_202 = c(0.006827,0.021085,0.019282), #DF
-                    ss_19 = c(0.010968,0.021085,0.019282), #AF
-                    ss_93 = c(0.006827,0.021085,0.019282), #ES, BS
-                    ss_746 = c(0.010968,0.021085,0.019282), #AS
-                    ss_15 = c(0.010968,0.021085,0.049804), #WF
-                    ss_122 = c(0.010968,0.021085,0.02943)) #PP, OS
+#original code Mark castle
+#Read in CSV containing validation plots and years
+valPlots<-plt_measyr
 
-b_all_df <- data.frame(species = c(202,93,122),
-                       b3 = c(0.022753,-0.122483,-0.287654),
-                       b4 = c(0.015235,-0.198194,-0.411292),
-                       b5 = c(-0.532905,0.240433,0.016965),
-                       b6 = c(-0.086518,0,2.282665),
-                       b7 = c(0.479631,0.587579,0.733305),
-                       b8 = c(-0.707380,-0.399357,-0.320124),
-                       b9 = c(3.182592,0.331129,1.315804),
-                       b10 = c(-1.310144,0.816301,0.238917),
-                       b11 = c(0,0,-0.0005345),
-                       b12 = c(-0.001613,0,-0.002576),
-                       b13 = c(0,-0.043414,0))
+#Remove row names column
+valPlots$X<-NULL;head(valPlots)
 
-#dataframe of coefficients for bark ratio calculation
-#from Utah variant guide
-bratio_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321),
-                        #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,96=BS,106=PI,108=LP,133=PM,321=OH
-                        b1 = c(0.9502,0.867,0.8967,0.890,0.890,0.9002,0.9502,0.9002,0.9625,0.9002,0.93789),
-                        b2 = c(-0.2528, 0, -0.4448,0,0,-0.3089,-0.2528,-0.3089,-0.1141,-0.3089,-0.24096),
-                        exp = c(1,0,1,0,0,1,1,1,1,1,1)) #can add more species later 
-#DBH0 = DBH - k * DG , where k = 1/BRATIO
-# so DBH0 + k*DG = DBH
-# DG   = periodic increment in inside bark diameter 
-#see page 53 of prognosis model
-#DG = sqrt(dib^2 + dds) - dib
-#dib  = inside bark diameter at the beginning of the growth period
-#DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
-#see UT variant guide
-#BRATIO = b1 + b2/(DBH^exp)
+#Open DB connection
+con <- dbConnect(SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
 
-for(i in 1:nrow(val_dset)){
-  Species <- val_dset$SPCD[i]
-  loc_cd <- val_dset$FVS_LOC_CD[i] #forest code
-  site_sp <- val_dset$site_sp[i] #species with the largest BA on a plot
-  #model coefficients
-  b1 <- b1_df[b1_df$species == Species, grepl(loc_cd,names(b1_df))] #grabs column with species code in the name
-  ifelse(site_sp %in% c(202,19,93,746,15,122), #need to add BS and OS
-         b2 <- b2_df[b2_df$species == Species, grepl(site_sp,names(b2_df))],
-         b2 <- b2_df[b2_df$species == Species, 2])
-  b3 <- b_all_df$b3[b_all_df$species == Species]
-  b4 <- b_all_df$b4[b_all_df$species == Species]
-  b5 <- b_all_df$b5[b_all_df$species == Species]
-  b6 <- b_all_df$b6[b_all_df$species == Species]
-  b7 <- b_all_df$b7[b_all_df$species == Species]
-  b8 <- b_all_df$b8[b_all_df$species == Species]
-  b9 <- b_all_df$b9[b_all_df$species == Species]
-  b10 <- b_all_df$b10[b_all_df$species == Species]
-  b11 <- b_all_df$b11[b_all_df$species == Species]
-  b12 <- b_all_df$b12[b_all_df$species == Species]
-  b13 <- b_all_df$b13[b_all_df$species == Species]
-  #parameters
-  SICOND <- val_dset$SICOND[i] #site index
-  ASPECT <- val_dset$ASPECT[i] #aspect of slope
-  SLOPE <- val_dset$SLOPE[i]/100 #inclination expressed as percent
-  DIA <- val_dset$DIA[i] #DBH
-  BAL <- val_dset$BAL[i] #basal area of trees larger than the subject tree
-  CR <- val_dset$UNCRCD[i]/100 #uncompacted crown ratio expressed as a proportion
-  PCCF <- val_dset$PCCF[i] #crown competition factor on the subplot
-  CCF <- val_dset$CCF[i] #stand crown competition factor
-  #large tree diameter growth model
-  val_dset$log_dds[i] <- b1 + (b2*SICOND) + (b3*sin(ASPECT-0.7854)*SLOPE) + (b4*cos(ASPECT-0.7854)*SLOPE) +
-    (b5*SLOPE) + (b6*I(SLOPE^2)) + (b7*I(log(DIA))) + (b8*I(BAL/100)) + (b9*CR) +
-    (b10*I(CR^2)) + (b11*I(DIA^2)) + (b12*PCCF) + (b13*I(CCF/100)) 
-  #from log(dds) to DBHt+1
-  #scale to remeasurement interval
-  dds_adj <- ((val_dset$fMEASYEAR[i]-val_dset$MEASYEAR[i])/10)*exp(val_dset$log_dds[i])
-  #BRATIO = b1+b2/(DBH^exp)
-  b1 <- bratio_df$b1[bratio_df$species == Species]
-  b2 <- bratio_df$b2[bratio_df$species == Species]
-  exp <- bratio_df$exp[bratio_df$species == Species]
-  BRATIO <- b1 + b2/(DIA^exp) #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
-  #k = 1/BRATIO
-  k <- 1/BRATIO 
-  #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-  DG <- sqrt((DIA/k)^2 + dds_adj) - (DIA/k)
-  #so DBH0 + k*DG = DBH
-  val_dset$eDIA[i] <- DIA + (k*DG)
-}
+#Extract FVS_GroupAddFilesAndKeywords table
+fvsAddKey<-dbReadTable(con, 'FVS_GROUPADDFILESANDKEYWORDS')
 
-#expected vs predicted
-plot(val_dset$eDIA,val_dset$fDIA,
-     xlab = "predicted", ylab = "observed",
-     main = "Current FVS Growth Model")
+#Extract FVS_PlotInit_Plot table
+fvsPlotInitPlot<-dbReadTable(con, 'FVS_PLOTINIT_PLOT')
 
-  #check difference between measyear and fmeasyear
-#might need to express output as a proportion
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitCond<-dbReadTable(con, 'FVS_STANDINIT_COND')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitPlot<-dbReadTable(con, 'FVS_TREEINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitCond<-dbReadTable(con, 'FVS_TREEINIT_COND')
+
+#Disconnect from input database
+dbDisconnect(con)
+
+#Rename  PLT_CN header in valPlots
+names(valPlots)[names(valPlots)=="PLT_CN"]<-"STAND_CN";head(valPlots)
+
+#Subset FIA utah data based on the plots in valPlots
+fvsPlotInitPlot<-fvsPlotInitPlot[fvsPlotInitPlot$STAND_CN %in% valPlots$STAND_CN,]
+fvsStandInitPlot<-fvsStandInitPlot[fvsStandInitPlot$STAND_CN %in% valPlots$STAND_CN,]
+fvsTreeInitPlot<-fvsTreeInitPlot[fvsTreeInitPlot$STAND_CN %in% valPlots$STAND_CN,]
+
+#Merge inventory years to FVSPlotInitPlot and FVSStandInitPlot
+fvsPlotInitPlot<-merge(fvsPlotInitPlot, valPlots, by="STAND_CN", all.x = T);head(fvsPlotInitPlot)
+fvsStandInitPlot<-merge(fvsStandInitPlot, valPlots, by="STAND_CN", all.x = T);head(fvsStandInitPlot)
+
+#Create group label based on inventory years
+fvsPlotInitPlot$NewGroup<-paste(fvsPlotInitPlot$MEASYEAR, fvsPlotInitPlot$fMEASYEAR, sep = "_");head(fvsPlotInitPlot)
+fvsStandInitPlot$NewGroup<-paste(fvsStandInitPlot$MEASYEAR, fvsStandInitPlot$fMEASYEAR, sep = "_");head(fvsStandInitPlot)
+
+#Add NewGroup to GROUPS column
+fvsPlotInitPlot$GROUPS<-paste(fvsPlotInitPlot$GROUPS, fvsPlotInitPlot$NewGroup, sep = " ");head(fvsPlotInitPlot$GROUPS)
+fvsStandInitPlot$GROUPS<-paste(fvsStandInitPlot$GROUPS, fvsStandInitPlot$NewGroup, sep = " ");head(fvsStandInitPlot$GROUPS)
+
+#Create new UT DB
+conn <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_Data.db")
+
+#Write each of the neccesary FVS tables to DB
+dbWriteTable(conn, "FVS_GROUPADDFILESANDKEYWORDS", fvsAddKey)
+dbWriteTable(conn, "FVS_PLOTINIT_PLOT", fvsPlotInitPlot)
+dbWriteTable(conn, "FVS_STANDINIT_COND", fvsStandInitCond)
+dbWriteTable(conn, "FVS_STANDINIT_PLOT", fvsStandInitPlot)
+dbWriteTable(conn, "FVS_TREEINIT_COND", fvsTreeInitCond)
+dbWriteTable(conn, "FVS_TREEINIT_PLOT", fvsTreeInitPlot)
+
 
 #from FVS online
-
+#https://forest.moscowfsl.wsu.edu/FVSOnline/
 fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_runs.csv")
 length(unique(fvs_treelist$StandID)) #63
 fvs_red <- fvs_treelist %>%
@@ -517,6 +501,20 @@ head(fvs_stid)
 length(unique(fvs_stid$StandID)) #43
 stid_red <- fvs_stid %>%
   filter(!(StandID %in% fvs_red$StandID))
+
+# Climate-FVS ----
+
+clim_fvs <- val_red %>%
+  mutate(Ele = ELEV/3.28L) %>%
+  dplyr::select(PLT_CN,LON,LAT,Ele) %>%
+  distinct()
+write.table(clim_fvs, file = "./data/formatted/clim_fvs.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = FALSE, col.names = TRUE)
+
+#climate-ready fvs data
+#http://charcoal.cnre.vt.edu/climate/customData/fvs_data.php
+#custom data
+#http://charcoal.cnre.vt.edu/climate/customData/
 
 
 
