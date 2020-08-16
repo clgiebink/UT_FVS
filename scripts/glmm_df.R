@@ -327,18 +327,7 @@ fvs_clim_11 <- lmer(log(tdds)~z.SICOND+z.sin+
                     data = glmm_df_z)
 AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,fvs_clim_4,fvs_clim_5,
     fvs_clim_6,fvs_clim_7,fvs_clim_8,fvs_clim_9,fvs_clim_10,fvs_clim_11)
-#          df      AIC
-#fvs_clim_1  19 10215.65
-#fvs_clim_2  19 10214.50
-#fvs_clim_3  19 10213.60
-#fvs_clim_4  19 10200.93*
-#fvs_clim_5  19 10183.85**
-#fvs_clim_6  19 10214.95
-#fvs_clim_7  19 10205.72*
-#fvs_clim_8  19 10216.34
-#fvs_clim_9  19 10210.34
-#fvs_clim_10 19 10211.36
-#fvs_clim_11 19 10207.58*
+
 
 #average temp
 #1 month: Feb tmin, Jul tmax
@@ -348,69 +337,61 @@ fvs_clim_1 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmax_Jul+
+                     ppt_pJunSep+tmax_Jul+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 fvs_clim_2 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmin_Feb+
+                     ppt_pJunSep+tmin_Feb+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 fvs_clim_3 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                       I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                       I(log(DIA_C))+I(BAL/100)+CR_fvs+
                       I(DIA_C^2)+PCCF+I(CCF/100)+
-                      ppt_pJunAug+tmin_JanMar+
+                      ppt_pJunSep+tmin_JanMar+
                       (1+DIA_C|TRE_CN)+(1|Year),
                     data = glmm_df_z)
 fvs_clim_4 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmax_pJulSep+
+                     ppt_pJunSep+tmax_pJulSep+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 fvs_clim_5 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                       I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                       I(log(DIA_C))+I(BAL/100)+CR_fvs+
                       I(DIA_C^2)+PCCF+I(CCF/100)+
-                      ppt_pJunAug+tmax_JunAug+
+                      ppt_pJunSep+tmax_JunAug+
                       (1+DIA_C|TRE_CN)+(1|Year),
                     data = glmm_df_z)
 fvs_clim_6 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmax_FebJul+
+                     ppt_pJunSep+tmax_FebJul+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 fvs_clim_7 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmin_JanJun+
+                     ppt_pJunSep+tmin_JanJun+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 fvs_clim_8 <- lmer(log(dds)~SICOND+I(sin(ASPECT-0.7854)*SLOPE)+
                      I(cos(ASPECT-0.7854)*SLOPE)+SLOPE+
                      I(log(DIA_C))+I(BAL/100)+CR_fvs+
                      I(DIA_C^2)+PCCF+I(CCF/100)+
-                     ppt_pJunAug+tmax_JanJun+
+                     ppt_pJunSep+tmax_JanJun+
                      (1+DIA_C|TRE_CN)+(1|Year),
                    data = glmm_df_z)
 AIC(fvs_clim_1,fvs_clim_2,fvs_clim_3,fvs_clim_4,
     fvs_clim_5,fvs_clim_6,fvs_clim_7,fvs_clim_8)
-#          df      AIC
-#fvs_clim_1 18 9348.695
-#fvs_clim_2 18 9348.754
-#fvs_clim_3 18 9349.264
-#fvs_clim_4 18 9348.031
-#fvs_clim_5 18 9336.595
-#fvs_clim_6 18 9320.838**max_febjul
-#fvs_clim_7 18 9343.432
-#fvs_clim_8 18 9327.618
+
 
 #glmm
 #reminder- can't compare AIC values between a transformed and nontransformed model
