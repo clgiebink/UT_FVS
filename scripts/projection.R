@@ -4,56 +4,256 @@
 #clgiebink@gmail.com
 #August 2020
 
-#climate data
+#climate ----
 #climateNA: 
 #or
 #climate explorer: 
 #https://climexp.knmi.nl/selectfield_cmip5.cgi?id=someone@somewhere
 #can be downloaded as ASCII or NetCDF files
 
-#for NetCDF
+#climate_kah5
+#script originally from kelly
+#updated by Courtney Giebink
+# script to readin in the downscaled climate model projections from https://gdo-dcp.ucllnl.org/downscaled_cmip_projections/#Projections:%20Complete%20Archives
+# Under Subset request, I selected downscaled projections for Jan 2018 - Dec 2099 and highlighted the region of AZ for the domain
+# I used the projection set: BCSD-CMIP5-Hydrology-monthly and selected maximum temperature and precipiation
+# then for all the rcps, I selected "all"
+# then I selected "no analysis" and "netcdf" on the last page...it took less than an hour for them to email me with a link to download the zipped data
+# #######################more information from the product:
+# Product:               Bias-corrected statistically downscaled GCM data
+# Variables:             tasmax    
+# NetCDF type:          float     
+# NetCDF missing value:  1e+20     
+# Period:                2010Jan through 2099Dec
+# Resolution:            1/8 degree
+# Latitude bounds:       (29.875, 38.125)
+# Longitude bounds:      (-115.125, -108.0)
+# Area within bounds:    602058 km^2 (approx)
+# Dimensions:         
+#   Times:                984
+# Latitudes:            66
+# Longitudes:           57
+# Projections:          97
+# 
+# 
+# Global attributes
+#   Conventions:           GDT 1.2
+# authors:               Bridget Thrasher, Ed Maurer
+# description:           Bias-corrected and downscaled GCM data
+# creation_date:         2012
+# institution:           Climate Analytics Group, Santa Clara U.
+# SurfSgnConvention:     Traditional
 
-library(ncdf4) # package for netcdf manipulation
-library(raster) # package for raster manipulation
-library(rgdal) # package for geospatial analysis
-library(ggplot2) # package for plotting
 
-#load climate data
-#pr - precipitation (kg m-2 s-1)
-nc_pr <- nc_open('./data/raw/climate/projections/icmip5_pr_Amon_modmean_rcp85_-114.095882--108.910335E_42.044053-36.961812N_n_000.nc')
-#tasmax - Maximum Near-Surface Air Temperature (C)
-nc_tmax <- nc_open('./data/raw/climate/projections/icmip5_tasmax_Amon_modmean_rcp85_-114.095882--108.910335E_42.044053-36.961812N_n_su_000.nc')
+# Selected 
+# overview:
+# 1. Read in the lat long data we need to extract climate data over
+# 2. create function to open netcdf, generate a raster stack of all the projections, then extract by our lat long data
+# 3. output & repeat for the next climate variable
 
-nc_tmax
-# don't include lon lat because it is averaged over all utah
-# lon <- ncvar_get(nc_tmax, "lon")
-# lat <- ncvar_get(nc_tmax, "lat", verbose = F)
-nc_tmax$dim$time$units
-t <- ncvar_get(nc_tmax, "time")
+library(raster)
+library(sp)
+library(rgeos)
+library(ggplot2)
+library(reshape2)
+library(ncdf4) # a must have package for opening netcdfs
+library(lubridate)
+library(tidync)
 
-tas <- ncvar_get(nc_tmax, "tasmax")
-dim(tas)
-#fillvalue_tas <- ncatt_get(nc_tmax, "tasmax", "_FillValue")
+# 1. read in the data set that has the lat long of the plots/cores we want to extract projections from
+load("./data/formatted/val_dset.Rdata")
 
-#give tas year and month values
-tas <- as.data.frame(tas)
-tas$Year <- rep(1861:2100, each = 12)
-tas$month <- rep(1:12, times = 240)
+#validation trees w/ LAT & LON
+val_trees <- val_red2 %>%
+  dplyr::select(LON,LAT) %>%
+  distinct()
 
-#remove data before 2009
-tas <- tas %>%
-  filter(Year > 2009)
+# Make lat, lon data spatial
+val_tree_spat <- SpatialPointsDataFrame(coords = cbind(val_trees$LON, val_trees$LAT), 
+                                        data = val_trees, 
+                                        proj4string = CRS("+init=epsg:4326"))
+plot(val_tree_spat)
 
-#close connection
-nc_close(nc_tmax)
+# dont need this, but this would be the way to transform to a new projection (needed for climat NA)
+#cov.data.en <- spTransform(val_tree_spat, CRSobj = CRS("+proj=lcc +lat_1=49.0 +lat_2=77.0 +lat_0=0.0 +lon_0=-95.0 +x_0=0.0 +y_0=0.0 +ellps=WGS84 + datum=WGS84 +units=m +no_defs"))
 
-#calculate climate variables
-#ppt_pJunSep
-#tmax_JunAug
-#tmax_FebJul
-#tmax_pAug
 
-#project growth
+
+# 2. create function to open netcdf, generate a raster stack of all the projections, then extract by our lat long data
+
+# for the precipitation:
+# open the netcdf
+pr_nc <- nc_open("./data/raw/climate/projections/DNSC CMIP5/hydro5/Extraction_pr.nc")
+variableofinterest <- names(pr_nc$var) # get the variable of interest
+ppt <- ncvar_get(pr_nc,variableofinterest) # this extracts a 4 dimensional array of data
+# 4 Dimensional array:
+# dim 1: long
+# dim 2: lat
+# dim 3: time in months (jan 2018 - Dec 2099)
+# dim 4: each climate model/ensemble member
+lat <- ncvar_get(pr_nc,"latitude") # get lat
+lon <- ncvar_get(pr_nc, "longitude") # get long
+#projection <- ncvar_get(pr_nc, "projection") # cant get the dimvar, but metadata has info on projections
+
+dim(ppt)# look at the dimensions
+nmonths <- dim(ppt)[3] # 3rd dimension is the number of months in the downscaled projections
+nc_close(pr_nc) # close the netcdf file when you are done extracting
+
+
+# this function takes a given projection, makes a raster stack where each raster is a month for a given climate model run projection
+# and extracts the monthly time series for each lat long point of interest, then summs across year to get a data frame of
+#  columns: lat   lon climate year  year.ppt
+# inputs: proj = a number of which climate ensemble you want 
+# ppt = the 4 D array 
+# val_tree_spat = the spatial object to extract by
+# nmonths = # months from the 4D array
+proj <- seq(1:97) #97 ensembles
+rlist <- list()
+# apply funcation across all 97 projections downloaded in the netcdf
+all.future.ppt <- list()
+extract.yearly.ppt  <- function(proj, ppt, val_tree_spat, nmonths){ 
+  for(p in 1:length(proj)){
+    #all.future.ppt <- list()
+    for(i in 1:nmonths){ 
+      #rlist() <- list
+      # make a raster for each month
+      rlist[[i]] <- raster(as.matrix(ppt[,,i,p]), xmn = min(lon), xmx = max(lon), 
+                           ymn = min(lat) , ymx = max(lat), 
+                           crs = CRS('+init=epsg:4269'))
+    }
+    rast.stack <- stack(rlist)
+    #plot(rast.stack[[9]]) # can plot for sanity
+    #plot(val_tree_spat, add = TRUE)
+    
+    #tmax.rast.ll <- projectRaster(tmax.rast, crs =CRS("+init=epsg:4326") ) # dont recommend trying to change projections of the rasters, it will take much much longer to run this
+    
+    extracted.pts <- data.frame(raster::extract(rast.stack, val_tree_spat))
+    ll.data <- as.data.frame(val_tree_spat)
+    extracted.pts$lat <-ll.data$LAT # get the lat and long
+    extracted.pts$lon <-ll.data$LON
+    
+    months <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+    colnames(extracted.pts)[1:nmonths] <- paste0("ppt_", rep(2010:2099, each = 12), "_", rep(months, 90)) # note may need to change this to make more customizable
+    extracted.pts.m <- extracted.pts %>%
+      pivot_longer(cols = -c("lat","lon"), 
+                   names_to = "year",
+                   names_pattern =  ".*[_](\\d+)[_].*", #takes year out of column name
+                   values_to = paste0("ppt_",months)) 
+   extracted.pts.m[, 4:15][extracted.pts.m[, 4:15] >= 1e+20] <- NA #replace values with NA
+   yearly.ppt <- extracted.pts.m %>%
+      group_by(lat,lon) %>%
+      arrange(year) %>%
+      mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
+               lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
+               ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep)
+    all.future.ppt[[p]] <- yearly.ppt
+  }
+  all.future.ppt
+}
+
+# for loop is slightly faster, so we will use that, but this takes a bit
+# extracts for all 97 projections 
+all.future.ppt <- extract.yearly.ppt(proj = proj, ppt = ppt, val_tree_spat = val_tree_spat, nmonths = nmonths)
+
+
+# for temperature
+# open the netcdf
+tmx_nc <- nc_open("./data/raw/climate/projections/DNSC CMIP5/hydro5/Extraction_tasmax.nc")
+variableofinterest <- names(tmx_nc$var)
+Tmax <- ncvar_get(tmx_nc,variableofinterest)
+# 4 Dimensional array:
+# dim 1: long
+# dim 2: lat
+# dim 3: time in months (jan 2010 - Dec 2099)
+# dim 4: each climate model + ensemble member
+lat <- ncvar_get(tmx_nc,"latitude")
+lon <- ncvar_get(tmx_nc, "longitude")
+#projection <- ncvar_get(tmx_nc, "projection") # cant get the dimvar
+
+dim(Tmax)
+nmonths <- dim(Tmax)[3] # 3rd dimension is the number of months in the downscaled projections
+nc_close(tmx_nc)
+
+
+# open all the ncs
+rlist <- list()
+all.future.tmax <- list()
+extract.yearly.tmax  <- function(proj, Tmax, val_tree_spat, nmonths){ 
+  for(p in 1:length(proj)){
+    #all.future.tmax <- list()
+    for(i in 1:nmonths){
+      #rlist() <- list
+      # make a raster for each month
+      rlist[[i]] <- raster(as.matrix(Tmax[,,i,p]), xmn = min(lon), xmx = max(lon), 
+                           ymn = min(lat) , ymx = max(lat), 
+                           crs = CRS('+init=epsg:4269'))
+    }
+    
+    rast.stack <- stack(rlist)
+    #plot(rast.stack[[9]])
+    #plot(val_tree_spat, add = TRUE)
+    
+    #tmax.rast.ll <- projectRaster(tmax.rast, crs =CRS("+init=epsg:4326") )
+    # extracted.pts <- list()
+    extracted.pts<- data.frame(raster::extract(rast.stack, val_tree_spat))
+    
+    ll.data <- as.data.frame(val_tree_spat)
+    extracted.pts$lat <-ll.data$LAT # get the lat and long
+    extracted.pts$lon <-ll.data$LON
+    
+    months <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+    colnames(extracted.pts)[1:nmonths] <- paste0("tmax_", rep(2010:2099, each = 12), "_", rep(months, 90)) # note may need to change this to make more customizable
+    extracted.pts.m <- extracted.pts %>%
+      pivot_longer(cols = -c("lat","lon"), 
+                   names_to = "year",
+                   names_pattern =  ".*[_](\\d+)[_].*", #takes year out of column name
+                   values_to = paste0("tmax_",months)) 
+    extracted.pts.m[, 4:15][extracted.pts.m[, 4:15] >= 1e+20] <- NA #replace values with NA
+    #tmax_JunAug
+    #tmax_FebJul
+    #tmax_pAug
+    yearly.tmax <- extracted.pts.m %>%
+      group_by(lat,lon) %>%
+      arrange(year) %>%
+      mutate(tmax_JunAug = tmax_Jun + tmax_Jul + tmax_Aug,
+             tmax_FebJul = (tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul)/6,
+             tmax_pAug = lag(tmax_Aug))
+    all.future.tmax[[p]] <- yearly.tmax
+  }
+  all.future.tmax
+}
+
+#run
+all.future.tmax <- extract.yearly.tmax(proj = proj, Tmax = Tmax, val_tree_spat = val_tree_spat, nmonths = nmonths)
+
+# convert to df
+all.tmax.df <- do.call(rbind, all.future.tmax)
+all.ppt.df <- do.call(rbind, all.future.ppt)
+
+# because the projection labels were not working for this, I need to read in a text file with all the projection names:
+proj <- read.delim("./data/raw/climate/projections/DNSC CMIP5/hydro5/Projections5.txt", header = FALSE)
+
+#add the projection names to the tmax and ppt data frames
+all.tmax.df$proj <- rep(proj$V1, sapply(all.future.tmax , nrow))
+all.ppt.df$proj <- rep(proj$V1, sapply(all.future.ppt , nrow))
+
+ppt.models <- all.ppt.df %>% tidyr::separate(proj, sep = -5, into = c("modelrun", "rcp")) #%>% 
+#tidyr::separate(modelrun, sep = "-", into = c("model", "run"))
+tmax.models <- all.tmax.df %>% tidyr::separate(proj, sep = -5, into = c("modelrun", "rcp")) 
+summary.tas <- tmax.models %>% dplyr::group_by(lat, lon, year, rcp) %>% dplyr::summarise(sd = sd(tmax.fall.spr, na.rm = TRUE), 
+                                                                                         mean = mean(tmax.fall.spr, na.rm = TRUE))
+
+summary.ppt <- ppt.models %>% dplyr::group_by(lat, lon, year, rcp) %>% dplyr::summarise(sd = sd(ppt, na.rm = TRUE), 
+                                                                                        mean = mean(ppt, na.rm = TRUE))
+
+# okay lets merge these together:
+future_clim <- merge(ppt.models, tmax.models, by = c("lat", "lon", "year", "modelrun","rcp"))
+
+save(future_clim,file = "./data/formatted/future_clim.Rdata")
+
+#maybe merge
+
+#project growth ----
 
 #load trees
 load('./data/formatted/val_dset.Rdata')
