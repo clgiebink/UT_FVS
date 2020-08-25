@@ -44,6 +44,8 @@ val_red <- val_full %>%
            SPCD %in% c(93,122,202)) %>% #filter for focal species
   #filter for alive trees at both remeasurement
   filter(STATUSCD == 1 & fSTATUSCD == 1) %>%
+  #filter for trees that are greater than 3 inch (large tree growth model threshold)
+  filter(DIA >= 3) %>%
   #filter for trees that that are larger at remeasurement/grew
   filter(DIA <= fDIA)
 #5689 rows
@@ -85,7 +87,7 @@ val_red <- val_red %>%
   filter(!is.na(SICOND_c))
 #3457 rows
 length(unique(val_red$TRE_CN))
-#3368 trees (reduced by 1246)
+#reduced by 1246
 
 #Condition
 #CONDID is the unique number assigned to each condition on a plot (1,2,etc)
@@ -129,26 +131,33 @@ val_cond_tre <- val_red %>%
 #try filter with only 1 condition on plot, which is forest land
 val_cond_plt <- val_cond_plt %>%
   filter(n_cond == 1 & max_stat ==1)
-val_red2 <- val_red %>%
+val_red <- val_red %>%
   filter(PLT_CN %in% val_cond_plt$PLT_CN)
-length(unique(val_red2$TRE_CN)) #2536 (total reduction is 832)
+length(unique(val_red$TRE_CN)) #total reduction is 832
 
 #disturbance
-val_dist <- val_red2 %>%
+val_dist <- val_red %>%
   select(TRE_CN,DSTRBCD1) %>%
   group_by(DSTRBCD1) %>%
   summarise(n_tre = length(unique(TRE_CN)))
-#2633 trees (reduce by 409)
-#2194 (reduce by 342)
+#reduce by 326
 
-#filter no disturbance at start of projection cycle
+#keep disturbance
+#calibration data set has disturbance codes:
+# 10, 20, 30, 50, 52, 60, 80
 
+val_dset <- val_red
+val_dset %>%
+  dplyr::select(TRE_CN,SPCD) %>%
+  group_by(SPCD) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
 
-#TODO filter      no disturbance at end?
-val_dset <- val_dset %>%
-  filter(DSTRBCD1 == 0) %>%
-  filter(!is.na(UNCRCD)) %>%
-  filter(!is.na(SICOND))
+PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
+  collect()
+val_dset$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(val_dset$PLT_CN, PLOTGEOM$CN)]
+
+# Disconnect from the database
+dbDisconnect(UT_FIA)
 
 #all available trees
 save(val_dset,file = "./data/formatted/val_dset.Rdata")
@@ -170,8 +179,6 @@ plot_val <- unique(val_dset$PLT_CN)
 tree_val <- unique(val_dset$TRE_CN)
 density_val <- tree[(tree$PLT_CN %in% plot_val),]
 #make sure trees are on the same plot b/c calculating stand variables
-#make sure I'm not including validation trees
-colnames(density_val)[colnames(density_val)=="CN"] <- "TRE_CN"
 
 #remove trees that are dead
 density_val <- density_val %>%
@@ -179,19 +186,18 @@ density_val <- density_val %>%
 
 #get DIA at remeasurement
 density_val$fDIA <- tree$DIA[match(density_val$TRE_CN,tree$PREV_TRE_CN)]
-
+#get future status - dead or alive
 density_val$fSTATUSCD <- tree$STATUSCD[match(density_val$TRE_CN,tree$PREV_TRE_CN)]
 
-density_val$MEASYEAR <- plot$MEASYEAR[match(density_val$PLT_CN, plot$CN)]
+#plot information
+density_val <- left_join(density_val,plot)
+
 density_val$fMEASYEAR <- plot$MEASYEAR[match(density_val$PLT_CN, plot$PREV_PLT_CN)]
-density_val$DESIGNCD <- plot$DESIGNCD[match(density_val$PLT_CN, plot$CN)]
-density_val$CONDID <- cond$CONDID[match(density_val$PLT_CN, cond$PLT_CN)]
-density_val$SDImax <- cond$SDIMAX_RMRS[match(density_val$PLT_CN, cond$PLT_CN)]
 
 #check
-length(plot_val) #129
-length(unique(density_val$PLT_CN)) #129
-
+length(plot_val)
+length(unique(density_val$PLT_CN))
+#also check - no duplicate trees - can happen with multiple CONDID
 
 #calculate density metrics
 #ccf
@@ -212,7 +218,7 @@ ccf_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321,66,475,113
                      dbrk = c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10)) #can add more species later 
 
 #empty vector to hold calculated crown competition factor
-CCF_t <- vector(mode="numeric", length=nrow(density_val))
+density_val$CCF_t <- vector(mode="numeric", length=nrow(density_val))
 for(i in 1:nrow(density_val)){
   Species <- density_val$SPCD[i]
   r1 <- ccf_df$r1[ccf_df$species == Species]
@@ -281,12 +287,13 @@ val_dset <- density_val %>%
 #SDI = sum((DIA_t/10)^1.6)
 #then number of trees on a plot
 #rank in the diameter distribution
-val_dset <- val_dset %>%
-  group_by(PLT_CN) %>%
-  mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6),
-         num_t = length(unique(TRE_CN)),
-         rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
+# val_dset <- val_dset %>%
+#   group_by(PLT_CN) %>%
+#   mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6),
+#          num_t = length(unique(TRE_CN)),
+#          rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
 
+#will only need cr function for crown ratio change
 crw_bound <- function(data,CR_WEIB_df){
   #by tree
   data$CR_fvs <- NA
@@ -380,8 +387,8 @@ crw_bound <- function(data,CR_WEIB_df){
   return(data_empty)
 }
 
-val_dset <- crw_bound(data = val_dset, CR_WEIB_df)
-
+save(density_val, file = "./data/formatted/density_val.Rdata")
+save(val_dset,file = "./data/formatted/val_dset.Rdata")
 
 # Current FVS ----
 #grow focal trees
@@ -390,16 +397,14 @@ val_dset <- crw_bound(data = val_dset, CR_WEIB_df)
 #b1 based on location
 #location codes found in FIADB
 #(FVS_LOC_CD) in PLOTGEOM table
-library(dbplyr)
-library(RSQLite)
 
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
-PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
-  collect()
-val_dset$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(val_dset$PLT_CN, PLOTGEOM$CN)]
+View(val_dset %>% 
+  ungroup() %>% 
+  dplyr::select(TRE_CN,MEASYEAR,fMEASYEAR) %>% 
+  group_by(MEASYEAR,fMEASYEAR) %>% 
+  summarise(n_tre = length(unique(TRE_CN))))
 
 #FVS ready data
-
 plt_measyr <- val_dset %>%
   select(PLT_CN,MEASYEAR,fMEASYEAR) %>%
   distinct()
@@ -412,7 +417,7 @@ valPlots<-plt_measyr
 valPlots$X<-NULL;head(valPlots)
 
 #Open DB connection
-con <- dbConnect(SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
+con <- dbConnect(SQLite(), "./data/raw/FIADB.db")
 
 #Extract FVS_GroupAddFilesAndKeywords table
 fvsAddKey<-dbReadTable(con, 'FVS_GROUPADDFILESANDKEYWORDS')
@@ -459,7 +464,7 @@ fvsPlotInitPlot$GROUPS<-paste(fvsPlotInitPlot$GROUPS, fvsPlotInitPlot$NewGroup, 
 fvsStandInitPlot$GROUPS<-paste(fvsStandInitPlot$GROUPS, fvsStandInitPlot$NewGroup, sep = " ");head(fvsStandInitPlot$GROUPS)
 
 #Create new UT DB
-conn <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_Data.db")
+conn <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_val.db")
 
 #Write each of the neccesary FVS tables to DB
 dbWriteTable(conn, "FVS_GROUPADDFILESANDKEYWORDS", fvsAddKey)
@@ -472,40 +477,92 @@ dbWriteTable(conn, "FVS_TREEINIT_PLOT", fvsTreeInitPlot)
 
 #from FVS online
 #https://forest.moscowfsl.wsu.edu/FVSOnline/
-fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_runs.csv")
-length(unique(fvs_treelist$StandID)) #63
+
+#get output from fvs runs
+#tree list table
+fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_val.csv")
+length(unique(fvs_treelist$StandID))
+#mostly to convert 093 -> 93
+fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
 fvs_red <- fvs_treelist %>%
-  select(StandID,Year,PrdLen,TreeId,SpeciesFIA,DBH,DG,PctCr,PtBAL) %>%
+  dplyr::select(StandID,Year,PrdLen,TreeId,TreeIndex,SpeciesFIA,DBH,DG,PctCr,ActPt) %>%
   filter(SpeciesFIA %in% c(93,122,202)) %>%
-  filter(DBH >= 1)
-length(unique(fvs_red$StandID)) #40
+  filter(DBH >= 3) #growth model threshold
+length(unique(fvs_red$StandID)) #should match above
 
+#connect to fvs ready database for validation data
+library(dbplyr)
 library(RSQLite)
-UT_fvsred_db <- dbConnect(RSQLite::SQLite(), "./New_Utah/FVS_Data.db")
+fvs_val_db <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_val.db")
 #Extract FVS_StandInit_Plot table
-fvsStandInitPlot<-dbReadTable(UT_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
+#has the link between stand_cn (aka plt_cn) and stand_id
+fvsStandInitPlot<-dbReadTable(fvs_val_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
+# Disconnect from the database
+dbDisconnect(fvs_val_db)
 std2plt <- fvsStandInitPlot %>%
-  select(STAND_CN,STAND_ID)
-length(unique(std2plt$STAND_ID)) #63
-length(unique(std2plt$STAND_CN)) #63
-
+  dplyr::select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID))
+#stand_cn = plt_cn
 fvs_red$PLT_CN <- std2plt$STAND_CN[match(fvs_red$StandID,std2plt$STAND_ID)]
-length(unique(fvs_red$StandID)) #40
-length(unique(fvs_red$PLT_CN)) #40
+length(unique(fvs_red$PLT_CN))
 
-length(unique(fvs_red$StandID))
-#43
-#should be 63 - what is up?
-fvs_stid <- read.csv(file = "./data/raw/FVS/StandID.csv", header = T)
-head(fvs_stid)
-length(unique(fvs_stid$StandID)) #43
-stid_red <- fvs_stid %>%
-  filter(!(StandID %in% fvs_red$StandID))
+#separate observations from predictions
+fvs_obs <- fvs_red %>%
+  filter(DG == 0) %>%
+  select(-DG)
+dim(fvs_obs) 
+length(unique(fvs_obs$PLT_CN))
+
+fvs_pred <- fvs_red %>%
+  filter(DG != 0) %>%
+  select(-c("PrdLen"))
+dim(fvs_pred) 
+length(unique(fvs_pred$PLT_CN))
+
+#rename columns to be able to merge
+colnames(fvs_obs)[colnames(fvs_obs)=="Year"] <- "MEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="Year"] <- "fMEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="DBH"] <- "eDBH"
+colnames(fvs_pred)[colnames(fvs_pred)=="PctCr"] <- "CR2"
+
+#merge 
+fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
+#tree index > 2000 means trees died in projection?
+
+#validation dataset for future observations
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE <- dbReadTable(UT_FIA, 'TREE')
+TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
+  collect()
+TREE_red$fDIA <- TREE$DIA[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#get status (dead or alive) of trees at remeasurement
+TREE_red$fSTATUSCD <- TREE$STATUSCD[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#prep for merge
+colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="SpeciesFIA"] <- "SPCD"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="ActPt"] <- "SUBP"
+# Disconnect from the database
+dbDisconnect(UT_FIA)
+
+#merge fvs runs and fia observations
+fvs_check <- left_join(fvs_obs_pred,TREE_red)
+length(unique(fvs_check$CN))
+#filter for trees that are alive at remeasurement
+fvs_check <- fvs_check %>%
+  filter(fSTATUSCD == 1)
+length(unique(fvs_check$CN))
+fvs_check_red <- fvs_check %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% val_dset$TRE_CN)
+length(unique(fvs_check_red$CN))
+
+save(fvs_check_red, file = "./data/formatted/fvs_check_red.Rdata")
+
 
 # Climate-FVS ----
 
-clim_fvs <- val_red %>%
-  mutate(Ele = ELEV/3.28L) %>%
+clim_fvs <- val_dset %>%
+  mutate(Ele = ELEV/3.28) %>%
   dplyr::select(PLT_CN,LON,LAT,Ele) %>%
   distinct()
 write.table(clim_fvs, file = "./data/formatted/clim_fvs.txt", append = FALSE, sep = " ", dec = ".",
@@ -513,9 +570,92 @@ write.table(clim_fvs, file = "./data/formatted/clim_fvs.txt", append = FALSE, se
 
 #climate-ready fvs data
 #http://charcoal.cnre.vt.edu/climate/customData/fvs_data.php
-#custom data
-#http://charcoal.cnre.vt.edu/climate/customData/
 
+#ensemble of 17 AR5 model predictions, rcp85
+#get output from fvs runs
+#tree list table
+fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_85.csv")
+length(unique(fvs_treelist$StandID))
+#mostly to convert 093 -> 93
+fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
+fvs_red <- fvs_treelist %>%
+  dplyr::select(StandID,Year,PrdLen,TreeId,TreeIndex,SpeciesFIA,DBH,DG,PctCr,ActPt) %>%
+  filter(SpeciesFIA %in% c(93,122,202)) %>%
+  filter(DBH >= 3) #growth model threshold
+length(unique(fvs_red$StandID)) #should match above
+
+#connect to fvs ready database for validation data
+library(dbplyr)
+library(RSQLite)
+fvs_val_db <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_val.db")
+#Extract FVS_StandInit_Plot table
+#has the link between stand_cn (aka plt_cn) and stand_id
+fvsStandInitPlot<-dbReadTable(fvs_val_db, 'FVS_STANDINIT_PLOT')
+# Disconnect from the database
+dbDisconnect(fvs_val_db)
+std2plt <- fvsStandInitPlot %>%
+  dplyr::select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID))
+#stand_cn = plt_cn
+fvs_red$PLT_CN <- std2plt$STAND_CN[match(fvs_red$StandID,std2plt$STAND_ID)]
+length(unique(fvs_red$PLT_CN))
+
+#separate observations from predictions
+fvs_obs <- fvs_red %>%
+  filter(DG == 0) %>%
+  select(-DG)
+dim(fvs_obs) 
+length(unique(fvs_obs$PLT_CN))
+
+fvs_pred <- fvs_red %>%
+  filter(DG != 0) %>%
+  select(-c("PrdLen"))
+dim(fvs_pred) 
+length(unique(fvs_pred$PLT_CN))
+
+#rename columns to be able to merge
+colnames(fvs_obs)[colnames(fvs_obs)=="Year"] <- "MEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="Year"] <- "fMEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="DBH"] <- "eDBH"
+colnames(fvs_pred)[colnames(fvs_pred)=="PctCr"] <- "CR2"
+
+#merge 
+fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
+#tree index > 2000 means trees died in projection?
+
+#validation dataset for future observations
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE <- dbReadTable(UT_FIA, 'TREE')
+TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
+  collect()
+TREE_red$fDIA <- TREE$DIA[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#get status (dead or alive) of trees at remeasurement
+TREE_red$fSTATUSCD <- TREE$STATUSCD[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#prep for merge
+colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="SpeciesFIA"] <- "SPCD"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="ActPt"] <- "SUBP"
+# Disconnect from the database
+dbDisconnect(UT_FIA)
+
+#merge fvs runs and fia observations
+fvs_check <- left_join(fvs_obs_pred,TREE_red)
+length(unique(fvs_check$CN))
+#filter for trees that are alive at remeasurement
+fvs_check <- fvs_check %>%
+  filter(fSTATUSCD == 1)
+length(unique(fvs_check$CN))
+fvs_clim_red <- fvs_check %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% val_dset$TRE_CN)
+length(unique(fvs_check_red$CN))
+
+#are climate projections different from regular projections?
+fvs_clim_check <- fvs_check_red %>%
+  dplyr::select(TRE_CN,DIA,fDIA,eDBH)
+fvs_clim_check$eDBH_clim <- fvs_clim_red$eDBH[match(fvs_clim_check$TRE_CN,fvs_clim_red$TRE_CN)]
+fvs_clim_check <- fvs_clim_check %>%
+  mutate(diff_clim = eDBH - eDBH_clim) #0 no difference
 
 
 # Climate ----
