@@ -2226,81 +2226,10 @@ ggplot(data = pred_rclim_fmy, aes(x = FVS_LOC_CD,y = diff)) +
 
 ## current FVS growth model
 
-```{r}
-fvs_treelist <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/fvs_runs.csv")
-length(unique(fvs_treelist$StandID)) #63
-fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
-fvs_red <- fvs_treelist %>%
-  select(StandID,Year,PrdLen,TreeId,TreeIndex,SpeciesFIA,DBH,DG,PctCr,PtBAL,ActPt) %>%
-  filter(SpeciesFIA %in% c(93,122,202)) %>%
-  filter(DBH >= 1)
-length(unique(fvs_red$StandID)) #63
+```{r echo=FALSE}
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_check_red.Rdata")
 ```
 
-```{r}
-library(dbplyr)
-library(RSQLite)
-UT_fvsred_db <- dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/FVS_Data.db")
-#Extract FVS_StandInit_Plot table
-fvsStandInitPlot<-dbReadTable(UT_fvsred_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
-std2plt <- fvsStandInitPlot %>%
-  select(STAND_CN,STAND_ID)
-length(unique(std2plt$STAND_ID)) #63
-
-fvs_red$PLT_CN <- std2plt$STAND_CN[match(fvs_red$StandID,std2plt$STAND_ID)]
-length(unique(fvs_red$PLT_CN)) #63
-```
-
-```{r}
-#separate observations from predictions
-fvs_obs <- fvs_red %>%
-  filter(DG == 0) %>%
-  select(-DG)
-dim(fvs_obs) 
-length(unique(fvs_obs$PLT_CN))
-
-fvs_pred <- fvs_red %>%
-  filter(DG > 0) %>%
-  select(-c("PtBAL","PrdLen"))
-dim(fvs_pred) 
-length(unique(fvs_pred$PLT_CN))
-
-#rename columns to be able to merge
-colnames(fvs_obs)[colnames(fvs_obs)=="Year"] <- "MEASYEAR"
-colnames(fvs_pred)[colnames(fvs_pred)=="Year"] <- "fMEASYEAR"
-colnames(fvs_pred)[colnames(fvs_pred)=="DBH"] <- "eDBH"
-colnames(fvs_pred)[colnames(fvs_pred)=="PctCr"] <- "CR2"
-
-#merge to get first pred (median)
-#not mean of tripling
-fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
-#tree index > 2000 means trees died in projection?
-
-#validation dataset for future observations
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FIADB.db")
-TREE <- dbReadTable(UT_FIA, 'TREE')
-TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
-  collect()
-TREE_red$fDIA <- TREE$DIA[match(TREE_red$CN,TREE$PREV_TRE_CN)]
-#get status (dead or alive) of trees at remeasurement
-TREE_red$fSTATUSCD <- TREE$STATUSCD[match(TREE_red$CN,TREE$PREV_TRE_CN)]
-#prep for merge
-colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
-colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="SpeciesFIA"] <- "SPCD"
-colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="ActPt"] <- "SUBP"
-
-#merge fvs runs and fia observations
-fvs_check <- left_join(fvs_obs_pred,TREE_red)
-length(unique(fvs_check$CN)) #999
-#filter for trees that are alive at remeasurement
-fvs_check <- fvs_check %>%
-  filter(fSTATUSCD == 1)
-length(unique(fvs_check$CN)) #785
-fvs_check_red <- fvs_check %>%
-  mutate(TRE_CN = as.numeric(CN)) %>%
-  filter(TRE_CN %in% val_dset$TRE_CN)
-length(unique(fvs_check_red$CN)) #710
-```
 
 ```{r}
 #plot fvs predicted vs observed
