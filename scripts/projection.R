@@ -11,7 +11,7 @@
 #https://climexp.knmi.nl/selectfield_cmip5.cgi?id=someone@somewhere
 #can be downloaded as ASCII or NetCDF files
 
-#climate_kah5
+
 #script originally from kelly
 #updated by Courtney Giebink
 # script to readin in the downscaled climate model projections from https://gdo-dcp.ucllnl.org/downscaled_cmip_projections/#Projections:%20Complete%20Archives
@@ -255,21 +255,509 @@ save(future_clim,file = "./data/formatted/future_clim.Rdata")
 
 #project growth ----
 
-#load trees
-load('./data/formatted/val_dset.Rdata')
-#or select
-#alive
-#no missing data
-#
+#FIA ----
+#get trees for projection
+#skip if already selected
+#criteria: alive, no missing data
+#connect to database
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+tree <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, COUNTYCD, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ, INVYR FROM TREE")) %>%
+  collect()
+colnames(tree)[colnames(tree)=="CN"] <- "TRE_CN"
+plot <- tbl(UT_FIA, sql("SELECT CN, MEASYEAR, LAT, LON, ELEV, DESIGNCD, SUBP_EXAMINE_CD, PREV_PLT_CN FROM PLOT")) %>%
+  collect()
+colnames(plot)[colnames(plot)=="CN"] <- "PLT_CN"
+cond <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD, SLOPE, ASPECT,SDI_RMRS, SDIMAX_RMRS, SICOND, BALIVE, DSTRBCD1, SIBASE, SISP FROM COND")) %>%
+  collect()
 
+#merge tables to make dataset
+#each row is a tree
+plt_tre <- left_join(tree,plot, by = "PLT_CN")
+all_fia <- left_join(plt_tre,cond, by = "PLT_CN")
+
+#filter for trees to be used for projection
+#filter for trees that were measured last
+proj_red <- all_fia %>%
+  filter(MEASYEAR >= 2010 &
+           SPCD %in% c(93,122,202)) %>% #filter for focal species
+  #filter for alive trees
+  filter(STATUSCD == 1) %>%
+  #filter for trees that are greater than 3 inch (large tree growth model threshold)
+  filter(DIA >= 3)
+
+#summarize dataset
+#find NAs, etc
+summary(proj_red)
+#site index has NA
+
+#filter for SICOND
+#Species associated with SICOND (aka SISP) doesn't always match SPCD
+SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE FROM SITETREE")) %>%
+  collect()
+#filter trees for SI
+proj_si_check <- proj_red %>%
+  select(PLT_CN,SUBP,TRE_CN,SPCD,SICOND,SISP,SIBASE) %>%
+  distinct() #for some reason there are duplicate trees - more than one condition?
+#join with SITREE table
+proj_si_check <- left_join(proj_si_check, SITREE, by = c("PLT_CN","SPCD")) %>%
+  distinct()
+#calculate average site index per species per plot
+proj_si_plt <- proj_si_check %>%
+  dplyr::select(PLT_CN,SPCD,SITREE) %>%
+  group_by(PLT_CN,SPCD) %>%
+  summarise(mean = mean(SITREE,na.rm=TRUE))
+#replace in data set
+proj_red <- proj_red %>%
+  mutate(SICOND_c = ifelse(SPCD == SISP,
+                           SICOND,
+                           proj_si_plt$mean[val_si_plt$PLT_CN == PLT_CN &
+                                             val_si_plt$SPCD == SPCD])) %>%
+  filter(!is.na(SICOND_c))
+length(unique(proj_red$TRE_CN))
+
+#Condition
+#CONDID is the unique number assigned to each condition on a plot (1,2,etc)
+#CON_STATUS_CD is the number associated with the type of land
+##1 = forest land
+##2 = nonforested land
+##3 = noncensus water
+##4 = census water
+##5 = non sampled forest land
+
+#find plots with multiple conditions
+plt_proj <- proj_red$PLT_CN
+cond_red <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD FROM COND")) %>%
+  collect() %>%
+  filter(PLT_CN %in% plt_proj)
+#summarize to find how many unique conditions on each plot
+proj_cond_plt <- cond_red %>%
+  group_by(PLT_CN) %>%
+  summarise(n_cond = length(unique(CONDID)), #number of conditions
+            n_stat = length(unique(COND_STATUS_CD)), 
+            max_stat = max(COND_STATUS_CD)) #maximum condition status code on the plot
+
+# filter with only 1 condition on plot, which is forest land
+proj_cond_plt <- proj_cond_plt %>%
+  filter(n_cond == 1 & max_stat ==1)
+proj_red <- proj_red %>%
+  filter(PLT_CN %in% proj_cond_plt$PLT_CN)
+length(unique(proj_red$TRE_CN)) 
+
+#disturbance
+# proj_dist <- proj_red %>%
+#   select(TRE_CN,DSTRBCD1) %>%
+#   group_by(DSTRBCD1) %>%
+#   summarise(n_tre = length(unique(TRE_CN)))
+
+#keep disturbance
+#calibration data set has disturbance codes:
+# 10, 20, 30, 50, 52, 60, 80
+
+proj_dset <- proj_red
+proj_dset %>%
+  dplyr::select(TRE_CN,SPCD) %>%
+  group_by(SPCD) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
+
+PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
+  collect()
+proj_dset$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(proj_dset$PLT_CN, PLOTGEOM$CN)]
+
+# Disconnect from the database
+dbDisconnect(UT_FIA)
+
+#all available trees
+save(proj_dset,file = "./data/formatted/proj_dset.Rdata")
+
+#rm(list=ls())
+
+#load trees if have already selected
+load('./data/formatted/proj_dset.Rdata')
+
+#Density ----
 #load/get nonfocal trees
+#get trees from same plot
+plot_proj <- unique(proj_dset$PLT_CN)
+tree_proj <- unique(proj_dset$TRE_CN)
+density_proj <- tree[(tree$PLT_CN %in% plot_proj),]
+#make sure trees are on the same plot b/c calculating stand variables
 
-#calculate density
+#remove trees that are dead
+density_proj <- density_proj %>%
+  filter(STATUSCD == 1)
+
+#plot information
+density_proj <- left_join(density_proj,plot)
+
+#check
+length(plot_proj)
+length(unique(density_proj$PLT_CN))
+#also check - no duplicate trees - can happen with multiple CONDID
+
+#calculate density metrics
+#ccf
+#equations taken from Utah variant guide
+##If DBH greater than or equal to 1” CCFt= R1 + (R2 * DBH) + (R3 * DBH2)
+##If DBH less than 1” but greater than 0.1” CCFt = R4 * DBHR5
+##If DBH less than 0.1” CCFt = 0.001
+
+
+#dataframe of species specific coefficients for ccf calculation
+ccf_df <- data.frame(species=c(93,202,122,15,19,65,96,106,108,133,321,66,475,113,746,814,102),
+                     #93=ES,202=DF,122=PP,15=WF,19=AF,65=UJ,66=RM,96=BS,106=PI,108=LP,113=LM,133=PM,321=OH,475=MC,746=AS,814=GO,102=bristlecone pine
+                     r1 = c(0.03,0.11,0.03,0.04,0.03,0.01925,0.03,0.01925,0.01925,0.01925,0.03,0.01925,0.0204,0.01925,0.03,0.03,0.01925),
+                     r2 = c(0.0173,0.0333,0.0180,0.0270,0.0216,0.01676,0.0173,0.01676,0.01676,0.01676,0.0215,0.01676,0.0246,0.01676,0.0238,0.0215,0.01676),
+                     r3 = c(0.00259,0.00259,0.00281,0.00405,0.00405,0.00365,0.00259,0.00365,0.00365,0.00365,0.00363,0.00365,0.0074,0.00365,0.00490,0.00363,0.00365),
+                     r4 = c(0.007875,0.017299,0.007813,0.015248,0.011402,0.009187,0.007875,0.009187,0.009187,0.009187,0.011109,0.009187,0,0.009187,0.008915,0.011109,0.009187),
+                     r5 = c(1.7360,1.5571,1.7680,1.7333,1.7560,1.76,1.736,1.76,1.76,1.76,1.7250,1.76,0,1.76,1.78,1.725,1.76),
+                     dbrk = c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10)) #can add more species later 
+
+#empty vector to hold calculated crown competition factor
+density_proj$CCF_t <- NA
+for(i in 1:nrow(density_proj)){
+  Species <- density_proj$SPCD[i]
+  r1 <- ccf_df$r1[ccf_df$species == Species]
+  r2 <- ccf_df$r2[ccf_df$species == Species]
+  r3 <- ccf_df$r3[ccf_df$species == Species]
+  r4 <- ccf_df$r4[ccf_df$species == Species]
+  r5 <- ccf_df$r5[ccf_df$species == Species]
+  dbrk <- ccf_df$dbrk[ccf_df$species == Species]
+  if(Species == 475){
+    ifelse(density_proj$DIA[i] < dbrk,
+           CCF_t <- density_proj$DIA[i]*(r1+r2+r3),
+           CCF_t <- r1 + (r2 * density_proj$DIA[i]) + (r3 * density_proj$DIA[i]^2))
+  }
+  if(Species != 475){
+    ifelse(is.na(density_proj$DIA[i]), 
+           CCF_t <- NA,
+           ifelse(density_proj$DIA[i] <= 0.1, 
+                  CCF_t <- 0.0001,
+                  ifelse(density_proj$DIA[i] < dbrk, 
+                         CCF_t <- r4 * (density_proj$DIA[i]^r5),
+                         CCF_t <- r1 + (r2 * density_proj$DIA[i]) + (r3 * density_proj$DIA[i]^2))))
+  }
+  density_proj$CCF_t[i] <- CCF_t
+}
+
+#PCCF is the crown competition factor on the inventory point where the tree is established
+#pCCF = the sum of CCF_t on a subplot on a per acre basis
+#subplot given by SUBP
+#TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
+
+density_proj <- density_proj %>%
+  group_by(PLT_CN,SUBP) %>%
+  mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
+
+#stand CCF = sum(CCFt on a plot) on a per acre basis
+#plot given by PLT_CN
+#TPA measured on a plot/stand level
+density_proj <- density_proj %>%
+  group_by(PLT_CN) %>%
+  mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
+
+#bal
+#basal area
+# = dbh^2 * 0.005454 ; converts dbh in inches to squared feet
+#basal area per acre
+#BA*tpa
+density_proj <- density_proj %>%
+  mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
+
+#BAL
+#sum BApa of trees larger on the same plot in same year
+density_proj <- density_proj %>%
+  group_by(PLT_CN) %>%
+  #min assigns lowest value to ties (1,2,3,3,5,6)
+  mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+
+#CR
+#see CR.R
+#filter for focal trees
+proj_dset <- density_proj %>%
+  select(TRE_CN,CCF,PCCF,BAL) %>%
+  right_join(.,proj_dset)
+
+#First need to calcuate SDI
+#Calculations from John Shaw (2000; Stage 1968)
+#SDI = sum((DIA_t/10)^1.6)
+#then number of trees on a plot
+#rank in the diameter distribution
+# val_dset <- val_dset %>%
+#   group_by(PLT_CN) %>%
+#   mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6),
+#          num_t = length(unique(TRE_CN)),
+#          rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min"))
+
+#will only need cr function for crown ratio change
+crw_bound <- function(data,CR_WEIB_df){
+  #by tree
+  data$CR_fvs <- NA
+  data_empty <- data[F,]
+  for(t in unique(data$TRE_CN)){
+    #make dataframe
+    tre_df <- data %>%
+      filter(TRE_CN == t) %>%
+      arrange(Year)
+    Species <- tre_df$SPCD[1]
+    
+    #only focal species
+    if(Species %in% CR_WEIB_df$species){
+      
+      #SDI max values for each species were pulled from UT Variant overview
+      ifelse(is.na(tre_df$SDIMAX_RMRS[1]),
+             SDIMAX <- CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
+             SDIMAX <- tre_df$SDIMAX_RMRS[1])
+      #parameters true for same species
+      d0 <- CR_WEIB_df$d0[CR_WEIB_df$species == Species]
+      d1 <- CR_WEIB_df$d1[CR_WEIB_df$species == Species]
+      #Parameters of Weibull distribution: A,B,C
+      a0 <- CR_WEIB_df$a0[CR_WEIB_df$species == Species]
+      b0 <- CR_WEIB_df$b0[CR_WEIB_df$species == Species]
+      b1 <- CR_WEIB_df$b1[CR_WEIB_df$species == Species]
+      c0 <- CR_WEIB_df$c0[CR_WEIB_df$species == Species]
+      c1 <- CR_WEIB_df$c1[CR_WEIB_df$species == Species]
+      
+      N <- which(tre_df$Year == tre_df$MEASYEAR[1]) #next step is to allow N to be ring width year -1
+      if(length(N) == 0){
+        N <- which(tre_df$Year + 1 == tre_df$MEASYEAR[1])
+      }
+      if(length(N) > 0){
+        Curr_row <- N-1 #each time through subtract 1 and move down one row
+        tre_df$CR_fvs[N] <- tre_df$CR[N] #dbh when year of ring width and measure year are equal
+        while (Curr_row > 0) { #loop will stop when it gets to the end of data for that tree
+          #Calculate relative density
+          #SDI - is SDI of stand (Stage 1968)
+          RD <- tre_df$SDI[Curr_row]/SDIMAX
+          #Calculate average stand crown ratio (ACR) for each species in the stand
+          ACR <- d0 + d1 * RD * 100
+          #A parameter
+          WEIBA <-a0
+          #B parameter
+          WEIBB <- b0 + b1*ACR
+          #C parameter
+          WEIBC <- c0 + c1*ACR
+          
+          #Function arguments:
+          
+          #CCF - crown competition factor of stand
+          #rank_pltyr - tree's rank in diameter distribution by plot by year
+          #N  - number of records in the stand by year
+          
+          #Calculate scale parameter
+          SCALE = (1.0 - .00167 * (tre_df$CCF[Curr_row]-100.0))
+          if(SCALE < 0.3){SCALE = 0.3}
+          if(SCALE > 1.0){SCALE = 1.0}
+          
+          N <- tre_df$num_t[Curr_row]
+          #X is tree's rank in diameter distribution
+          #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+          Y <- tre_df$rank_pltyr[Curr_row]/N * SCALE
+          if(Y < 0.05){Y = 0.05}
+          if(Y > 0.95){Y = 0.95}
+          #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+          
+          #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+          X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+          #X = a tree’s crown ratio expressed as a percent / 10
+          CR_weib <- X * 10
+          
+          CR_1 <- tre_df$CR_fvs[Curr_row+1] #or CR_fvs[N] for the first round
+          #bound to 1% change per year
+          cr_bound1 <- tre_df$CR_fvs[Curr_row+1] * .01
+          tre_df$CR_fvs[Curr_row] <- ifelse(CR_1 > CR_weib, 
+                                            CR_1 - cr_bound1,
+                                            CR_1 + cr_bound1)
+          
+          #loop will stop when it gets to the end of data for that tree
+          #continue loop for next row until curr_row>0
+          Curr_row = Curr_row - 1 
+        }
+      }
+      data_empty <- bind_rows(data_empty,tre_df)
+    }
+    else {
+      data_empty <- bind_rows(data_empty,tre_df)
+    }
+  }
+  return(data_empty)
+}
+
+save(density_proj, file = "./data/formatted/density_proj.Rdata")
+save(proj_dset,file = "./data/formatted/proj_dset.Rdata")
 
 #calculate solar radiation
+library(solrad)
+
+#function applied to all trees.
+seas_dirad <- function(begin, end, Lat, Lon, Elevation, Slope, Aspect) {
+  DOY <- seq(1,365,1)
+  aspect_s <- ifelse(Aspect[1] <= 180, Aspect[1] + 180, Aspect[1] - 180)
+  yr_dirad <- DirectRadiation(DOY = DOY, Lat = abs(Lat[1]), Lon = abs(Lon[1]), #lat & lon in degrees
+                              SLon = -105, DS = 60, #Slon and DS for UT; SLon = -7*15, DS = 60 minutes
+                              Elevation = Elevation[1]/3.281, #from ft to meters
+                              Slope[1], Aspect = aspect_s) #Aspect
+  sum_rad = sum(yr_dirad[begin:end])
+  return(sum_rad) #W/m2
+}
+
+proj_dset <- proj_dset %>%
+  mutate(sin = sin((ASPECT * (pi/180)) - 0.7854) * SLOPE,
+         cos = cos((ASPECT * (pi/180)) - 0.7854) * SLOPE)
+
+#function applied to all trees.
+#seas_dirad
+#JanApr = (1:120)
+#MayAug = (121:243)
+#SepDec = (244:365)
+
+proj_dset <- proj_dset %>%
+  group_by(TRE_CN) %>%
+  mutate(solrad_an = seas_dirad(begin = 1, end = 365, Lat = LAT, Lon = LON, 
+                                Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT),
+         solrad_MayAug = seas_dirad(begin = 121, end = 243, Lat = LAT, Lon = LON, 
+                                    Elevation = ELEV, Slope = SLOPE, Aspect = ASPECT))
+
+save(proj_dset,file = "./data/formatted/proj_dset.Rdata")
+
+#recent climate
+#Precipitation
+#Tmax
+#for only large trees
+
+#new plots w/ LAT & LON
+proj_plt <- proj_dset %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,LON,LAT) %>%
+  distinct()
+
+library(raster)
+# Make lat, lon data spatial
+proj_plt_spat <- SpatialPointsDataFrame(coords = cbind(proj_plt$LON, proj_plt$LAT), 
+                                       data = proj_plt, 
+                                       proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# Read in PRISM climate stacks
+clim.path <-  "./data/formatted/"
+ppt <- stack(paste(clim.path,"pptStack.tif",sep=''))
+tmax <- stack(paste(clim.path,"tmaxStack.tif",sep=''))
+#tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
+
+# raster::extract PRISM data
+ppt.extr <- raster::extract(ppt, proj_plt_spat) # this step takes about 8 minutes each (laptop)
+tmax.extr <- raster::extract(tmax, proj_plt_spat)
+#tmin.extr <- raster::extract(tmin, val_tree_spat)
+
+# Jan 1999 - Dec 2019
+ppt.extr <- ppt.extr[, 1249:1488] 
+tmax.extr <- tmax.extr[, 1249:1488]
+#tmin.extr <- tmin.extr[, 1249:1476]
+
+# Add sensible column names for raster::extracted climate data
+ppt.extr <- as.data.frame(ppt.extr)
+tmax.extr <- as.data.frame(tmax.extr)
+#tmin.extr <- as.data.frame(tmin.extr)
+PRISM.path <-  "./data/raw/climate/PRISM/"
+pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+pptFiles <- pptFiles[1249:1488] 
+#tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
+#vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
+colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
+colNames <- unlist(colNames)
+colNames <- lapply(strsplit(colNames, "_"), function (x) x[1])
+colNames <- unlist(colNames)
+colnames(ppt.extr) <- paste0("ppt_", colNames)
+colnames(tmax.extr) <- paste0("tmax_", colNames)
+#colnames(tmin.extr) <- paste0("tmin_", colNames)
 
 
-project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,climate) {
+# Export climate data
+processed.path <- "./data/formatted/"
+write.csv(ppt.extr, paste0(processed.path,"ppt_proj_extr.csv"), row.names = F)
+write.csv(tmax.extr, paste0(processed.path,"tmax_proj_extr.csv"), row.names = F)
+#write.csv(tmin.extr, paste0(processed.path,"tmin_val_extr.csv"), row.names = F)
+
+#already have some climate information
+processed.path <- "./data/formatted/"
+ppt.extr <- read.csv(paste(processed.path,"ppt_proj_extr.csv",sep=''), header = T)
+tmax.extr <- read.csv(paste(processed.path,"tmax_proj_extr.csv",sep=''), header = T)
+#tmin.extr <- read.csv(paste(processed.path,"tmin_val_extr.csv",sep=''), header = T)
+
+#for all plots
+#same dataset LAT/LONG used to extract climate
+proj_plots <- unique(val_plt$PLT_CN)
+
+clim_col <- function(PRISM,clim_var,PLT_CN){
+  #make a list
+  #each item is a year
+  #each item has 1-13 columns (TRE_CN + 12 months)
+  
+  #ppt
+  #empty list
+  climate_list <- list()
+  start_col <- 1 #Jan
+  end_col <- 12 #Dec
+  n <- ncol(PRISM)/12
+  for(i in 1:n){ #number of years (1895:2000)
+    climate_list[[i]] <- PRISM[,start_col:end_col]
+    start_col <- start_col + 12
+    end_col <- end_col + 12
+  }
+  
+  prism_id <- colnames(ppt.extr)
+  
+  months <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+  #clim_var <- str_sub(prism_id,1,4) #1:5 for tmin_ and tmax_
+  climate_list <- lapply(climate_list, setNames, nm = paste0(clim_var,months))
+  
+  #years <- seq(from=start_yr,to=end_yr,by=1)
+  prism_yr <- unique(sub('\\D*(\\d{4}).*', '\\1', prism_id))
+  names(climate_list) <- as.integer(prism_yr)
+  
+  climate_stack <- bind_rows(climate_list, .id = "Year")
+  climate_stack$PLT_CN <- rep(PLT_CN,times=n)
+  return(climate_stack)
+}
+#could make function for all climate variables
+#find way to extract start_yr and end_yr
+#lubridate?
+
+proj_ppt <- clim_col(ppt.extr,clim_var = "ppt_",PLT_CN = proj_plots)
+proj_tmax <- clim_col(tmax.extr,clim_var = "tmax_",PLT_CN = proj_plots)
+#val_tmin <- clim_col(tmin.extr,clim_var = "tmin_",PLT_CN = val_plots)
+
+proj_clim <- full_join(proj_ppt,proj_tmax, by = c("PLT_CN","Year"))
+proj_clim$Year <- as.integer(proj_clim$Year)
+
+#seasonal calculations
+proj_clim <- proj_clim %>%
+  group_by(PLT_CN) %>%
+  arrange(Year) %>%
+  mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
+           lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
+           ppt_May + ppt_Jun + ppt_Jul + ppt_Aug + ppt_Sep,
+         tmax_FebJul = (tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul)/6, #temp parameter for DF
+         tmax_JunAug = (tmax_Jun + tmax_Jul + tmax_Aug)/3, #temp parameter for PP
+         tmax_pAug = lag(tmax_Aug)) #temp parameter for ES
+save(proj_clim,file = "./data/formatted/proj_clim.Rdata")
+
+#future climate
+load("./data/formatted/future_clim.Rdata")
+
+#one ensemble for each rcp?
+
+rcp45 <- future_clim %>%
+  filter()
+
+rcp60
+
+rcp85 <- 
+
+
+# Function ----
+
+project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_WEIB_df,cur_clim,fut_clim) {
   #parameters:
   #data - trees from FIADB
   data_rep <- data %>%
@@ -277,7 +765,7 @@ project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
     dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
                   TPA_UNADJ, DESIGNCD,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDImax,SICOND_c,solrad_MayAug) %>%
+                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug) %>%
     mutate(Year = NA,
            DIA = NA,
            CCF = NA,
@@ -287,8 +775,8 @@ project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
            CR_fvs = NA)
   data_rep <- data_rep %>% 
     group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = 20)) %>% #grow 20 years into the future?
-    mutate(Year = (MEASYEAR[1]:(MEASYEAR[1]+19))) %>% #repeated data frame ready  to fill in
+    slice(rep(1:n(), each = 30)) %>% #grow 30 years into the future?
+    mutate(Year = (MEASYEAR[1]:(MEASYEAR[1]+29))) %>% #repeated data frame ready  to fill in
     ungroup()
   ##density for new data in MEASYEAR will already be calculated
   #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
@@ -304,7 +792,7 @@ project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
       data_rep$CCF[i] <- data$CCF[data$TRE_CN == TRE_CN]
       data_rep$PCCF[i] <- data$PCCF[data$TRE_CN == TRE_CN]
       data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
-      data_rep$SDI[i] <- data$SDI[data$TRE_CN == TRE_CN]
+      data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
       data_rep$CR_fvs[i] <- data$CR[data$TRE_CN == TRE_CN]
     }
     #add climate
@@ -498,9 +986,9 @@ project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
         #SDI - is SDI of stand (Stage 1968)
         Species <- plt_yr2_df$SPCD[i]
         #SDI max values for each species were pulled from UT Variant overview
-        SDIMAX <- ifelse(is.na(plt_yr2_df$SDImax[i]),
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDIMAX_RMRS[i]),
                          CR_WEIB_df$SDIMAX[CR_WEIB_df$species == Species],
-                         plt_yr2_df$SDImax[i])
+                         plt_yr2_df$SDIMAX_RMRS[i])
         #Calculate relative density
         RD <- plt_yr2_df$SDI[i]/SDIMAX
         
@@ -585,4 +1073,7 @@ project_clim <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_
   
   return(pred_df)
 }
+
+#under alternative scenarios
+#ensembles?
 
