@@ -61,9 +61,6 @@ summary(val_red)
 
 #filter for SICOND
 #Species associated with SICOND (aka SISP) doesn't always match SPCD
-library(dbplyr)
-library(RSQLite)
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
 SITREE <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SPCD, SITREE FROM SITETREE")) %>%
   collect()
 #filter trees for SI
@@ -100,9 +97,6 @@ length(unique(val_red$TRE_CN))
 
 #find plots with multiple conditions
 plt_val <- val_red$PLT_CN
-library(dbplyr)
-library(RSQLite)
-UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FS_FIADB_STATECD_49.db")
 cond_red <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD FROM COND")) %>%
   collect() %>%
   filter(PLT_CN %in% plt_val)
@@ -387,6 +381,13 @@ crw_bound <- function(data,CR_WEIB_df){
   return(data_empty)
 }
 
+#what other species are on the plot?
+density_val %>%
+  ungroup() %>%
+  dplyr::select(TRE_CN,SPCD) %>%
+  group_by(SPCD) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
+
 save(density_val, file = "./data/formatted/density_val.Rdata")
 save(val_dset,file = "./data/formatted/val_dset.Rdata")
 
@@ -663,42 +664,41 @@ fvs_clim_check <- fvs_clim_check %>%
 #Tmax
 #for only large trees
 
-#new trees w/ LAT & LON
-val_trees <- val_dset %>%
-  select(TRE_CN,LON,LAT)
+#new plots w/ LAT & LON
+val_plt <- val_dset %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,LON,LAT) %>%
+  distinct()
 
 library(raster)
 # Make lat, lon data spatial
-val_tree_spat <- SpatialPointsDataFrame(coords = cbind(val_trees$LON, val_trees$LAT), 
-                                        data = val_trees, 
+val_plt_spat <- SpatialPointsDataFrame(coords = cbind(val_plt$LON, val_plt$LAT), 
+                                        data = val_plt, 
                                         proj4string = CRS("+proj=longlat +datum=NAD83"))
 
 # Read in PRISM climate stacks
 clim.path <-  "./data/formatted/"
 ppt <- stack(paste(clim.path,"pptStack.tif",sep=''))
 tmax <- stack(paste(clim.path,"tmaxStack.tif",sep=''))
-tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
+#tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
 
 # raster::extract PRISM data
-ppt.extr <- raster::extract(ppt, val_tree_spat) # this step takes about 8 minutes each (laptop)
-tmin.extr <- raster::extract(tmin, val_tree_spat)
-tmax.extr <- raster::extract(tmax, val_tree_spat)
+ppt.extr <- raster::extract(ppt, val_plt_spat) # this step takes about 8 minutes each (laptop)
+tmax.extr <- raster::extract(tmax, val_plt_spat)
+#tmin.extr <- raster::extract(tmin, val_tree_spat)
 
-  # Jan 1999 - 
-# Remove data after Oct, 2016 (because of different CRS Nov, 2016 vpdmax .bil)
-# note that the work-around for this problem is to assign the CRS of another layer to Nov and Dec of 2016
-# crs(vpdNov2016_raster) <- crs(vpdOct2016_raster)
-ppt.extr <- ppt.extr[, 1249:1476] 
-tmin.extr <- tmin.extr[, 1249:1476]
-tmax.extr <- tmax.extr[, 1249:1476]
+# Jan 1999 - Dec 2019
+ppt.extr <- ppt.extr[, 1249:1488] 
+tmax.extr <- tmax.extr[, 1249:1488]
+#tmin.extr <- tmin.extr[, 1249:1476]
 
 # Add sensible column names for raster::extracted climate data
 ppt.extr <- as.data.frame(ppt.extr)
-tmin.extr <- as.data.frame(tmin.extr)
 tmax.extr <- as.data.frame(tmax.extr)
+#tmin.extr <- as.data.frame(tmin.extr)
 PRISM.path <-  "./data/raw/climate/PRISM/"
 pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
-pptFiles <- pptFiles[1249:1476] # (hack to deal with CRS incompatibility, vpd .bil file Nov, 2016)
+pptFiles <- pptFiles[1249:1488] 
 #tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
 #vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
 colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
@@ -706,27 +706,27 @@ colNames <- unlist(colNames)
 colNames <- lapply(strsplit(colNames, "_"), function (x) x[1])
 colNames <- unlist(colNames)
 colnames(ppt.extr) <- paste0("ppt_", colNames)
-colnames(tmin.extr) <- paste0("tmin_", colNames)
 colnames(tmax.extr) <- paste0("tmax_", colNames)
+#colnames(tmin.extr) <- paste0("tmin_", colNames)
 
 
 # Export climate data
 processed.path <- "./data/formatted/"
 write.csv(ppt.extr, paste0(processed.path,"ppt_val_extr.csv"), row.names = F)
-write.csv(tmin.extr, paste0(processed.path,"tmin_val_extr.csv"), row.names = F)
 write.csv(tmax.extr, paste0(processed.path,"tmax_val_extr.csv"), row.names = F)
+#write.csv(tmin.extr, paste0(processed.path,"tmin_val_extr.csv"), row.names = F)
 
 #already have some climate information
 processed.path <- "./data/formatted/"
 ppt.extr <- read.csv(paste(processed.path,"ppt_val_extr.csv",sep=''), header = T)
-tmin.extr <- read.csv(paste(processed.path,"tmin_val_extr.csv",sep=''), header = T)
 tmax.extr <- read.csv(paste(processed.path,"tmax_val_extr.csv",sep=''), header = T)
+#tmin.extr <- read.csv(paste(processed.path,"tmin_val_extr.csv",sep=''), header = T)
 
-#for all trees
+#for all plots
 #same dataset LAT/LONG used to extract climate
-val_tre <- unique(val_trees$TRE_CN)
+val_plots <- unique(val_plt$PLT_CN)
 
-clim_col <- function(PRISM,clim_var,TRE_CN){
+clim_col <- function(PRISM,clim_var,PLT_CN){
   #make a list
   #each item is a year
   #each item has 1-13 columns (TRE_CN + 12 months)
@@ -754,25 +754,24 @@ clim_col <- function(PRISM,clim_var,TRE_CN){
   names(climate_list) <- as.integer(prism_yr)
   
   climate_stack <- bind_rows(climate_list, .id = "Year")
-  climate_stack$TRE_CN <- rep(TRE_CN,times=n)
+  climate_stack$PLT_CN <- rep(PLT_CN,times=n)
   return(climate_stack)
 }
 #could make function for all climate variables
 #find way to extract start_yr and end_yr
 #lubridate?
 
-val_ppt <- clim_col(ppt.extr,clim_var = "ppt_",TRE_CN = val_tre)
-val_tmin <- clim_col(tmin.extr,clim_var = "tmin_",TRE_CN = val_tre)
-val_tmax <- clim_col(tmax.extr,clim_var = "tmax_",TRE_CN = val_tre)
+val_ppt <- clim_col(ppt.extr,clim_var = "ppt_",PLT_CN = val_plots)
+val_tmax <- clim_col(tmax.extr,clim_var = "tmax_",PLT_CN = val_plots)
+#val_tmin <- clim_col(tmin.extr,clim_var = "tmin_",PLT_CN = val_plots)
 
-val_clim <- full_join(val_ppt,val_tmin, by = c("TRE_CN","Year")) %>%
-  full_join(.,val_tmax,by = c("TRE_CN","Year"))
+val_clim <- full_join(val_ppt,val_tmax, by = c("PLT_CN","Year"))
 
 val_clim$Year <- as.integer(val_clim$Year)
 
 #seasonal calculations
 val_clim <- val_clim %>%
-  group_by(TRE_CN) %>%
+  group_by(PLT_CN) %>%
   arrange(Year) %>%
   mutate(ppt_pJunSep = lag(ppt_Jun) + lag(ppt_Jul) + lag(ppt_Aug) + lag(ppt_Sep) + lag(ppt_Oct) +
            lag(ppt_Nov)+ lag(ppt_Dec)+ ppt_Jan+ ppt_Feb + ppt_Mar + ppt_Apr +
@@ -782,37 +781,24 @@ val_clim <- val_clim %>%
          tmax_pAug = lag(tmax_Aug)) #temp parameter for ES
 save(val_clim,file = "./data/formatted/val_clim.Rdata")
 
-#get climate-fvs ready data
-#https://www.fs.fed.us/nrm/fsveg/index.shtml
-clim_fvs <- val_dset %>%
-  ungroup() %>%
-  select(TRE_CN,LAT,LON,ELEV) %>%
-  rename_at("ELEV",~"ELE")
-
-write.table(clim_fvs, file = "./data/formatted/clim_fvs.txt", sep = " ",
-            row.names = FALSE)
 
 # Forecast ----
 library(tidyverse)
 
 #first function for nonfocal trees
-tree_val <- unique(val_dset$TRE_CN) #905
+tree_val <- unique(val_dset$TRE_CN)
 non_focal <- density_val %>%
   dplyr::select(PLT_CN,TRE_CN,SUBP,SPCD,DIA,TPA_UNADJ,DESIGNCD,MEASYEAR,fMEASYEAR,fDIA,STATUSCD,fSTATUSCD) %>%
-  filter(!(TRE_CN %in% tree_val)) %>% #3707
-  filter(STATUSCD == 1) %>% #filter for live trees at start
-  filter(fSTATUSCD != 0) %>%
+  filter(!(TRE_CN %in% tree_val)) %>%
+  filter(fSTATUSCD != 0) %>% # get rid of trees that are not included in remeasurement sample
   ungroup()
-#check
-#905+3707
-#[1] 4612
   
 #add mortality year (estimated)
-non_focal$fMORTYR <- tree$MORTYR[match(non_focal$TRE_CN,tree$PREV_TRE_CN)]
-non_focal$CONDID <- tree$CONDID[match(non_focal$TRE_CN,tree$CN)]
-
-unique(non_focal$CONDID)
-#[1] 1 2 3
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE <- dbReadTable(UT_FIA, 'TREE')
+non_focal$fMORTYR <- TREE$MORTYR[match(non_focal$TRE_CN,TREE$PREV_TRE_CN)]
+dbDisconnect(UT_FIA)
 
 #explore
 non_focal_stat <- non_focal %>%
@@ -820,20 +806,12 @@ non_focal_stat <- non_focal %>%
   group_by(STATUSCD,fSTATUSCD) %>%
   tally()
 # STATUSCD fSTATUSCD
-#       1         0   #40 #? 0 = no status; tree is not presently in sample
-#       1         1   #2415; keep
-#       1         2   #603; 2 = dead
-#       1         3   #8;  3 = cut
-#       2         0   #10
-#       2         2   #622
-#       2         NA  #9
+#       1         0   #0 = no status; tree is not presently in sample
+#       1         1   # keep; alive
+#       1         2   # = dead
+#       1         3   # = cut
 
-#filter trees that died or were cut
-#do they have a year of death? MORTYR?
-non_focal_mort <- non_focal %>%
-  filter(fSTATUSCD %in% c(2,3))
-
-
+# what about plots that have a lot of die off?
 #change in BAL
 non_foc_bal <- non_focal %>%
   group_by(PLT_CN) %>%
@@ -852,44 +830,80 @@ hist(non_foc_hist$BA_ratio,breaks = 50, xlab = "BA2 / BA1", main = "Ratio of bas
 
 #interpolate dbh
 #change in DBH per year = (fDBH-DBH/census interval)
-int_tre <- function(data){
-  growth_df <- data %>%
-    filter(!is.na(av_growth))
-  for(i in 1:nrow(data)){
-    Species <- data$SPCD[i]
-    data$growth_adj[i] <- ifelse(is.na(data$av_growth[i]),
-                                 round(mean(growth_df$av_growth[growth_df$SPCD == Species]),digits = 5),
-                                 data$av_growth[i])
-    tre_df <- data[i,] %>%
-      slice(rep(1:n(), each = (data$census_int[i] +1))) %>%
-      mutate(Year =  ifelse(is.na(fMORTYR),
-                            c(MEASYEAR[1]:fMEASYEAR[1]),
-                              c(MEASYEAR[1]:fMORTYR[1])),
-             DIA_int = ifelse(DIA == fDIA,
-                              DIA,
-                              NA))
+int_tre <- function(non_focal,growth_df){
+  non_focal <- non_focal %>%
+    ungroup()
+  for(i in 1:nrow(non_focal)){
+    Species <- non_focal$SPCD[i]
+    growth_adj <- ifelse(is.finite(non_focal$av_growth[i]),
+                         non_focal$av_growth[i],
+                         growth_df$av_growth[growth_df$SPCD == Species])
+    tre_df <- non_focal[i,] %>%
+      slice(rep(1:n(), each = (census_int +1))) %>%
+      mutate(Year =  ifelse(census_int == 0,
+                            MEASYEAR,
+                            ifelse(is.na(fMORTYR),
+                                   c(MEASYEAR[1]:fMEASYEAR[1]),
+                                   c(MEASYEAR[1]:fMORTYR[1]))),
+             growth_adj = growth_adj,
+             DIA_int = NA)
     N <- which(tre_df$Year == tre_df$MEASYEAR[1])
     tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
     Curr_row <- N+1 #each time through subtract 1 and move down one row
-    while(Curr_row <= (data$census_int[i] +1)){
-      DIA_1 <- tre_df$DIA_int[Curr_row-1]
-      tre_df$DIA_int[Curr_row] <- DIA_1 + tre_df$growth_adj[Curr_row]
-      #continue loop for next row until curr_row>0
-      Curr_row = Curr_row + 1 
+    if(tre_df$census_int[1] != 0){
+      while(Curr_row <= (non_focal$census_int[i] +1)){
+        DIA_1 <- tre_df$DIA_int[Curr_row-1]
+        tre_df$DIA_int[Curr_row] <- DIA_1 + tre_df$growth_adj[Curr_row]
+        #continue loop for next row until curr_row>0
+        Curr_row = Curr_row + 1 
+      }
     }
-    data <- full_join(data,tre_df)
+    tre_df <- tre_df %>%
+      dplyr::select(TRE_CN,Year,growth_adj,DIA_int)
+    non_focal <- full_join(non_focal,tre_df, by = "TRE_CN")
   }
-  return(data)
+  return(non_focal)
 }
 
-non_focal_test <- non_focal %>%
+tre_df <- non_focal[1966,] %>%
+  slice(rep(1:n(), each = (census_int + 1))) %>%
+  mutate(Year =  ifelse(census_int == 0,
+                        MEASYEAR,
+                        ifelse(is.na(fMORTYR),
+                               c(MEASYEAR[1]:fMEASYEAR[1]),
+                               c(MEASYEAR[1]:fMORTYR[1]))),
+         growth_adj = av_growth,
+         DIA_int = NA)
+N <- which(tre_df$Year == tre_df$MEASYEAR[1])
+tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
+Curr_row <- N+1 #each time through subtract 1 and move down one row
+if(tre_df$census_int[1] != 0){
+  while(Curr_row <= (non_focal$census_int[i] +1)){
+    DIA_1 <- tre_df$DIA_int[Curr_row-1]
+    tre_df$DIA_int[Curr_row] <- DIA_1 + tre_df$growth_adj[Curr_row]
+    #continue loop for next row until curr_row>0
+    Curr_row = Curr_row + 1 
+  }
+}
+
+non_focal <- non_focal %>%
   mutate(census_int = ifelse(is.na(fMORTYR),
                               fMEASYEAR - MEASYEAR,
                               fMORTYR - MEASYEAR),
-         av_growth = (fDIA-DIA)/census_int) %>%
-  # some will be NA where fDIA is NA and some will be negative where fDIA<DIA
-  int_tre(.)
+         av_growth = (fDIA-DIA)/census_int) # some will be NA where fDIA is NA and some will be negative where fDIA<DIA
 
+sp_avgrow_df <- non_focal %>%
+  filter(census_int > 0) %>% #some trees were estimated to have died in the measurement year
+  filter(!is.na(av_growth)) %>% #happens if fDIA is NA
+  ungroup() %>%
+  dplyr::select(SPCD, av_growth) %>%
+  group_by(SPCD) %>%
+  summarise(av_growth = mean(av_growth))
+
+non_focal_test <- int_tre(non_focal = non_focal, growth_df = sp_avgrow_df)
+  
+  
+#check
 non_focal_test <- non_focal_test %>%
   filter(!is.na(Year)) %>%
   filter(!is.infinite(growth_adj))
