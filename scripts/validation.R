@@ -829,84 +829,58 @@ hist(non_foc_hist$BA_ratio,breaks = 50, xlab = "BA2 / BA1", main = "Ratio of bas
 
 
 #interpolate dbh
-#change in DBH per year = (fDBH-DBH/census interval)
-int_tre <- function(non_focal,growth_df){
-  non_focal <- non_focal %>%
-    ungroup()
-  for(i in 1:nrow(non_focal)){
-    Species <- non_focal$SPCD[i]
-    growth_adj <- ifelse(is.finite(non_focal$av_growth[i]),
-                         non_focal$av_growth[i],
-                         growth_df$av_growth[growth_df$SPCD == Species])
-    tre_df <- non_focal[i,] %>%
+int_tre <- function(data){
+  growth_df <- data %>%
+    filter(!is.na(av_growth))
+  for(i in 1:nrow(data)){
+    Species <- data$SPCD[i]
+    data$growth_adj[i] <- ifelse(is.na(data$av_growth[i]),
+                                 round(mean(growth_df$av_growth[growth_df$SPCD == Species]),digits = 5),
+                                 data$av_growth[i])
+    tre_df <- data[i,] %>%
       slice(rep(1:n(), each = (census_int +1))) %>%
       mutate(Year =  ifelse(census_int == 0,
                             MEASYEAR,
                             ifelse(is.na(fMORTYR),
-                                   c(MEASYEAR[1]:fMEASYEAR[1]),
-                                   c(MEASYEAR[1]:fMORTYR[1]))),
-             growth_adj = growth_adj,
-             DIA_int = NA)
-    N <- which(tre_df$Year == tre_df$MEASYEAR[1])
-    tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
-    Curr_row <- N+1 #each time through subtract 1 and move down one row
-    if(tre_df$census_int[1] != 0){
-      while(Curr_row <= (non_focal$census_int[i] +1)){
+                                   c(MEASYEAR:fMEASYEAR),
+                                   c(MEASYEAR:fMORTYR))),
+             DIA_int = ifelse(DIA == fDIA,
+                              DIA,
+                              ifelse(census_int == 0,
+                                     DIA,
+                                     NA)))
+    if(is.na(tre_df$DIA_int[1])){
+      N <- which(tre_df$Year == tre_df$MEASYEAR[1])
+      tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
+      Curr_row <- N+1 #each time through subtract 1 and move down one row
+      while(Curr_row <= (data$census_int[i] +1)){
         DIA_1 <- tre_df$DIA_int[Curr_row-1]
         tre_df$DIA_int[Curr_row] <- DIA_1 + tre_df$growth_adj[Curr_row]
         #continue loop for next row until curr_row>0
         Curr_row = Curr_row + 1 
       }
     }
-    tre_df <- tre_df %>%
-      dplyr::select(TRE_CN,Year,growth_adj,DIA_int)
-    non_focal <- full_join(non_focal,tre_df, by = "TRE_CN")
+    data <- full_join(data,tre_df)
   }
-  return(non_focal)
-}
-
-tre_df <- non_focal[1966,] %>%
-  slice(rep(1:n(), each = (census_int + 1))) %>%
-  mutate(Year =  ifelse(census_int == 0,
-                        MEASYEAR,
-                        ifelse(is.na(fMORTYR),
-                               c(MEASYEAR[1]:fMEASYEAR[1]),
-                               c(MEASYEAR[1]:fMORTYR[1]))),
-         growth_adj = av_growth,
-         DIA_int = NA)
-N <- which(tre_df$Year == tre_df$MEASYEAR[1])
-tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
-Curr_row <- N+1 #each time through subtract 1 and move down one row
-if(tre_df$census_int[1] != 0){
-  while(Curr_row <= (non_focal$census_int[i] +1)){
-    DIA_1 <- tre_df$DIA_int[Curr_row-1]
-    tre_df$DIA_int[Curr_row] <- DIA_1 + tre_df$growth_adj[Curr_row]
-    #continue loop for next row until curr_row>0
-    Curr_row = Curr_row + 1 
-  }
+  data <- data %>%
+    filter(!is.na(Year))
+  return(data)
 }
 
 non_focal <- non_focal %>%
   mutate(census_int = ifelse(is.na(fMORTYR),
-                              fMEASYEAR - MEASYEAR,
-                              fMORTYR - MEASYEAR),
-         av_growth = (fDIA-DIA)/census_int) # some will be NA where fDIA is NA and some will be negative where fDIA<DIA
+                             fMEASYEAR - MEASYEAR,
+                             fMORTYR - MEASYEAR),
+         av_growth = ifelse(census_int == 0,
+                            0,
+                            #change in DBH per year
+                            (fDIA-DIA)/census_int)) # some will be NA where fDIA is NA and some will be negative where fDIA<DIA
 
-sp_avgrow_df <- non_focal %>%
-  filter(census_int > 0) %>% #some trees were estimated to have died in the measurement year
-  filter(!is.na(av_growth)) %>% #happens if fDIA is NA
-  ungroup() %>%
-  dplyr::select(SPCD, av_growth) %>%
-  group_by(SPCD) %>%
-  summarise(av_growth = mean(av_growth))
-
-non_focal_test <- int_tre(non_focal = non_focal, growth_df = sp_avgrow_df)
-  
+non_focal_exp <- int_tre(data = non_focal)
+save(non_focal_exp, file =  "./data/formatted/non_focal_exp.Rdata")
   
 #check
-non_focal_test <- non_focal_test %>%
-  filter(!is.na(Year)) %>%
-  filter(!is.infinite(growth_adj))
+summary(non_focal_exp) #NA, Inf?
 
 #function
 #insert model object, focal trees, nonfocal trees, climate (default null)
