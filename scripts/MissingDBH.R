@@ -25,6 +25,22 @@ incr_imputed <- incr_imputed %>%
 unique(incr_imputed$SPCD) #Values of BAR can be used for other species
 #[1] 106 202 122  93  15  65 108  19  96 133 321
 
+#BAR by size?
+bar_df <- incr_imputed %>%
+  ungroup() %>%
+  dplyr:: select(SPCD,DIA_C,BAR) %>%
+  group_by(SPCD,DBHRange = cut(DIA_C, breaks = c(0, 12, 40), 
+                          labels = c("0-12", "13-40"))) %>%
+  summarise(BAR_Avg = mean(BAR, na.rm = TRUE))
+
+#or just by species?
+bar_df <- incr_imputed %>%
+  ungroup() %>%
+  dplyr:: select(SPCD,BAR) %>%
+  group_by(SPCD) %>%
+  summarise(BAR_Avg = mean(BAR, na.rm = TRUE))
+#use in projection script
+
 #create dataframe of trees without increment cores in plots with trees that have increment cores
 plot_rw <- unique(incr_imputed$PLT_CN) #475
 tree_rw <- unique(incr_imputed$TRE_CN) #568
