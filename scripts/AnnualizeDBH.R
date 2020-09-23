@@ -91,7 +91,9 @@ check_data <- check_data[check_data$SPCD == 202,]
 #filter for trees with back calculated DBH
 length(unique(incr_imputed$TRE_CN)) #670
 incr_imputed <- incr_imputed %>%
-  filter(!is.na(DIA_C)) #filter for >5" later?
+  filter(!is.na(DIA_C)) %>%
+  #filter for >3" - check variant for large tree growth threshold - species specific
+  filter(DIA_C >= 3)
 length(unique(incr_imputed$TRE_CN)) #568
 
 length(unique(incr_imputed$TRE_CN[incr_imputed$SPCD == 202])) #131, 136
