@@ -1937,78 +1937,6 @@ pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = cl
                               bratio = bratio_df ,ccf_df = ccf_df, climate = clim_val)
 ```
 
-
-# Explore 
-
-## Explore covariates
-
-```{r}
-#look at a single tree over time
-bal_yr_plots <- pred_clim%>%
-  group_by(TRE_CN) %>%
-  do(plots=ggplot(data=.) +
-       aes(x=DIA, y=BAL) + geom_point() + ggtitle(unique(.$TRE_CN)))
-
-par(mfrow=c(2,2))
-bal_yr_plots$plots[[10]]
-bal_yr_plots$plots[[20]]
-bal_yr_plots$plots[[40]]
-bal_yr_plots$plots[[70]]
-```
-
-```{r}
-#cr
-pred_clim_2 <- pred_clim %>%
-  group_by(TRE_CN) %>%
-  filter(Year == MEASYEAR | Year == MEASYEAR + 1) %>%
-  mutate(cr_change = lag(CR_fvs) - CR_fvs)
-hist(pred_clim_2$cr_change, breaks = 50,
-     xlab = "CR(t) - CR(t+1)")
-
-pred_clim_2 <- pred_clim %>%
-  group_by(TRE_CN) %>%
-  filter(Year == MEASYEAR | Year == fMEASYEAR) %>%
-  mutate(cr_change = lag(CR_fvs) - CR_fvs)
-hist(pred_clim_2$cr_change, breaks = 50,
-     xlab = "CR(start) - CR(end)", main = "Weibull Distribution")
-
-hist((val_dset$CR_fvs - val_dset$fCR), breaks = 50,
-     xlab = "CR(start) - CR(end)", main = "Observed")
-
-##fvs
-hist((fvs_check_red$PctCr - fvs_check_red$CR2), breaks = 50,
-     xlab = "CR(start) - CR(end)", main = "FVS")
-
-val_dset$PctCR <- fvs_check_red$PctCr[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
-plot(val_dset$CR_fvs,val_dset$PctCR,
-     xlab = "Observed CR", ylab = "FVS CR")
-
-
-```
-
-```{r}
-#bal
-val_dset$PtBAL <- fvs_check_red$PtBAL[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
-
-val_dset$BAL <- density_val$BAL[match(val_dset$TRE_CN,density_val$TRE_CN)]
-plot(val_dset$BAL,val_dset$PtBAL,
-     xlab = "My BAL", ylab = "FVS BAL",
-     main = "Plot-level")
-
-val_dset$BAL_s <- density_val$BAL_s[match(val_dset$TRE_CN,density_val$TRE_CN)]
-plot(val_dset$BAL_s,val_dset$PtBAL,
-     xlab = "My BAL", ylab = "FVS BAL",
-     main = "Subplot/point-level")
-
-val_dset$BAL_sc <- density_val$BAL_sc[match(val_dset$TRE_CN,density_val$TRE_CN)]
-plot(val_dset$BAL_sc,val_dset$PtBAL,
-     xlab = "My BAL", ylab = "FVS BAL",
-     main = "Subplot/point-level & Scaled")
-```
-
-
-Compare predictions to observations
-
 ## Annual
 
 ```{r}
@@ -2029,12 +1957,16 @@ pred_fan_fmy <- pred_an_full %>%
   filter(Year == fMEASYEAR) %>%
   filter(!is.na(DIA))
 par(mfrow=c(1,2))
-plot(pred_fan_fmy$DIA,pred_fan_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH - Full: Tree Rings")
-plot(pred_fan_fmy$DG_pred,pred_fan_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG - Full: Tree Rings")
+ggplot(pred_fan_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_fan_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
 fit_fan <- lm(fDIA~DIA, data = pred_fan_fmy)
 summary(fit_fan)
 sqrt(mean(fit_fan$residuals^2))
@@ -2052,12 +1984,16 @@ pred_an <- pred_an %>%
 pred_an_fmy <- pred_an %>%
   filter(Year == fMEASYEAR) 
 par(mfrow=c(1,2))
-plot(pred_an_fmy$DIA,pred_an_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH - Reduced: Tree Rings")
-plot(pred_an_fmy$DG_pred,pred_an_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG - Reduced: Tree Rings")
+ggplot(pred_an_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_an_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
 fit_an <- lm(fDIA~DIA, data = pred_an_fmy)
 summary(fit_an)
 sqrt(mean(fit_an$residuals^2))
@@ -2310,26 +2246,16 @@ ggplot(data = pred_an_fmy, aes(x = FVS_LOC_CD,y = diff)) +
 ## Climate
 
 ```{r}
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_fvs.Rdata")
+#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_fvs.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_full.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim2.Rdata")
-#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim21.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim21.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim22.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim3.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr2.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr21.Rdata")
-```
-
-```{r}
-pred_clim_fvs <- pred_clim_fvs %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_cfvs_fmy <- pred_clim_fvs %>%
-  filter(Year == fMEASYEAR) %>%
-  filter(is.finite(PCCF) & is.finite(DIA)) #Size blows up due to pccf
 ```
 
 
@@ -2342,12 +2268,16 @@ pred_fclim_fmy <- pred_clim_full %>%
   filter(Year == fMEASYEAR) %>%
   filter(is.finite(PCCF) & is.finite(DIA)) #Size blows up due to pccf
 par(mfrow=c(1,2))
-plot(pred_fclim_fmy$DIA,pred_fclim_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH - Full: Tree-Rings + Climate")
-plot(pred_fclim_fmy$DG_pred,pred_fclim_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG - Full: Tree-Rings + Climate")
+ggplot(pred_fclim_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_fclim_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
 fit_fclim <- lm(fDIA~DIA,data = pred_fclim_fmy)
 summary(fit_fclim)
 sqrt(mean(fit_fclim$residuals^2))
@@ -2365,12 +2295,16 @@ pred_clim <- pred_clim %>%
 pred_rclim_fmy <- pred_clim %>%
   filter(Year == fMEASYEAR)
 par(mfrow=c(1,2))
-plot(pred_rclim_fmy$DIA,pred_rclim_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH")
-plot(pred_rclim_fmy$DG_pred,pred_rclim_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG")
+ggplot(pred_rclim_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_rclim_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
 fit_rclim <- lm(fDIA~DIA,data = pred_rclim_fmy)
 summary(fit_rclim)
 sqrt(mean(fit_rclim$residuals^2))
@@ -3276,3 +3210,16 @@ ggplot(data = r2_df_red,aes(color = model)) +
 ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) + 
   geom_point()
 ```
+
+# Choose and Explore
+
+## Full Annual
+
+
+## Reduced Annual
+
+
+## Full Climate
+
+
+## Reduced Climate
