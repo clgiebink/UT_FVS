@@ -748,28 +748,27 @@ save(proj_clim,file = "./data/formatted/proj_clim.Rdata")
 #future climate
 load("./data/formatted/future_clim.Rdata")
 
-#one ensemble for each rcp?
+#one ensemble for each rcp and model run
 
-rcp45 <- future_clim %>%
-  dplyr::select(-modelrun) %>%
-  filter(rcp == "rcp45" & year <= 2050) %>%
-  group_by(lat,lon,year) %>%
-  summarise_all("mean")
-save(rcp45, file = "./data/formatted/rcp45.Rdata")
+had_rcp26 <- future_clim %>%
+  filter(modelrun == "hadgem2-es.1.") %>%
+  filter(rcp == "rcp26" & year <= 2050)
+save(had_rcp26, file = "./data/formatted/fut_clim/had_rcp26.Rdata")
 
-rcp60 <- future_clim %>%
-  dplyr::select(-modelrun) %>%
-  filter(rcp == "rcp60" & year <= 2050) %>%
-  group_by(lat,lon,year) %>%
-  summarise_all("mean")
-save(rcp60, file = "./data/formatted/rcp60.Rdata")
+had_rcp45 <- future_clim %>%
+  filter(modelrun == "hadgem2-es.1.") %>%
+  filter(rcp == "rcp45" & year <= 2050)
+save(had_rcp45, file = "./data/formatted/fut_clim/had_rcp45.Rdata")
 
-rcp85 <- future_clim %>%
-  dplyr::select(-modelrun) %>%
-  filter(rcp == "rcp85" & year <= 2050) %>%
-  group_by(lat,lon,year) %>%
-  summarise_all("mean")
-save(rcp85, file = "./data/formatted/rcp85.Rdata")
+had_rcp60 <- future_clim %>%
+  filter(modelrun == "hadgem2-es.1.") %>%
+  filter(rcp == "rcp60" & year <= 2050)
+save(had_rcp60, file = "./data/formatted/fut_clim/had_rcp60.Rdata")
+
+had_rcp85 <- future_clim %>%
+  filter(modelrun == "hadgem2-es.1.") %>%
+  filter(rcp == "rcp85" & year <= 2050)
+save(had_rcp85, file = "./data/formatted/fut_clim/had_rcp85.Rdata")
 
 #for climate
 proj_tst <- proj_dset %>%
@@ -933,7 +932,7 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
   data_rep <- data %>%
     ungroup() %>%
     dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD,
+                  TPA_UNADJ, DESIGNCD, CR,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
                   FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug) %>%
     mutate(Year = NA,
@@ -941,8 +940,7 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
            CCF = NA,
            PCCF = NA,
            BAL = NA,
-           SDI = NA,
-           CR_fvs = NA)
+           SDI = NA)
   data_rep <- data_rep %>% 
     group_by(TRE_CN) %>%
     slice(rep(1:n(), each = 30)) %>% #grow 30 years into the future?
@@ -951,7 +949,6 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
   ##density for new data in MEASYEAR will already be calculated
   #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
   #climate projections
-  #TODO CMIP - 5? or 6?
   #fill climate
   climate <- cur_clim %>%
     ungroup()
@@ -963,35 +960,28 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
       data_rep$PCCF[i] <- data$PCCF[data$TRE_CN == TRE_CN]
       data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
       data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
-      data_rep$CR_fvs[i] <- data$CR[data$TRE_CN == TRE_CN]
     }
-    #add climate
-    #match over tree and year
-    data_rep$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$TRE_CN == TRE_CN &
-                                                        climate$Year == data_rep$Year[i]]
-    data_rep$tmax_JunAug[i] <- climate$tmax_JunAug[climate$TRE_CN == TRE_CN &
-                                                        climate$Year == data_rep$Year[i]]
-    data_rep$tmax_FebJul[i] <- climate$tmax_FebJul[climate$TRE_CN == TRE_CN &
-                                                        climate$Year == data_rep$Year[i]]
-    data_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$TRE_CN == TRE_CN &
-                                                    climate$Year == data_rep$Year[i]]
-  }
-  
-  #fill the rest with future climate
-  fut_clim <- fut_clim %>%
-    ungroup()
-  for(i in 1:nrow(data_rep)){
-    TRE_CN <- data_rep$TRE_CN[i]
-    if(is.na(data_rep$ppt_pJunSep[i])){
+    #add known climate
+    if(data_rep$Year[i] <= 2018){ #data set only goes up to 2018
       #match over tree and year
-      data_rep$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$TRE_CN == TRE_CN &
-                                                       climate$Year == data_rep$Year[i]]
-      data_rep$tmax_JunAug[i] <- climate$tmax_JunAug[climate$TRE_CN == TRE_CN &
-                                                       climate$Year == data_rep$Year[i]]
-      data_rep$tmax_FebJul[i] <- climate$tmax_FebJul[climate$TRE_CN == TRE_CN &
-                                                       climate$Year == data_rep$Year[i]]
-      data_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$TRE_CN == TRE_CN &
-                                                   climate$Year == data_rep$Year[i]]
+      data_rep$ppt_pJunSep[i] <- cur_clim$ppt_pJunSep[cur_clim$PLT_CN == PLT_CN &
+                                                       cur_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_JunAug[i] <- cur_clim$tmax_JunAug[cur_clim$PLT_CN == PLT_CN &
+                                                       cur_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_FebJul[i] <- cur_clim$tmax_FebJul[cur_clim$PLT_CN == PLT_CN &
+                                                       cur_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_pAug[i] <- cur_clim$tmax_pAug[cur_clim$PLT_CN == PLT_CN &
+                                                   cur_clim$Year == data_rep$Year[i]]
+    }
+    else{ #use future climate
+      data_rep$ppt_pJunSep[i] <- fut_clim$ppt_pJunSep[fut_clim$PLT_CN == PLT_CN &
+                                                       fut_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_JunAug[i] <- fut_clim$tmax_JunAug[fut_clim$PLT_CN == PLT_CN &
+                                                       fut_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_FebJul[i] <- fut_clim$tmax_FebJul[fut_clim$PLT_CN == PLT_CN &
+                                                       fut_clim$Year == data_rep$Year[i]]
+      data_rep$tmax_pAug[i] <- fut_clim$tmax_pAug[fut_clim$PLT_CN == PLT_CN &
+                                                   fut_clim$Year == data_rep$Year[i]]
     }
   }
   
@@ -1042,16 +1032,16 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        #plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
+        #plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
         plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
         plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
         plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
+        #plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        #plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        #plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
         plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
                                                para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
         #temperature different for each species
@@ -1194,11 +1184,4 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
   return(pred_df)
 }
 
-#test
-proj_test <- proj_dset[1:2,]
-load("./")
-
-test_85 <- project_fun(data = proj_test, mod_df = , mod_pp = , mod_es = , sp_stats = sp_stats, 
-                       nonfocal = nonfoc_proj_exp, bratio = , ccf_df = , 
-                       cur_clim = , fut_clim = rcp85)
 
