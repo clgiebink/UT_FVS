@@ -2217,3 +2217,53 @@ val_clim_fc <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
   
   return(pred_df)
 }
+
+
+# Predict -----
+
+#load validation trees
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/val_dset.Rdata")
+#load other trees on plot
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/non_focal_exp.Rdata")
+
+#Predict growth using annualized with tree rings only models for each species.
+pred_an_full <- val_an(newdata = val_dset,mod_df = an_al_df, mod_pp = an_al_pp, 
+                       mod_es = an_al_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
+                       bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
+
+pred_an <- val_an(newdata = val_dset,mod_df = an_red_df, mod_pp = an_red_pp, 
+                  mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
+                  bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
+
+
+pred_clim_full <- val_an_clim(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_al_pp, 
+                              mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
+                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
+
+#reduced climate models
+pred_clim <- val_clim(newdata = val_dset,mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                      mod_es = clim_red_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
+                      bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
+
+pred_clim2 <- val_clim(newdata = val_dset,mod_df = clim_red2_df, mod_pp = clim_red2_pp, 
+                       mod_es = clim_red_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
+                       bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
+
+
+## Predict CR
+
+pred_fan_cr <- val_an_cr(newdata = val_dset,mod_df = an_al_df, mod_pp = an_al_pp, 
+                         mod_es = an_al_es,sp_stats = sp_stats,nonfocal = non_focal,
+                         bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
+
+pred_an_cr <- val_an_cr(newdata = val_dset,mod_df = an_red_df, mod_pp = an_red_pp, 
+                        mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
+                        bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
+
+pred_fclim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_al_pp, 
+                             mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal,
+                             bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = val_clim)
+
+pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
+                            mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
+                            bratio = bratio_df ,ccf_df = ccf_df, climate = clim_val)
