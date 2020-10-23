@@ -167,24 +167,66 @@ val_tree_spat <- SpatialPointsDataFrame(coords = cbind(val_trees$LON, val_trees$
 
 # Read in PRISM climate stacks
 ppt.norm <- stack(paste(PRISM.norm.path,"pptNormals.tif",sep=''))
-tmx.norm <- stack(paste(PRISM.norm.path,"tmxNormals.tif",sep=''))
+#tmx.norm <- stack(paste(PRISM.norm.path,"tmxNormals.tif",sep=''))
 tmp.norm <- stack(paste(PRISM.norm.path,"tmpNormals.tif",sep=''))
 
 # raster::extract PRISM data
 n.ppt.extr <- raster::extract(ppt.norm, val_tree_spat)
 n.tmp.extr <- raster::extract(tmp.norm, val_tree_spat)
-n.tmx.extr <- raster::extract(tmx.norm, val_tree_spat)
+#n.tmx.extr <- raster::extract(tmx.norm, val_tree_spat)
 
 # Add tre_cn column to link to other dataframes
 n.ppt.extr <- as.data.frame(n.ppt.extr)
 n.ppt.extr$TRE_CN <- val_trees$TRE_CN
 n.tmp.extr <- as.data.frame(n.tmp.extr)
 n.tmp.extr$TRE_CN <- val_trees$TRE_CN
-n.tmx.extr <- as.data.frame(n.tmx.extr)
-n.tmx.extr$TRE_CN <- val_trees$TRE_CN
+#n.tmx.extr <- as.data.frame(n.tmx.extr)
+#n.tmx.extr$TRE_CN <- val_trees$TRE_CN
 
 # Export climate data
 processed.path <- "./data/formatted/"
 write.csv(n.ppt.extr, paste0(processed.path,"n_ppt_extr.csv"), row.names = F)
 write.csv(n.tmp.extr, paste0(processed.path,"n_tmp_extr.csv"), row.names = F)
 write.csv(n.tmx.extr, paste0(processed.path,"n_tmx_extr.csv"), row.names = F)
+
+#join with validation dataset
+val_dset$n_ppt <- n.ppt.extr$normalspptNormals[match(val_dset$TRE_CN,n.ppt.extr$TRE_CN)]
+val_dset$n_tmp <- n.tmp.extr$normalstmpNormals[match(val_dset$TRE_CN,n.tmp.extr$TRE_CN)]
+
+#calibration trees w/ LAT & LON
+load("./data/formatted/data_all.Rdata")
+cal_plt <- data_all %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,LON,LAT) %>%
+  distinct() %>%
+  drop_na()
+
+# Make lat, lon data spatial
+cal_plt_spat <- SpatialPointsDataFrame(coords = cbind(cal_plt$LON, cal_plt$LAT), 
+                                        data = cal_plt, 
+                                        proj4string = CRS("+proj=longlat +datum=NAD83"))
+
+# Read in PRISM climate stacks
+ppt.norm <- stack(paste(PRISM.norm.path,"pptNormals.tif",sep=''))
+tmx.norm <- stack(paste(PRISM.norm.path,"tmxNormals.tif",sep=''))
+tmp.norm <- stack(paste(PRISM.norm.path,"tmpNormals.tif",sep=''))
+
+# raster::extract PRISM data
+n.ppt.extr <- raster::extract(ppt.norm, cal_plt_spat)
+n.tmp.extr <- raster::extract(tmp.norm, cal_plt_spat)
+n.tmx.extr <- raster::extract(tmx.norm, cal_plt_spat)
+
+# Add tre_cn column to link to other dataframes
+n.ppt.extr <- as.data.frame(n.ppt.extr)
+n.ppt.extr$PLT_CN <- cal_plt$PLT_CN
+n.tmp.extr <- as.data.frame(n.tmp.extr)
+n.tmp.extr$PLT_CN <- cal_plt$PLT_CN
+n.tmx.extr <- as.data.frame(n.tmx.extr)
+n.tmx.extr$PLT_CN <- cal_plt$PLT_CN
+
+# Export climate data
+processed.path <- "./data/formatted/"
+write.csv(n.ppt.extr, paste0(processed.path,"n_ppt_cal.csv"), row.names = F)
+write.csv(n.tmp.extr, paste0(processed.path,"n_tmp_cal.csv"), row.names = F)
+write.csv(n.tmx.extr, paste0(processed.path,"n_tmx_cal.csv"), row.names = F)
+
