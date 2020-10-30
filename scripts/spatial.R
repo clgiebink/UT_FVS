@@ -74,3 +74,44 @@ ggplot()+
                                  "Engelmann spruce" = "gold1")) +
   theme_bw() +
   ditch_the_axes
+
+#elev & climate
+
+load("./data/formatted/data_all.Rdata")
+length(unique(data_all$TRE_CN)) #568
+spatial_df <- data_all %>%
+  ungroup() %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  mutate(ppt_an = ppt_Jan + ppt_Feb + ppt_Mar + ppt_Apr + ppt_May + ppt_Jun + ppt_Jul +
+           ppt_Aug + ppt_Sep + ppt_Oct + ppt_Nov + ppt_Dec,
+         tmax_an = (tmax_Jan + tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul +
+           tmax_Aug + tmax_Sep + tmax_Oct + tmax_Nov + tmax_Dec)/12) %>%
+  dplyr::select(TRE_CN,SPCD,ELEV,ppt_an,tmax_an,RW) %>%
+  group_by(TRE_CN,SPCD,ELEV) %>%
+  summarise(mn_ppt = mean(ppt_an, na.rm = TRUE),
+            mn_tmax = mean(tmax_an, na.rm = TRUE),
+            mn_growth = mean(RW, na.rm = TRUE)) %>%
+  mutate(Species = factor(ifelse(SPCD==93,"Engelmann spruce",
+                          ifelse(SPCD==122,"Ponderosa pine",
+                                 "Douglas fir"))))
+
+length(unique(spatial_df$TRE_CN)) #318
+
+#precip
+ggplot()+
+  geom_point(data=spatial_df,aes(x=mn_ppt,y=ELEV,
+                                 color=Species, size = mn_growth, alpha = 0.5))+
+  scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1")) +
+  theme_bw() +
+  xlab("Average Annual Precipitation (mm)") + ylab("Elevation (ft)")
+
+#temp
+ggplot()+
+  geom_point(data=spatial_df,aes(x=mn_tmax,y=ELEV,
+                                 color=Species, size = mn_growth, alpha = 0.5))+
+  scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1")) +
+  theme_bw() +
+  xlab("Average Monthly Max Temperature (C)") + ylab("Elevation (ft)")
+
