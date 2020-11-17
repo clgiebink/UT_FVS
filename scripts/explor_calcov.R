@@ -86,6 +86,15 @@ subp_check2 <- density_data %>%
   dplyr::select(PLT_CN,SUBP_t,TPA_UNADJ) %>%
   distinct()
 
+#tpa_unadj check
+#do I have to do any transforming in ccf.R?
+tpa_check <- density_data %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,TRE_CN,DIA_t,DESIGNCD,TPA_UNADJ) %>%
+  distinct()
+#check (40/(0.005454*(DIA_C^2)))/5
+#can just use tpa_unadj
+
 #unique subplots per plot?
 #does subplot equal plot and plot equal stand?
 
@@ -130,3 +139,307 @@ bal_check <- density_data %>%
   select(PLT_CN,TRE_CN,Year,DIA_C,BALIVE,TPA_C,BA_pa,BAL,DESIGNCD) %>%
   filter(PLT_CN == plot1) %>%
   filter(Year == 1988)
+
+#disturbance
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+cond <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD, SLOPE, ASPECT,SDI_RMRS, SDIMAX_RMRS, SICOND, BALIVE, DSTRBCD1, SIBASE, SISP FROM COND")) %>%
+  collect()
+
+load("./data/formatted/data_all.Rdata")
+data_all_sp <- data_all %>%
+  filter(SPCD %in% c(93,122,202))
+data_all_sp$DSTRBCD1 <- cond$DSTRBCD1[match(data_all_sp$PLT_CN,cond$PLT_CN)]
+cal_dist <- data_all_sp %>%
+  ungroup() %>%
+  select(TRE_CN,DSTRBCD1,SPCD) %>%
+  group_by(DSTRBCD1,SPCD) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
+
+
+#validation ----
+val_red %>%
+  filter(SPCD == SISP) %>%
+  ungroup() %>%
+  dplyr::select(TRE_CN,SIBASE) %>%
+  group_by(SIBASE) %>%
+  summarise(n_tre = length(unique(TRE_CN)))
+
+
+#look at a single tree over time
+bal_yr_plots <- pred_clim%>%
+  group_by(TRE_CN) %>%
+  do(plots=ggplot(data=.) +
+       aes(x=DIA, y=BAL) + geom_point() + ggtitle(unique(.$TRE_CN)))
+
+par(mfrow=c(2,2))
+bal_yr_plots$plots[[10]]
+bal_yr_plots$plots[[20]]
+bal_yr_plots$plots[[40]]
+bal_yr_plots$plots[[70]]
+
+
+#cr
+pred_clim_2 <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR | Year == MEASYEAR + 1) %>%
+  mutate(cr_change = lag(CR_fvs) - CR_fvs)
+hist(pred_clim_2$cr_change, breaks = 50,
+     xlab = "CR(t) - CR(t+1)")
+
+pred_clim_2 <- pred_clim %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR | Year == fMEASYEAR) %>%
+  mutate(cr_change = lag(CR_fvs) - CR_fvs)
+hist(pred_clim_2$cr_change, breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "Weibull Distribution")
+
+hist((val_dset$CR_fvs - val_dset$fCR), breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "Observed")
+
+##fvs
+hist((fvs_check_red$PctCr - fvs_check_red$CR2), breaks = 50,
+     xlab = "CR(start) - CR(end)", main = "FVS")
+
+val_dset$PctCR <- fvs_check_red$PctCr[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
+plot(val_dset$CR_fvs,val_dset$PctCR,
+     xlab = "Observed CR", ylab = "FVS CR")
+
+#bal
+val_dset$PtBAL <- fvs_check_red$PtBAL[match(val_dset$TRE_CN,fvs_check_red$TRE_CN)]
+
+val_dset$BAL <- density_val$BAL[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Plot-level")
+
+val_dset$BAL_s <- density_val$BAL_s[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL_s,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Subplot/point-level")
+
+val_dset$BAL_sc <- density_val$BAL_sc[match(val_dset$TRE_CN,density_val$TRE_CN)]
+plot(val_dset$BAL_sc,val_dset$PtBAL,
+     xlab = "My BAL", ylab = "FVS BAL",
+     main = "Subplot/point-level & Scaled")
+
+
+#stand density through time -----
+plt_df <- unique(glmm_df_z$PLT_CN)
+plt_pp <- unique(glmm_pp_z$PLT_CN)
+plt_es <- unique(glmm_es_z$PLT_CN)
+plt_foc <- c(plt_df,plt_pp,plt_es)
+load("./data/formatted/data_all.Rdata")
+plt_sdi_cal <- data_all %>%
+  dplyr::select(PLT_CN,DESIGNCD,SPCD,Year,SDI) %>%
+  filter(Year >= 1958 &
+           SPCD %in% c(93,122,202)) %>%
+  distinct() %>%
+  drop_na()
+length(unique(plt_sdi_cal$PLT_CN)) #224
+#are there distinct species on each plot
+dim(plt_sdi_cal %>%
+      ungroup()%>%
+      dplyr::select(PLT_CN,SPCD) %>%
+      distinct())
+#228 - 4 plots with multiple
+
+load("./data/formatted/pred_clim_cr2.Rdata")
+plt_sdi_val <- pred_clim_cr2 %>%
+  dplyr::select(PLT_CN,SPCD,Year,SDI) %>%
+  distinct()
+
+#projection dataset
+plt_sdi_proj <-  nonfoc_proj_exp %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(SDI = sum(TPA_UNADJ*(DIA_int/10)^1.6)) %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,SPCD,Year,SDI) %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  distinct()
+
+#stand age
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+cond_red <- tbl(UT_FIA, sql("SELECT PLT_CN, STDAGE FROM COND")) %>%
+  collect()
+
+plt_sdi_val <- left_join(plt_sdi_val, cond_red, by = "PLT_CN") #PLT is character
+plt_sdi_proj <- left_join(plt_sdi_proj, cond_red, by = "PLT_CN") #PLT is character
+cond_red$PLT_CN <- as.numeric(cond_red$PLT_CN)
+plt_sdi_cal <- left_join(plt_sdi_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#plt_sdi_proj <- left_join(plt_sdi_proj, cond_red, by = "PLT_CN")
+
+#for each plot
+# new data frame arranged by
+## max year for calibration
+## min year for validation
+
+#cal
+#number of years for each plot
+plt_sdi_cal <- plt_sdi_cal %>%
+  group_by(PLT_CN,SPCD) %>%
+  summarise(n = n()) %>%
+  full_join(.,plt_sdi_cal)
+#stand age back in time
+plt_sdi_cal <- plt_sdi_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN,SPCD) %>%
+  mutate(age = (STDAGE-n+1):STDAGE)
+
+#validation
+#number of years for each plot
+plt_sdi_val <- plt_sdi_val %>%
+  group_by(PLT_CN,SPCD) %>%
+  summarise(n = n()) %>%
+  full_join(.,plt_sdi_val)
+#stand age forward in time
+plt_sdi_val <- plt_sdi_val %>%
+  arrange(Year) %>%
+  group_by(PLT_CN,SPCD) %>%
+  mutate(age = STDAGE:(STDAGE+n-1))
+
+#proj
+#number of years for each plot and species
+plt_sdi_proj <- plt_sdi_proj %>%
+  group_by(PLT_CN,SPCD) %>%
+  summarise(n = n()) %>%
+  full_join(.,plt_sdi_proj)
+#stand age back in time
+plt_sdi_proj <- plt_sdi_proj %>%
+  arrange(Year) %>%
+  group_by(PLT_CN,SPCD) %>%
+  mutate(age = (STDAGE-n+1):STDAGE)
+
+#plot
+ggplot(plt_sdi_cal, aes(x = age, y = SDI, group = PLT_CN)) +
+  geom_line() + 
+  geom_text(data=plt_sdi_cal ,
+            aes(x = age + 0.03, label=PLT_CN), hjust=0)
+#%>% group_by(ID) %>% 
+#  arrange(desc(Year)) %>% 
+#  slice(1) %>% 
+#  filter(Y >= 50)
+#add max sdi?
+#add point for starting sdi?
+#some going up back in time?
+ggplot(plt_sdi_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+ggplot(plt_sdi_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(DESIGNCD))) +
+  labs(color = "Design code") +
+  theme_bw()
+
+#val
+ggplot(plt_sdi_val) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of validation plots") +
+  labs(color = "Species", caption = "Note: data from best validation run (clim_cr2)") +
+  theme_bw()
+
+sdi_hist_val <- plt_sdi_val%>%
+  group_by(PLT_CN) %>%
+  slice(which.min(Year), which.max(Year)) %>%
+  mutate(when = c("start", "end")) %>%
+  dplyr::select(PLT_CN, when, SDI) %>%
+  pivot_wider(names_from = when, values_from = SDI) %>%
+  mutate(diff = end-start)
+hist(sdi_hist_val$diff,breaks = 50, xlab = "SDI2 - SDI1", main = "Difference in SDI")
+
+#proj
+ggplot(plt_sdi_proj) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  theme_bw() +
+  ggtitle("Density of projection plots with BAR method") +
+  labs(color = "Species", caption = "Note: only includes nonfocal trees")
+
+
+plt_cal_ex <- plt_sdi_cal[1142, "PLT_CN"]
+View(density_data %>%
+       filter(PLT_CN %in% plt_cal_ex &
+                Year >= 1958) %>%
+       dplyr::select(PLT_CN,TRE_CN,DIA_C,TPA_C,Year,SDI))
+View(density_data %>%
+       filter(Year >= 1958) %>%
+       dplyr::select(PLT_CN,TRE_CN,Year) %>%
+       group_by(PLT_CN,Year) %>%
+       summarise(n_tre = n()))
+
+#ccf
+plt_comp_cal <- data_all %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF) %>%
+  distinct() %>%
+  right_join(.,plt_sdi_cal)
+ggplot(plt_comp_cal) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  ggtitle("CCF on calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+#bal
+plt_bal_cal <- data_all %>%
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,BAL) %>%
+  filter(Year >= 1958 &
+           SPCD %in% c(93,122,202)) %>%
+  distinct() %>%
+  drop_na()
+plt_bal_cal <- plt_sdi_cal %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,age) %>%
+  full_join(.,plt_bal_cal)
+ggplot(plt_bal_cal) +
+  geom_line(aes(age,BAL, group = TRE_CN, color = factor(SPCD))) +
+  ggtitle("BAL on calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+#number of species per plot
+load("./data/formatted/density_data.Rdata")
+plt_tre <- density_data %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,TRE_CN,SPCD,SDI) %>%
+  filter(Year >= 1958 & 
+           PLT_CN %in% plt_foc) %>%
+  group_by(PLT_CN) %>%
+  summarise(n_tre = length(unique(TRE_CN)),
+            n_sp = length(unique(SPCD)),
+            mn_sdi = mean(SDI))
+ggplot(plt_tre) +
+  geom_point(aes(n_tre,n_sp,color=mn_sdi,alpha = 0.5)) +
+  ggtitle("Calibration plots") +
+  xlab("Number of trees") + ylab("Unique Species") + labs(color = "Mean SDI") +
+  theme_bw()
+
+#site index by species
+load("./data/formatted/data_all.Rdata")
+length(unique(data_all$TRE_CN)) #568
+si_df <- data_all %>%
+  ungroup() %>%
+  filter(SPCD %in% c(93,122,202)) %>%
+  dplyr::select(TRE_CN,SPCD,SICOND) %>%
+  distinct() %>%
+  mutate(Species = factor(ifelse(SPCD==93,"Engelmann spruce",
+                                 ifelse(SPCD==122,"Ponderosa pine",
+                                        "Douglas fir"))))
+ggplot(si_df, aes(x=SICOND, fill=Species)) +
+  geom_histogram(binwidth=.5, alpha=.5, position="identity") +
+  theme_bw()
+
+ggplot(si_df, aes(x=SICOND, fill=Species)) +
+  geom_density(alpha=.5) +
+  theme_bw()
