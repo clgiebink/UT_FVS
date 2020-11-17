@@ -23,7 +23,7 @@ cond <- tbl(UT_FIA, sql("SELECT * FROM COND")) %>%
   collect()
 
 #grab covariates for model
-tree_red <- tree[,c("CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","CR","SITREE","TPA_UNADJ")]
+tree_red <- tree[,c("CN","PLT_CN","SUBP","PREV_TRE_CN","DIA","CR","SITREE","TPA_UNADJ","DIST","AGENTCD")]
 colnames(tree_red)[colnames(tree_red)=="CN"] <- "TRE_CN"
 colnames(tree_red)[colnames(tree_red)=="DIA"] <- "DIA_t"
 colnames(tree_red)[colnames(tree_red)=="SUBP"] <- "SUBP_t"
