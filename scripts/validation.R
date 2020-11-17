@@ -813,13 +813,16 @@ non_focal_stat <- non_focal %>%
 
 # what about plots that have a lot of die off?
 #change in BAL
-non_foc_bal <- non_focal %>%
+non_focal_red <- non_focal %>%
+  dplyr::select(PLT_CN,TRE_CN,DIA,fDIA,TPA_UNADJ,STATUSCD,fSTATUSCD,MEASYEAR,Year) %>%
+  filter(MEASYEAR == Year)
+non_foc_bal <- non_focal_red %>%
   group_by(PLT_CN) %>%
   mutate(BA1 = sum(((DIA^2) * 0.005454) * TPA_UNADJ),
          BA2 = sum(((fDIA[fSTATUSCD == 1]^2) * 0.005454) * TPA_UNADJ))
 
 non_foc_hist <- non_foc_bal %>%
-  select(PLT_CN, BA1, BA2) %>%
+  dplyr::select(PLT_CN, BA1, BA2) %>%
   distinct() %>%
   mutate(BA_diff = BA2 - BA1,
          BA_ratio = BA2/BA1)
