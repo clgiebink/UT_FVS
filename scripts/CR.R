@@ -37,6 +37,7 @@ length(unique(incr_calcov$TRE_CN))
 
 save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
 
+
 #Weibull bound ----
 
 ##UT variant guide instructions below:
@@ -205,4 +206,34 @@ incr_calcov <- crw_bound(data = incr_calcov, CR_WEIB_df)
 #Also FVS does have logic for adjusting a tree's crown ratio for top-kill 
 #not included
 save(incr_calcov,file = "./data/formatted/incr_calcov.Rdata")
+
+
+# TPA constant ----
+#load
+load('./data/formatted/dens_data_con.Rdata')
+
+#First need to calcuate SDI
+#Calculations from John Shaw (2000; Stage 1968)
+#SDI = sum(TPA * (DIA_t/10)^1.6)
+#FVS uses stage method
+dens_data_con <- dens_data_con %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(SDI = sum(TPA_UNADJ*(DIA_C/10)^1.6)) 
+
+save(dens_data_con, file = "./data/formatted/dens_data_con.Rdata")
+
+#done with nonfocal trees on plot
+#CR computationally expensive so fitler out trees I don't need (miss_data)
+length(unique(incr_imputed$TRE_CN))
+#[1] 568
+incr_tre <- unique(incr_imputed$TRE_CN)
+incr_calcov_con <- dens_data_con %>%
+  filter(TRE_CN %in% incr_tre)
+length(unique(incr_calcov_con$TRE_CN))
+#568
+
+#function weibull bound
+incr_calcov_con <- crw_bound(data = incr_calcov_con, CR_WEIB_df)
+
+save(incr_calcov_con,file = "./data/formatted/incr_calcov_con.Rdata")
 
