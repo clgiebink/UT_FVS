@@ -29,6 +29,8 @@ density_data <- density_data %>%
                                       (40/(0.005454*(DIA_C^2)))/5, 
                                       ifelse(TPA_UNADJ == 75, 75,60)))))
 
+
+
 #Crown Competition Factor
 #measure of stand density
 #equations taken from Utah variant guide
@@ -99,6 +101,36 @@ density_data <- density_data %>%
   group_by(PLT_CN,Year) %>%
   mutate(CCF = sum(CCF_t * TPA_C,na.rm = TRUE)) #%>%
   #mutate(CCF = ifelse(CCF == 0, NA, CCF))
+
+
+save(density_data,file = "./data/formatted/density_data.Rdata")
+
+# TPA Constant ----
+
+#PCCF is the crown competition factor on the inventory point where the tree is established
+#pCCF = the sum of CCF_t on a subplot on a per acre basis
+#subplot given by SUBP
+#TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
+#4 subplots for DESIGNCD 423, 424, 425; 4 microplots
+#5 subplots for DESIGNCD 410; 4 microplots 
+density_data <- density_data %>%
+  group_by(DESIGNCD) %>%
+  mutate(SUBP_N = ifelse(TPA_UNADJ %in% c(75,60), 4, max(SUBP_t))) 
+#DIA timber < 5 and woodland < 3 inches measured on microplots; TPA is 75
+
+density_data <- density_data %>%
+  group_by(PLT_CN,SUBP_t,Year) %>%
+  mutate(PCCF = sum(CCF_t * (TPA_UNADJ * SUBP_N), na.rm = TRUE))
+
+length(unique(density_data$PLT_CN)) #475
+
+#stand CCF = sum(CCFt on a plot) on a per acre basis
+#plot given by PLT_CN
+#TPA measured on a plot/stand level
+density_data <- density_data %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE)) #%>%
+#mutate(CCF = ifelse(CCF == 0, NA, CCF))
 
 
 save(density_data,file = "./data/formatted/density_data.Rdata")
