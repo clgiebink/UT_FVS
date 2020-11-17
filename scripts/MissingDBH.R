@@ -44,15 +44,31 @@ bar_df <- incr_imputed %>%
 #create dataframe of trees without increment cores in plots with trees that have increment cores
 plot_rw <- unique(incr_imputed$PLT_CN) #475
 tree_rw <- unique(incr_imputed$TRE_CN) #568
-miss_data <- tree[(tree$PLT_CN %in% plot_rw) & !(tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","STATUSCD","MORTYR","DIA","TPA_UNADJ")]
+miss_data <- tree[(tree$PLT_CN %in% plot_rw) & !(tree$CN %in% tree_rw),c("CN","PLT_CN","SUBP","SPCD","STATUSCD","MORTYR","DIA","TPA_UNADJ","DIST","AGENTCD")]
 #make sure trees are on the same plot b/c calculating stand variables
 #make sure I'm not including trees with increment data
 colnames(miss_data)[colnames(miss_data)=="CN"] <- "TRE_CN"
 colnames(miss_data)[colnames(miss_data)=="DIA"] <- "DIA_t"
 colnames(miss_data)[colnames(miss_data)=="SUBP"] <- "SUBP_t"
-miss_data$MEASYEAR <- plot$MEASYEAR[match(miss_data$PLT_CN, plot$CN)]
-miss_data$DESIGNCD <- plot$DESIGNCD[match(miss_data$PLT_CN, plot$CN)]
+miss_data$MEASYEAR <- plot$MEASYEAR[match(miss_data$PLT_CN, plot$PLT_CN)]
+miss_data$DESIGNCD <- plot$DESIGNCD[match(miss_data$PLT_CN, plot$PLT_CN)]
 miss_data$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
+miss_data$SLOPE <- cond$SLOPE[match(miss_data$PLT_CN, cond$PLT_CN)]
+
+#should I use slope from subplot?
+subp <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SLOPE, ASPECT FROM SUBPLOT")) %>%
+  collect()
+colnames(subp)[colnames(subp)=="SUBP"] <- "SUBP_t"
+colnames(subp)[colnames(subp)=="SLOPE"] <- "SLOPE_s"
+miss_data <- miss_data %>%
+  left_join(.,subp, by = c("PLT_CN","SUBP_t"))
+miss_check <- miss_data %>%
+  dplyr::select(SLOPE, SLOPE_s) %>%
+  filter(!(is.na(SLOPE_s))) %>%
+  mutate(diff = SLOPE - SLOPE_s)
+#lots of NAs and no when present, no difference from cond level
+#don't add subplot slope
+
 miss_data$Year <- NA #important for mutate(Year) to work
 miss_data$BAR_av <- NA
 miss_data$DIA_C <- NA
@@ -62,15 +78,24 @@ length(plot_rw) #475
 length(unique(miss_data$PLT_CN)) #474
 unique(miss_data$STATUSCD)
 # 1 2
+unique(miss_data$AGENTCD)
 miss_mort <- miss_data %>%
   filter(STATUSCD == 2) %>%
   select(PLT_CN,SUBP,TRE_CN,SPCD,MEASYEAR,STATUSCD,MORTYR)
 #no mortality year; no way to reconstruct death
 write.csv(miss_mort,file = "./data/formatted/miss_mort.csv")
 
+#filter for alive and recently dead
+miss_data <- miss_data %>%
+  filter(AGENTCD >= 0)
+miss_mort <- miss_data %>%
+  filter(STATUSCD ==2) %>%
+  group_by(PLT_CN) %>%
+  summarise(n_tre = n())
+
 #filter for live trees
 miss_data <- miss_data %>%
-  filter(STATUSCD ==1)
+  filter(STATUSCD == 1)
 
 #empty (year&DIA_C) dataframe?
 miss_data <- miss_data %>% 
@@ -135,6 +160,23 @@ miss_data_imputed <- miss_data %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
   mutate(DIA_C = DIA_BAR(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av))
+
+#check limiting distance for variable radius plots
+#depends on slope
+var_ld <- read_csv("./data/formatted/var_ld.csv")
+miss_data_imputed$CF <- var_ld$CF_40BAF[match(miss_data_imputed$SLOPE, var_ld$slope)]
+miss_data_imputed <- miss_data_imputed %>%
+  mutate(LD = DIA_C * CF,
+         out = ifelse(DESIGNCD != 410, 1,
+                      ifelse(DIST <= LD, 1, 0)))
+miss_data_imputed <- miss_data_imputed %>%
+  mutate(LD2 = DIA_C * 1.333,
+         out2 = ifelse(DESIGNCD != 410, 1,
+                      ifelse(DIST <= LD2, 1, 0)))
+
+miss_data_check <- miss_data_imputed %>%
+  filter(out != out2) %>%
+  dplyr::select(TRE_CN, PLT_CN, STATUSCD, DIST, Year, MEASYEAR, DESIGNCD, DIA_C, SLOPE, LD, out, LD2, out2)
 
 save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
 
