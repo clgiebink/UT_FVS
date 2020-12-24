@@ -747,6 +747,7 @@ save(proj_clim,file = "./data/formatted/proj_clim.Rdata")
 
 #future climate
 load("./data/formatted/future_clim.Rdata")
+sim <- future_clim %>% dplyr::select(modelrun, rcp) %>% distinct() %>% filter(rcp %in% c("rcp26","rcp85"))
 
 #one ensemble for each rcp and model run
 
@@ -780,7 +781,65 @@ proj_tst <- proj_dset %>%
   filter(is.na(ppt_Jan))
 
 
-# Function ----
+# Density ----
+
+
+##BAR method ----
+
+#get non focal data
+tree_proj <- unique(proj_dset$TRE_CN)
+non_foc_proj <- density_proj %>%
+  ungroup() %>%
+  filter(!(TRE_CN %in% tree_proj))
+#match bar to species or average over species
+sp_bar <- unique(bar_df$SPCD)
+non_foc_proj <- non_foc_proj %>%
+  mutate(BAR_av = ifelse(SPCD %in% sp_bar,
+                         bar_df$BAR_Avg[match(non_foc_proj$SPCD,bar_df$SPCD)], #mean species specific
+                         mean(bar_df$BAR_Avg))) #mean across all species
+
+#create nonfocal dataframe with average bar (missingDBH.R script)
+#From User's Guide to the Stand Prognosis Model
+#Wykoff, Crookston, Stage
+#pg 48
+#DBH_0 = sqrt(BAR * DBH_1^2) -- back calculating
+#DBH_1 = sqrt((DBH_0^2)/BAR_av) -- projecting
+#Optional: BAR by size (DBH)
+
+#adapted from function in missingDBH.R
+#take some code from validation function int_tre
+
+DIA_BAR <- function(data){
+  for(i in 1:nrow(data)){
+    #bar_av has already been matched
+    #otherwise could use this space to match (bar_df)
+    tre_df <- data[i,] %>%
+      slice(rep(1:n(), each = ((2050-MEASYEAR) +1))) %>%
+      mutate(Year = c(MEASYEAR:2050),
+             DIA_int = NA)
+      N <- which(tre_df$Year == tre_df$MEASYEAR[1])
+      tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
+      Curr_row <- N+1 #each time through subtract 1 and move down one row
+      while(Curr_row <= ((2050 - data$MEASYEAR[i]) +1)){
+        DIA_1 <- tre_df$DIA_int[Curr_row-1]
+        tre_df$DIA_int[Curr_row] <- sqrt((DIA_1^2)/tre_df$BAR_av[Curr_row])
+        #continue loop for next row until curr_row>0
+        Curr_row = Curr_row + 1 
+      }
+    data <- full_join(data,tre_df)
+  }
+  data <- data %>%
+    filter(!is.na(Year))
+  #there is probably a better way to do this
+  #maybe dplyr method like missing- and annualizeDBH - group by tree
+  return(data)
+}
+
+nonfoc_proj_exp <- non_foc_proj %>%
+  dplyr::select(TRE_CN,PLT_CN,SUBP,SPCD,DIA,TPA_UNADJ,MEASYEAR,
+                LAT,LON,ELEV,DESIGNCD,BAR_av) %>%
+  DIA_BAR(.)
+save(nonfoc_proj_exp, file = "./data/formatted/nonfoc_proj_exp.Rdata")
 
 ## FVS ----
 #optional - use fvs online to grow stands
@@ -794,6 +853,7 @@ View(proj_dset %>%
 
 #FVS ready data
 plt_measyr <- proj_dset %>%
+  ungroup() %>%
   select(PLT_CN,MEASYEAR) %>%
   distinct()
 
@@ -866,65 +926,130 @@ dbWriteTable(conn, "FVS_TREEINIT_PLOT", fvsTreeInitPlot)
 #from FVS online
 #https://forest.moscowfsl.wsu.edu/FVSOnline/
 
+#get output from fvs runs
+#tree list table
+fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_proj.csv")
+length(unique(fvs_treelist$StandID))
+#mostly to convert 093 -> 93
+fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
+
+#connect to fvs ready database for validation data
+library(dbplyr)
+library(RSQLite)
+fvs_proj_db <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_proj.db")
+#Extract FVS_StandInit_Plot table
+#has the link between stand_cn (aka plt_cn) and stand_id
+fvsStandInitPlot<-dbReadTable(fvs_proj_db, 'FVS_STANDINIT_PLOT');head(fvsStandInitPlot)
+# Disconnect from the database
+dbDisconnect(fvs_proj_db)
+std2plt <- fvsStandInitPlot %>%
+  dplyr::select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID))
+#stand_cn = plt_cn
+fvs_treelist$PLT_CN <- std2plt$STAND_CN[match(fvs_treelist$StandID,std2plt$STAND_ID)]
+length(unique(fvs_treelist$PLT_CN))
+
+#get tree cn
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
+  collect()
+#prep for merge
+fvs_proj_red <- fvs_treelist %>%
+  dplyr::select(PLT_CN, Year, TreeId, ActPt, SpeciesFIA, TPA, MortPA, DBH, DG, PctCr, PtBAL)
+colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
+colnames(fvs_proj_red)[colnames(fvs_proj_red)=="SpeciesFIA"] <- "SPCD"
+colnames(fvs_proj_red)[colnames(fvs_proj_red)=="ActPt"] <- "SUBP"
+# Disconnect from the database
+dbDisconnect(UT_FIA)
+
+#merge fvs runs and fia observations
+fvs_proj <- left_join(fvs_proj_red,TREE_red)
+length(unique(fvs_proj$CN))
+save(fvs_proj, file = "./data/formatted/fvs_proj.Rdata")
+
+#filter for nonfocal trees
+fvs_proj$CN <- as.numeric(fvs_proj$CN)
+n_tre <- fvs_proj %>%
+  dplyr::select(PLT_CN,TreeId,SUBP,SPCD) %>%
+  distinct() #8473
+fvs_proj_red <- fvs_proj %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TPA > 0) %>% #remove dead (2) trees; comment out to check line below
+  filter(!(TRE_CN %in% proj_dset$TRE_CN)) %>% #remove focal trees
+  filter(Year < 2060) #keep projection short
+n_tre <- fvs_proj_red %>%
+  dplyr::select(PLT_CN,TreeId,SUBP,SPCD) %>%
+  distinct() #5678; reduced 2795 trees
+length(unique(proj_dset$TRE_CN)) #so 176 not reduced
+
+#remove plots were trees do not match
+#trees not removed
+nrm_tre <- proj_dset %>% 
+  dplyr::select(PLT_CN, TRE_CN) %>% 
+  distinct() %>% 
+  filter(!(TRE_CN %in% fvs_proj$CN))
+length(unique(nrm_tre$TRE_CN)) #7?
+
+proj_dset <- proj_dset %>%
+  filter(!(PLT_CN %in% nrm_tre$PLT_CN))
+length(unique(proj_dset$TRE_CN)) #2795
+save(proj_dset, file = './data/formatted/proj_dset.Rdata')
+
+fvs_proj_red <- fvs_proj_red %>%
+  filter(!(PLT_CN %in% nrm_tre$PLT_CN))
 
 
-##BAR method ----
+#get difference in diameter
+fvs_proj_red <- fvs_proj_red %>%
+  group_by(PLT_CN,TreeId,SUBP,SPCD) %>%
+  arrange(desc(Year)) %>% 
+  mutate(DG_int = (lag(DBH) - DBH)/10,
+         mort_int = lag(MortPA)/10)
 
-#get non focal data
-tree_proj <- unique(proj_dset$TRE_CN)
-non_foc_proj <- density_proj %>%
-  ungroup() %>%
-  filter(!(TRE_CN %in% tree_proj))
-#match bar to species or average over species
-sp_bar <- unique(bar_df$SPCD)
-non_foc_proj <- non_foc_proj %>%
-  mutate(BAR_av = ifelse(SPCD %in% sp_bar,
-                         bar_df$BAR_Avg[match(non_foc_proj$SPCD,bar_df$SPCD)], #mean species specific
-                         mean(bar_df$BAR_Avg))) #mean across all species
+#interpolate dbh
+#mortality is applied over trees per acre so interpolate tpa
 
-#create nonfocal dataframe with average bar (missingDBH.R script)
-#From User's Guide to the Stand Prognosis Model
-#Wykoff, Crookston, Stage
-#pg 48
-#DBH_0 = sqrt(BAR * DBH_1^2) -- back calculating
-#DBH_1 = sqrt((DBH_0^2)/BAR_av) -- projecting
-#Optional: BAR by size (DBH)
-
-#adapted from function in missingDBH.R
-#take some code from validation function int_tre
-
-DIA_BAR <- function(data){
-  for(i in 1:nrow(data)){
-    #bar_av has already been matched
-    #otherwise could use this space to match (bar_df)
-    tre_df <- data[i,] %>%
-      slice(rep(1:n(), each = ((2050-MEASYEAR) +1))) %>%
-      mutate(Year = c(MEASYEAR:2050),
-             DIA_int = NA)
-      N <- which(tre_df$Year == tre_df$MEASYEAR[1])
-      tre_df$DIA_int[N] <- tre_df$DIA[N] #dbh when year and measure year are equal
-      Curr_row <- N+1 #each time through subtract 1 and move down one row
-      while(Curr_row <= ((2050 - data$MEASYEAR[i]) +1)){
-        DIA_1 <- tre_df$DIA_int[Curr_row-1]
-        tre_df$DIA_int[Curr_row] <- sqrt((DIA_1^2)/tre_df$BAR_av[Curr_row])
-        #continue loop for next row until curr_row>0
-        Curr_row = Curr_row + 1 
-      }
-    data <- full_join(data,tre_df)
+#interpolate dbh
+int_fvs <- function(data){
+  end <- data %>% filter(Year >= 2050) %>%
+    mutate(Year_int = Year,
+           DIA_int = DBH,
+           TPA_UNADJ = TPA)
+  data_red <- data %>% filter(Year < 2050) %>%
+    arrange(Year)
+  for(i in 1:nrow(data_red)){
+    tre_yr_df <- data_red[i,] %>%
+      slice(rep(1:n(), each = 10)) %>%
+      mutate(Year_int =  Year[1]:(Year[1]+9),
+             DIA_int = NA,
+             TPA_UNADJ = NA)
+    N <- which(tre_yr_df$Year_int == tre_yr_df$Year[1])
+    tre_yr_df$DIA_int[N] <- tre_yr_df$DBH[N] #dbh when year and measure year are equal
+    tre_yr_df$TPA_UNADJ[N] <- tre_yr_df$TPA[N]
+    Curr_row <- N+1 #each time through subtract 1 and move down one row
+    while(Curr_row <= 10){
+      DIA_1 <- tre_yr_df$DIA_int[Curr_row-1]
+      tre_yr_df$DIA_int[Curr_row] <- DIA_1 + tre_yr_df$DG_int[Curr_row]
+      TPA_1 <- tre_yr_df$TPA[Curr_row-1]
+      tre_yr_df$TPA_UNADJ[Curr_row] <- TPA_1 - tre_yr_df$mort_int[Curr_row]
+      #continue loop for next row until curr_row>0
+      Curr_row = Curr_row + 1 
+    }
+    end <- bind_rows(end,tre_yr_df) #%>%
+      #filter(!is.na(Year_int))
   }
-  data <- data %>%
-    filter(!is.na(Year))
-  #there is probably a better way to do this
-  #maybe dplyr method like missing- and annualizeDBH - group by tree
-  return(data)
+  #data <- data %>%
+  #  filter(!is.na(Year))
+  return(end)
 }
 
-nonfoc_proj_exp <- non_foc_proj %>%
-  dplyr::select(TRE_CN,PLT_CN,SUBP,SPCD,DIA,TPA_UNADJ,MEASYEAR,
-                LAT,LON,ELEV,DESIGNCD,BAR_av) %>%
-  DIA_BAR(.)
-save(nonfoc_proj_exp, file = "./data/formatted/nonfoc_proj_exp.Rdata")
+#TODO end should have DIA_int filled in
 
+proj_nonf <- int_fvs(data = fvs_proj_red)
+save(proj_nonf, file = './data/formatted/proj_nonf.Rdata')
+
+
+# Function ----
 
 project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,cur_clim,fut_clim) {
   #parameters:
