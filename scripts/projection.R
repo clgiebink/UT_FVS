@@ -67,15 +67,16 @@ load("./data/formatted/val_dset.Rdata")
 val_trees <- val_dset %>%
   dplyr::select(LON,LAT) %>%
   distinct()
-proj_trees <- proj_tst %>%
-  dplyr::select(lon,lat) %>%
+proj_trees <- proj_dset %>%
+  ungroup() %>%
+  dplyr::select(LON,LAT) %>%
   distinct()
 
 # Make lat, lon data spatial
-val_tree_spat <- SpatialPointsDataFrame(coords = cbind(val_trees$LON, val_trees$LAT), 
-                                        data = val_trees, 
+proj_tree_spat <- SpatialPointsDataFrame(coords = cbind(proj_trees$LON, proj_trees$LAT), 
+                                        data = proj_trees, 
                                         proj4string = CRS("+init=epsg:4326"))
-plot(val_tree_spat)
+plot(proj_tree_spat)
 
 # dont need this, but this would be the way to transform to a new projection (needed for climat NA)
 #cov.data.en <- spTransform(val_tree_spat, CRSobj = CRS("+proj=lcc +lat_1=49.0 +lat_2=77.0 +lat_0=0.0 +lon_0=-95.0 +x_0=0.0 +y_0=0.0 +ellps=WGS84 + datum=WGS84 +units=m +no_defs"))
@@ -114,7 +115,7 @@ proj <- seq(1:97) #97 ensembles
 rlist <- list()
 # apply funcation across all 97 projections downloaded in the netcdf
 all.future.ppt <- list()
-extract.yearly.ppt  <- function(proj, ppt, val_tree_spat, nmonths){ 
+extract.yearly.ppt  <- function(proj, ppt, proj_tree_spat, nmonths){ 
   for(p in 1:length(proj)){
     #all.future.ppt <- list()
     for(i in 1:nmonths){ 
@@ -130,8 +131,8 @@ extract.yearly.ppt  <- function(proj, ppt, val_tree_spat, nmonths){
     
     #tmax.rast.ll <- projectRaster(tmax.rast, crs =CRS("+init=epsg:4326") ) # dont recommend trying to change projections of the rasters, it will take much much longer to run this
     
-    extracted.pts <- data.frame(raster::extract(rast.stack, val_tree_spat))
-    ll.data <- as.data.frame(val_tree_spat)
+    extracted.pts <- data.frame(raster::extract(rast.stack, proj_tree_spat))
+    ll.data <- as.data.frame(proj_tree_spat)
     extracted.pts$lat <-ll.data$LAT # get the lat and long
     extracted.pts$lon <-ll.data$LON
     
@@ -156,7 +157,7 @@ extract.yearly.ppt  <- function(proj, ppt, val_tree_spat, nmonths){
 
 # for loop is slightly faster, so we will use that, but this takes a bit
 # extracts for all 97 projections 
-all.future.ppt <- extract.yearly.ppt(proj = proj, ppt = ppt, val_tree_spat = val_tree_spat, nmonths = nmonths)
+all.future.ppt <- extract.yearly.ppt(proj = proj, ppt = ppt, proj_tree_spat = proj_tree_spat, nmonths = nmonths)
 
 
 # for temperature
@@ -181,7 +182,7 @@ nc_close(tmx_nc)
 # open all the ncs
 rlist <- list()
 all.future.tmax <- list()
-extract.yearly.tmax  <- function(proj, Tmax, val_tree_spat, nmonths){ 
+extract.yearly.tmax  <- function(proj, Tmax, proj_tree_spat, nmonths){ 
   for(p in 1:length(proj)){
     #all.future.tmax <- list()
     for(i in 1:nmonths){
@@ -198,9 +199,9 @@ extract.yearly.tmax  <- function(proj, Tmax, val_tree_spat, nmonths){
     
     #tmax.rast.ll <- projectRaster(tmax.rast, crs =CRS("+init=epsg:4326") )
     # extracted.pts <- list()
-    extracted.pts<- data.frame(raster::extract(rast.stack, val_tree_spat))
+    extracted.pts<- data.frame(raster::extract(rast.stack, proj_tree_spat))
     
-    ll.data <- as.data.frame(val_tree_spat)
+    ll.data <- as.data.frame(proj_tree_spat)
     extracted.pts$lat <-ll.data$LAT # get the lat and long
     extracted.pts$lon <-ll.data$LON
     
@@ -218,7 +219,7 @@ extract.yearly.tmax  <- function(proj, Tmax, val_tree_spat, nmonths){
     yearly.tmax <- extracted.pts.m %>%
       group_by(lat,lon) %>%
       arrange(year) %>%
-      mutate(tmax_JunAug = tmax_Jun + tmax_Jul + tmax_Aug,
+      mutate(tmax_JunAug = (tmax_Jun + tmax_Jul + tmax_Aug)/3,
              tmax_FebJul = (tmax_Feb + tmax_Mar + tmax_Apr + tmax_May + tmax_Jun + tmax_Jul)/6,
              tmax_pAug = lag(tmax_Aug))
     all.future.tmax[[p]] <- yearly.tmax
@@ -227,7 +228,7 @@ extract.yearly.tmax  <- function(proj, Tmax, val_tree_spat, nmonths){
 }
 
 #run
-all.future.tmax <- extract.yearly.tmax(proj = proj, Tmax = Tmax, val_tree_spat = val_tree_spat, nmonths = nmonths)
+all.future.tmax <- extract.yearly.tmax(proj = proj, Tmax = Tmax, proj_tree_spat = proj_tree_spat, nmonths = nmonths)
 
 # convert to df
 all.tmax.df <- do.call(rbind, all.future.tmax)
@@ -251,6 +252,13 @@ summary.ppt <- ppt.models %>% dplyr::group_by(lat, lon, year, rcp) %>% dplyr::su
 
 # okay lets merge these together:
 future_clim <- merge(ppt.models, tmax.models, by = c("lat", "lon", "year", "modelrun","rcp"))
+
+#add plot number from lat and lon
+plot <- tbl(UT_FIA, sql("SELECT CN, LAT, LON FROM PLOT")) %>%
+  collect() %>%
+  mutate(PLT_CN = CN, lat = LAT, lon = LON) %>%
+  dplyr::select(PLT_CN,lat,lon)
+future_clim <- left_join(future_clim,plot, by = c("lat","lon"))
 
 save(future_clim,file = "./data/formatted/future_clim.Rdata")
 
@@ -629,6 +637,40 @@ save(proj_dset,file = "./data/formatted/proj_dset.Rdata")
 #Tmax
 #for only large trees
 
+# Search for PRISM files
+PRISM.path <-  "./data/raw/climate/PRISM_rec/"
+pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
+tmaxFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmax*.bil"), full.names = TRUE)
+
+# Stack monthly data
+pptStack <- stack()
+for (i in pptFiles) {
+  print(i)
+  pptStack <- stack(pptStack, raster(i))
+}
+
+tmaxStack <- stack()
+for (i in tmaxFiles) {
+  print(i)
+  tmaxStack <- stack(tmaxStack, raster(i))
+}
+
+# Crop climate to extent of Utah
+library(maps)
+m <- ggplot2::map_data('state', region = 'Utah')
+
+ut_spat <- SpatialPointsDataFrame(coords = cbind(m$long, m$lat), 
+                                  data = m, 
+                                  proj4string = CRS("+proj=longlat +datum=NAD83"))
+cropUT <- extent(ut_spat)
+pptStackCropped <- crop(pptStack, cropUT)
+tmaxStackCropped <- crop(tmaxStack, cropUT)
+
+# Export rasters
+clim.path <-  "./data/formatted/"
+writeRaster(pptStackCropped, paste0(clim.path, "pptStack_proj.tif"), overwrite = T)
+writeRaster(tmaxStackCropped, paste0(clim.path, "tmaxStack_proj.tif"), overwrite = T)
+
 #new plots w/ LAT & LON
 proj_plt <- proj_dset %>%
   ungroup() %>%
@@ -643,27 +685,24 @@ proj_plt_spat <- SpatialPointsDataFrame(coords = cbind(proj_plt$LON, proj_plt$LA
 
 # Read in PRISM climate stacks
 clim.path <-  "./data/formatted/"
-ppt <- stack(paste(clim.path,"pptStack.tif",sep=''))
-tmax <- stack(paste(clim.path,"tmaxStack.tif",sep=''))
-#tmin <- stack(paste(clim.path,"tminStack.tif",sep=''))
+ppt <- stack(paste(clim.path,"pptStack_proj.tif",sep=''))
+tmax <- stack(paste(clim.path,"tmaxStack_proj.tif",sep=''))
 
 # raster::extract PRISM data
-ppt.extr <- raster::extract(ppt, proj_plt_spat) # this step takes about 8 minutes each (laptop)
+ppt.extr <- raster::extract(ppt, proj_plt_spat)
 tmax.extr <- raster::extract(tmax, proj_plt_spat)
-#tmin.extr <- raster::extract(tmin, val_tree_spat)
 
-# Jan 1999 - Dec 2019
-ppt.extr <- ppt.extr[, 1249:1488] 
-tmax.extr <- tmax.extr[, 1249:1488]
-#tmin.extr <- tmin.extr[, 1249:1476]
+# Jan 2009 - Dec 2019 (or May 2020)
+#ppt.extr <- ppt.extr[, 1] 
+#tmax.extr <- tmax.extr[, 1]
 
 # Add sensible column names for raster::extracted climate data
 ppt.extr <- as.data.frame(ppt.extr)
 tmax.extr <- as.data.frame(tmax.extr)
 #tmin.extr <- as.data.frame(tmin.extr)
-PRISM.path <-  "./data/raw/climate/PRISM/"
+PRISM.path <-  "./data/raw/climate/PRISM_rec/"
 pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*ppt*.bil"), full.names = TRUE)
-pptFiles <- pptFiles[1249:1488] 
+pptFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmax*.bil"), full.names = TRUE)
 #tmpFiles <- list.files(path = PRISM.path, pattern = glob2rx("*tmean*.bil"), full.names = TRUE)
 #vpdFiles <- list.files(path = PRISM.path, pattern = glob2rx("*vpdmin*.bil"), full.names = TRUE)
 colNames <- lapply(strsplit(pptFiles, "4kmM._"), function (x) x[2])
@@ -726,6 +765,10 @@ clim_col <- function(PRISM,clim_var,PLT_CN){
 #find way to extract start_yr and end_yr
 #lubridate?
 
+#since not full years (12 months), add columns
+#june - dec
+#add directly to csv file
+
 proj_ppt <- clim_col(ppt.extr,clim_var = "ppt_",PLT_CN = proj_plots)
 proj_tmax <- clim_col(tmax.extr,clim_var = "tmax_",PLT_CN = proj_plots)
 #val_tmin <- clim_col(tmin.extr,clim_var = "tmin_",PLT_CN = val_plots)
@@ -745,31 +788,288 @@ proj_clim <- proj_clim %>%
          tmax_pAug = lag(tmax_Aug)) #temp parameter for ES
 save(proj_clim,file = "./data/formatted/proj_clim.Rdata")
 
+#normals
+#calibration trees w/ LAT & LON - proj_plt
+# Make lat, lon data spatial _proj_plt_spat
+#see above
+
+# Read in PRISM climate stacks
+PRISM.norm.path <-  "./data/raw/climate/normals"
+ppt.norm <- stack(paste(PRISM.norm.path,"pptNormals.tif",sep=''))
+#tmx.norm <- stack(paste(PRISM.norm.path,"tmxNormals.tif",sep=''))
+tmp.norm <- stack(paste(PRISM.norm.path,"tmpNormals.tif",sep=''))
+
+# raster::extract PRISM data
+n.ppt.extr <- raster::extract(ppt.norm, proj_plt_spat)
+n.tmp.extr <- raster::extract(tmp.norm, proj_plt_spat)
+#n.tmx.extr <- raster::extract(tmx.norm, proj_plt_spat)
+
+# Add tre_cn column to link to other dataframes
+n.ppt.extr <- as.data.frame(n.ppt.extr)
+n.ppt.extr$PLT_CN <- proj_plt$PLT_CN
+n.tmp.extr <- as.data.frame(n.tmp.extr)
+n.tmp.extr$PLT_CN <- proj_plt$PLT_CN
+
+#join with dataset
+proj_dset$n_ppt <- n.ppt.extr$normalspptNormals[match(proj_dset$PLT_CN,n.ppt.extr$PLT_CN)]
+proj_dset$n_tmp <- n.tmp.extr$normalstmpNormals[match(proj_dset$PLT_CN,n.tmp.extr$PLT_CN)]
+save(proj_dset, file = './data/formatted/proj_dset.Rdata')
+
 #future climate
 load("./data/formatted/future_clim.Rdata")
 sim <- future_clim %>% dplyr::select(modelrun, rcp) %>% distinct() %>% filter(rcp %in% c("rcp26","rcp85"))
 
 #one ensemble for each rcp and model run
 
+acc_rcp85 <- future_clim %>%
+  filter(modelrun == "access1-0.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(acc_rcp85, file = "./data/formatted/fut_clim/acc_rcp85.Rdata")
+
+bccm_rcp85 <- future_clim %>%
+  filter(modelrun == "bcc-csm1-1-m.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(bccm_rcp85, file = "./data/formatted/fut_clim/bccm_rcp85.Rdata")
+
+bcc_rcp26 <- future_clim %>%
+  filter(modelrun == "bcc-csm1-1.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(bcc_rcp26, file = "./data/formatted/fut_clim/bcc_rcp26.Rdata")
+
+bcc_rcp85 <- future_clim %>%
+  filter(modelrun == "bcc-csm1-1.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(bcc_rcp85, file = "./data/formatted/fut_clim/bcc_rcp85.Rdata")
+
+can_rcp26 <- future_clim %>%
+  filter(modelrun == "canesm2.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(can_rcp26, file = "./data/formatted/fut_clim/can_rcp26.Rdata")
+
+can_rcp85 <- future_clim %>%
+  filter(modelrun == "canesm2.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(can_rcp85, file = "./data/formatted/fut_clim/can_rcp85.Rdata")
+
+ccs_rcp26 <- future_clim %>%
+  filter(modelrun == "ccsm4.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(ccs_rcp26, file = "./data/formatted/fut_clim/ccs_rcp26.Rdata")
+
+ccs_rcp85 <- future_clim %>%
+  filter(modelrun == "ccsm4.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(ccs_rcp85, file = "./data/formatted/fut_clim/ccs_rcp85.Rdata")
+
+cesb_rcp85 <- future_clim %>%
+  filter(modelrun == "cesm1-bgc.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(cesb_rcp85, file = "./data/formatted/fut_clim/cesb_rcp85.Rdata")
+
+ces_rcp26 <- future_clim %>%
+  filter(modelrun == "cesm1-cam5.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(ces_rcp26, file = "./data/formatted/fut_clim/ces_rcp26.Rdata")
+
+ces_rcp85 <- future_clim %>%
+  filter(modelrun == "cesm1-cam5.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(ces_rcp85, file = "./data/formatted/fut_clim/ces_rcp85.Rdata")
+
+cmc_rcp85 <- future_clim %>%
+  filter(modelrun == "cmcc-cm.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(cmc_rcp85, file = "./data/formatted/fut_clim/cmc_rcp85.Rdata")
+
+cnm_rcp85 <- future_clim %>%
+  filter(modelrun == "cnrm-cm5.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(cnm_rcp85, file = "./data/formatted/fut_clim/cnm_rcp85.Rdata")
+
+csr_rcp26 <- future_clim %>%
+  filter(modelrun == "csiro-mk3-6-0.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(csr_rcp26, file = "./data/formatted/fut_clim/csr_rcp26.Rdata")
+
+csr_rcp85 <- future_clim %>%
+  filter(modelrun == "csiro-mk3-6-0.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(csr_rcp85, file = "./data/formatted/fut_clim/csr_rcp85.Rdata")
+
+fgl_rcp26 <- future_clim %>%
+  filter(modelrun == "fgoals-g2.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(fgl_rcp26, file = "./data/formatted/fut_clim/fgl_rcp26.Rdata")
+
+fgl_rcp85 <- future_clim %>%
+  filter(modelrun == "fgoals-g2.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(fgl_rcp85, file = "./data/formatted/fut_clim/fgl_rcp85.Rdata")
+
+fio_rcp26 <- future_clim %>%
+  filter(modelrun == "fio-esm.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(fio_rcp26, file = "./data/formatted/fut_clim/fio_rcp26.Rdata")
+
+fio_rcp85 <- future_clim %>%
+  filter(modelrun == "fio-esm.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(fio_rcp85, file = "./data/formatted/fut_clim/fio_rcp85.Rdata")
+
+gfc_rcp26 <- future_clim %>%
+  filter(modelrun == "gfdl-cm3.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(gfc_rcp26, file = "./data/formatted/fut_clim/gfc_rcp26.Rdata")
+
+gfc_rcp85 <- future_clim %>%
+  filter(modelrun == "gfdl-cm3.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(gfc_rcp85, file = "./data/formatted/fut_clim/gfc_rcp85.Rdata")
+
+gfg_rcp26 <- future_clim %>%
+  filter(modelrun == "gfdl-esm2g.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(gfg_rcp26, file = "./data/formatted/fut_clim/gfg_rcp26.Rdata")
+
+gfg_rcp85 <- future_clim %>%
+  filter(modelrun == "gfdl-esm2g.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(gfg_rcp85, file = "./data/formatted/fut_clim/gfg_rcp85.Rdata")
+
+gfm_rcp26 <- future_clim %>%
+  filter(modelrun == "gfdl-esm2m.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(gfm_rcp26, file = "./data/formatted/fut_clim/gfm_rcp26.Rdata")
+
+gfm_rcp85 <- future_clim %>%
+  filter(modelrun == "gfdl-esm2m.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(gfm_rcp85, file = "./data/formatted/fut_clim/gfm_rcp85.Rdata")
+
+gis_rcp26 <- future_clim %>%
+  filter(modelrun == "giss-e2-r.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(gis_rcp26, file = "./data/formatted/fut_clim/gis_rcp26.Rdata")
+
+gis_rcp85 <- future_clim %>%
+  filter(modelrun == "giss-e2-r.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(gis_rcp85, file = "./data/formatted/fut_clim/gis_rcp85.Rdata")
+
+hada_rcp26 <- future_clim %>%
+  filter(modelrun == "hadgem2-ao.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(hada_rcp26, file = "./data/formatted/fut_clim/hada_rcp26.Rdata")
+
+hada_rcp85 <- future_clim %>%
+  filter(modelrun == "hadgem2-es.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(hada_rcp85, file = "./data/formatted/fut_clim/hada_rcp85.Rdata")
+
+hadc_rcp85 <- future_clim %>%
+  filter(modelrun == "hadgem2-cc.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(hadc_rcp85, file = "./data/formatted/fut_clim/hadc_rcp85.Rdata")
+
 had_rcp26 <- future_clim %>%
   filter(modelrun == "hadgem2-es.1.") %>%
-  filter(rcp == "rcp26" & year <= 2050)
+  filter(rcp == "rcp26" & year <= 2060)
 save(had_rcp26, file = "./data/formatted/fut_clim/had_rcp26.Rdata")
-
-had_rcp45 <- future_clim %>%
-  filter(modelrun == "hadgem2-es.1.") %>%
-  filter(rcp == "rcp45" & year <= 2050)
-save(had_rcp45, file = "./data/formatted/fut_clim/had_rcp45.Rdata")
-
-had_rcp60 <- future_clim %>%
-  filter(modelrun == "hadgem2-es.1.") %>%
-  filter(rcp == "rcp60" & year <= 2050)
-save(had_rcp60, file = "./data/formatted/fut_clim/had_rcp60.Rdata")
 
 had_rcp85 <- future_clim %>%
   filter(modelrun == "hadgem2-es.1.") %>%
-  filter(rcp == "rcp85" & year <= 2050)
+  filter(rcp == "rcp85" & year <= 2060)
 save(had_rcp85, file = "./data/formatted/fut_clim/had_rcp85.Rdata")
+
+inm_rcp85 <- future_clim %>%
+  filter(modelrun == "inmcm4.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(inm_rcp85, file = "./data/formatted/fut_clim/inm_rcp85.Rdata")
+
+ipm_rcp26 <- future_clim %>%
+  filter(modelrun == "ipsl-cm5a-mr.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(ipm_rcp26, file = "./data/formatted/fut_clim/ipm_rcp26.Rdata")
+
+ipm_rcp85 <- future_clim %>%
+  filter(modelrun == "ipsl-cm5a-mr.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(ipm_rcp85, file = "./data/formatted/fut_clim/ipm_rcp85.Rdata")
+
+ipl_rcp85 <- future_clim %>%
+  filter(modelrun == "ipsl-cm5b-lr.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(ipl_rcp85, file = "./data/formatted/fut_clim/ipl_rcp85.Rdata")
+
+mrc_rcp26 <- future_clim %>%
+  filter(modelrun == "miroc-esm-chem.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mrc_rcp26, file = "./data/formatted/fut_clim/mrc_rcp26.Rdata")
+
+mrc_rcp85 <- future_clim %>%
+  filter(modelrun == "miroc-esm-chem.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mrc_rcp85, file = "./data/formatted/fut_clim/mrc_rcp85.Rdata")
+
+mre_rcp26 <- future_clim %>%
+  filter(modelrun == "miroc-esm.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mre_rcp26, file = "./data/formatted/fut_clim/mre_rcp26.Rdata")
+
+mre_rcp85 <- future_clim %>%
+  filter(modelrun == "miroc-esm.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mre_rcp85, file = "./data/formatted/fut_clim/mre_rcp85.Rdata")
+
+mir_rcp26 <- future_clim %>%
+  filter(modelrun == "miroc5.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mir_rcp26, file = "./data/formatted/fut_clim/mir_rcp26.Rdata")
+
+mir_rcp85 <- future_clim %>%
+  filter(modelrun == "miroc5.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mir_rcp85, file = "./data/formatted/fut_clim/mir_rcp85.Rdata")
+
+mpl_rcp26 <- future_clim %>%
+  filter(modelrun == "mpi-esm-lr.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mpl_rcp26, file = "./data/formatted/fut_clim/mpl_rcp26.Rdata")
+
+mpl_rcp85 <- future_clim %>%
+  filter(modelrun == "mpi-esm-lr.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mpl_rcp85, file = "./data/formatted/fut_clim/mpl_rcp85.Rdata")
+
+mpm_rcp26 <- future_clim %>%
+  filter(modelrun == "mpi-esm-mr.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mpm_rcp26, file = "./data/formatted/fut_clim/mpm_rcp26.Rdata")
+
+mpm_rcp85 <- future_clim %>%
+  filter(modelrun == "mpi-esm-mr.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mpm_rcp85, file = "./data/formatted/fut_clim/mpm_rcp85.Rdata")
+
+mri_rcp26 <- future_clim %>%
+  filter(modelrun == "mri-cgcm3.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(mri_rcp26, file = "./data/formatted/fut_clim/mri_rcp26.Rdata")
+
+mri_rcp85 <- future_clim %>%
+  filter(modelrun == "mri-cgcm3.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(mri_rcp85, file = "./data/formatted/fut_clim/mri_rcp85.Rdata")
+
+nor_rcp26 <- future_clim %>%
+  filter(modelrun == "noresm1-m.1.") %>%
+  filter(rcp == "rcp26" & year <= 2060)
+save(nor_rcp26, file = "./data/formatted/fut_clim/nor_rcp26.Rdata")
+
+nor_rcp85 <- future_clim %>%
+  filter(modelrun == "noresm1-m.1.") %>%
+  filter(rcp == "rcp85" & year <= 2060)
+save(nor_rcp85, file = "./data/formatted/fut_clim/nor_rcp85.Rdata")
 
 #for climate
 proj_tst <- proj_dset %>%
@@ -982,6 +1282,13 @@ n_tre <- fvs_proj_red %>%
   distinct() #5678; reduced 2795 trees
 length(unique(proj_dset$TRE_CN)) #so 176 not reduced
 
+#get data set with focal trees for visualization as well
+proj_foc <- fvs_proj %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% proj_dset$TRE_CN) %>% #keep focal trees
+  filter(Year < 2060) #keep projection short
+save(proj_foc, file = "./data/formatted/projection/proj_foc.Rdata")
+
 #remove plots were trees do not match
 #trees not removed
 nrm_tre <- proj_dset %>% 
@@ -1030,7 +1337,7 @@ int_fvs <- function(data){
     while(Curr_row <= 10){
       DIA_1 <- tre_yr_df$DIA_int[Curr_row-1]
       tre_yr_df$DIA_int[Curr_row] <- DIA_1 + tre_yr_df$DG_int[Curr_row]
-      TPA_1 <- tre_yr_df$TPA[Curr_row-1]
+      TPA_1 <- tre_yr_df$TPA_UNADJ[Curr_row-1]
       tre_yr_df$TPA_UNADJ[Curr_row] <- TPA_1 - tre_yr_df$mort_int[Curr_row]
       #continue loop for next row until curr_row>0
       Curr_row = Curr_row + 1 
@@ -1043,40 +1350,92 @@ int_fvs <- function(data){
   return(end)
 }
 
-#TODO end should have DIA_int filled in
-
 proj_nonf <- int_fvs(data = fvs_proj_red)
 save(proj_nonf, file = './data/formatted/proj_nonf.Rdata')
+
+#get interpolated tpa for focal trees
+fvs_tpa_foc <- fvs_proj %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% proj_dset$TRE_CN) %>% #keep focal trees
+  filter(Year < 2060) %>%
+  group_by(PLT_CN,TRE_CN) %>%
+  arrange(desc(Year)) %>% 
+  mutate(mort_int = lag(MortPA)/10)
+#function to interpolate just tpa
+int_tpa_fvs <- function(data){
+  end <- data %>% filter(Year >= 2050) %>%
+    mutate(Year_int = Year,
+           TPA_UNADJ = TPA) %>%
+    dplyr::select(PLT_CN,TRE_CN,Year_int,TPA_UNADJ)
+  data_red <- data %>% filter(Year < 2050) %>%
+    arrange(Year)
+  for(i in 1:nrow(data_red)){
+    tre_yr_df <- data_red[i,] %>%
+      slice(rep(1:n(), each = 10)) %>%
+       mutate(Year_int =  Year[1]:(Year[1]+9),
+             TPA_UNADJ = NA)
+    mort_c <- tre_yr_df$mort_int[1]
+    N <- which(tre_yr_df$Year_int == tre_yr_df$Year[1])
+    tre_yr_df$TPA_UNADJ[N] <- tre_yr_df$TPA[N] #tpa when year and measure year are equal
+    Curr_row <- N+1 #each time through subtract 1 and move down one row
+    while(Curr_row <= 10){
+      TPA_1 <- tre_yr_df$TPA_UNADJ[Curr_row-1]
+      tre_yr_df$TPA_UNADJ[Curr_row] <- TPA_1 - mort_c
+      #continue loop for next row until curr_row>0
+      Curr_row = Curr_row + 1 
+    }
+    tre_yr_df <- tre_yr_df %>%
+      dplyr::select(PLT_CN,TRE_CN,Year_int,mort_int,TPA_UNADJ)
+    end <- bind_rows(end,tre_yr_df) 
+  }
+  return(end)
+}
+#expand df
+proj_tpa_foc <- int_tpa_fvs(fvs_tpa_foc)
+#good
+proj_tpa_foc <- proj_tpa_foc %>%
+  mutate(Year = Year_int) %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,TPA_UNADJ)
+save(proj_tpa_foc, file = './data/formatted/proj_tpa_foc.Rdata')
+
+#join tpa
+proj_dtst <- proj_dset %>%
+  ungroup() %>%
+  mutate(PLT_CN = as.numeric(PLT_CN),
+         TRE_CN = as.numeric(TRE_CN)) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
+                DESIGNCD, CR,
+                ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
+                FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug) %>%
+  right_join(.,proj_tpa_foc) %>%
+  mutate(DIA = NA,
+         CCF = NA,
+         PCCF = NA,
+         BAL = NA,
+         SDI = NA)
 
 
 # Function ----
 
-project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,cur_clim,fut_clim) {
+proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df) {
   #parameters:
   #data - trees from FIADB
   data_rep <- data %>%
     ungroup() %>%
+    mutate(PLT_CN = as.numeric(PLT_CN),
+           TRE_CN = as.numeric(TRE_CN)) %>%
     dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD, CR,
+                  DESIGNCD, CR,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
                   FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug) %>%
-    mutate(Year = NA,
-           DIA = NA,
+    right_join(.,tpa_df) %>%
+    mutate(DIA = NA,
            CCF = NA,
            PCCF = NA,
            BAL = NA,
            SDI = NA)
-  data_rep <- data_rep %>% 
-    group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = 30)) %>% #grow 30 years into the future?
-    mutate(Year = (MEASYEAR[1]:(MEASYEAR[1]+29))) %>% #repeated data frame ready  to fill in
-    ungroup()
   ##density for new data in MEASYEAR will already be calculated
   #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
-  #climate projections
-  #fill climate
-  climate <- cur_clim %>%
-    ungroup()
   for(i in 1:nrow(data_rep)){
     TRE_CN <- data_rep$TRE_CN[i]
     if(data_rep$Year[i] == data_rep$MEASYEAR[i]){
@@ -1086,28 +1445,6 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
       data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
       data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
     }
-    #add known climate
-    if(data_rep$Year[i] <= 2018){ #data set only goes up to 2018
-      #match over tree and year
-      data_rep$ppt_pJunSep[i] <- cur_clim$ppt_pJunSep[cur_clim$PLT_CN == PLT_CN &
-                                                       cur_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_JunAug[i] <- cur_clim$tmax_JunAug[cur_clim$PLT_CN == PLT_CN &
-                                                       cur_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_FebJul[i] <- cur_clim$tmax_FebJul[cur_clim$PLT_CN == PLT_CN &
-                                                       cur_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_pAug[i] <- cur_clim$tmax_pAug[cur_clim$PLT_CN == PLT_CN &
-                                                   cur_clim$Year == data_rep$Year[i]]
-    }
-    else{ #use future climate
-      data_rep$ppt_pJunSep[i] <- fut_clim$ppt_pJunSep[fut_clim$PLT_CN == PLT_CN &
-                                                       fut_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_JunAug[i] <- fut_clim$tmax_JunAug[fut_clim$PLT_CN == PLT_CN &
-                                                       fut_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_FebJul[i] <- fut_clim$tmax_FebJul[fut_clim$PLT_CN == PLT_CN &
-                                                       fut_clim$Year == data_rep$Year[i]]
-      data_rep$tmax_pAug[i] <- fut_clim$tmax_pAug[fut_clim$PLT_CN == PLT_CN &
-                                                   fut_clim$Year == data_rep$Year[i]]
-    }
   }
   
   #mod_obj - list of model objects for each species
@@ -1115,7 +1452,9 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
   ##will be used to standardize data covariates
   #nonfocal - trees on the same plot as focal trees
   nonfocal <- nonfocal %>%
-    ungroup()
+    ungroup() %>%
+    mutate(Year = Year_int,
+           DIA = DIA_int)
   #TODO expand nonfocal -> will fill in...how??
   ##will be used to compute density parameters
   #bratio - dataframe of bark ratio constants for equation
@@ -1140,13 +1479,6 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
       
       for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
         Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
         
         #standardize covariates
         #get mean/sd for each species
@@ -1158,17 +1490,290 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
         #plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        #plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
+        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
         plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
         plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
         plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        #plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        #plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        #plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
+        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
+      }
+      
+      #predict
+      plt_yr_df$dds <- NA
+      
+      #but first separate by species
+      # modobj will change with different species
+      #DF
+      plt_yr_df_df <- plt_yr_df %>% filter(SPCD == 202)
+      if(dim(plt_yr_df_df)[1] > 0){
+        plt_yr_df_df$dds <- predict(object = mod_df, newdata = plt_yr_df_df,
+                                    re.form = NA, type = "response")
+      }
+      #PP
+      plt_yr_df_pp <- plt_yr_df %>% filter(SPCD == 122)
+      if(dim(plt_yr_df_pp)[1] > 0){
+        plt_yr_df_pp$dds <- predict(object = mod_pp, newdata = plt_yr_df_pp,
+                                    re.form = NA, type = "response")
+      }
+      #ES
+      plt_yr_df_es <- plt_yr_df %>% filter(SPCD == 93)
+      if(dim(plt_yr_df_es)[1] > 0){
+        plt_yr_df_es$dds <- predict(object = mod_es, newdata = plt_yr_df_es,
+                                    re.form = NA, type = "response")
+      }
+      #re.form specify random effects to include
+      ##NA include none
+      
+      #bind rows again
+      plt_yr_df <- bind_rows(plt_yr_df_df,plt_yr_df_pp) %>% bind_rows(.,plt_yr_df_es) %>% arrange(TRE_CN)
+      
+      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
+        Species <- plt_yr_df$SPCD[i]
+        #see page 53 of prognosis model
+        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
+        # k = 1/BRATIO
+        #see UT variant guide
+        #BRATIO = b1+b2/(DBH^exp)
+        b1 <- bratio$b1[bratio$species == Species]
+        b2 <- bratio$b2[bratio$species == Species]
+        exp <- bratio$exp[bratio$species == Species]
+        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
+        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
+        k <- 1/BRATIO 
+        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$dds[i])) -
+                                  (plt_yr_df$DIA[i]/k))
+        plt_yr_df$DIA2[i] <- plt_yr_df$DIA[i] + plt_yr_df$DG[i]
+      }
+      
+      #so DBH0 + k*DG = DBH
+      plt_yr2_df <- plt_df %>%
+        filter(Year == (growthyr+1)) %>%
+        arrange(TRE_CN)
+      for(i in 1:nrow(plt_yr2_df)){
+        plt_yr2_df$DIA[i] <- plt_yr_df$DIA2[i]
+      }
+      
+      #TODO grow nonfocal trees
+      
+      #join with nonfocal
+      #fitler for trees on plots in validation set in same year
+      non_foc_filt <- nonfocal %>%
+        dplyr::select(PLT_CN, TRE_CN, TreeId, SUBP, SPCD,TPA_UNADJ,Year,DIA) %>%
+        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
+               Year == plt_yr2_df$Year[1])
+      #join
+      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
+      
+      #compute density parameters
+      #ccf
+      for(i in 1:nrow(density_cal)){
+        Species <- density_cal$SPCD[i]
+        r1 <- ccf_df$r1[ccf_df$species == Species]
+        r2 <- ccf_df$r2[ccf_df$species == Species]
+        r3 <- ccf_df$r3[ccf_df$species == Species]
+        r4 <- ccf_df$r4[ccf_df$species == Species]
+        r5 <- ccf_df$r5[ccf_df$species == Species]
+        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
+        if(Species == 475){
+          ifelse(density_cal$DIA[i] < dbrk,
+                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
+                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
+        }
+        if(Species != 475){
+          ifelse(is.na(density_cal$DIA[i]), 
+                 CCF_t <- NA,
+                 ifelse(density_cal$DIA[i] <= 0.1, 
+                        CCF_t <- 0.0001,
+                        ifelse(density_cal$DIA[i] < dbrk, 
+                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
+                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
+        }
+        density_cal$CCF_t[i] <- CCF_t
+      }
+      
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,SUBP,Year) %>%
+        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
+      
+      #stand CCF = sum(CCFt on a plot) on a per acre basis
+      #TPA measured on a plot/stand level
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
+      
+      #bal
+      density_cal <- density_cal %>%
+        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
+      
+      #rank trees per year per plot
+      #sum BApa of trees larger on the same plot in same year
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
+        #min assigns lowest value to ties (1,2,3,3,5,6)
+        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+      
+      density_cal <- density_cal %>%
+        group_by(PLT_CN,Year) %>%
+        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6)) #stage
+      
+      #filter for focal trees
+      plt_yr2_df <- density_cal %>%
+        filter(TRE_CN %in% plt_yr_df$TRE_CN)
+      
+      #join with plt_df
+      for(i in 1:nrow(plt_df)){
+        TRE_CN <- plt_df$TRE_CN[i]
+        if(plt_df$Year[i] == (growthyr + 1)){
+          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+        }
+      }
+      #add density metrics in
+      
+      #loop over next year
+      growthyr = growthyr + 1
+    }
+    #join plt_df with empty data frame
+    #output
+    pred_df <- bind_rows(pred_df,plt_df)
+    
+    #loop over next plot
+  }
+  
+  return(pred_df)
+}
+
+tr_an <- proj_an(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = an_df, mod_pp = an_pp, 
+                 mod_es = an_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                 ccf_df = ccf_df)
+save(tr_an, file = "./data/formatted/projection/tr_an.Rdata")
+
+#climate
+proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,cur_clim,fut_clim) {
+  #parameters:
+  #data - trees from FIADB
+  data <- data %>%
+    ungroup() %>%
+    mutate(PLT_CN = as.numeric(PLT_CN),
+           TRE_CN = as.numeric(TRE_CN))
+  tpa_df <- tpa_df %>% ungroup()
+  #tpa_df - updated tpa from fvs includes mortality
+  data_rep <- data %>%
+    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
+                  DESIGNCD, CR,
+                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
+                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug,n_ppt,n_tmp) %>%
+    right_join(.,tpa_df) %>%
+    mutate(DIA = NA,
+           DG = NA,
+           CCF = NA,
+           PCCF = NA,
+           BAL = NA,
+           SDI = NA)
+
+  ##density for new data in MEASYEAR will already be calculated
+  #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
+  for(i in 1:nrow(data_rep)){
+    TRE_CN <- data_rep$TRE_CN[i]
+    if(data_rep$Year[i] == data_rep$MEASYEAR[i]){
+      data_rep$DIA[i] <- data$DIA[data$TRE_CN == TRE_CN ]
+      data_rep$CCF[i] <- data$CCF[data$TRE_CN == TRE_CN]
+      data_rep$PCCF[i] <- data$PCCF[data$TRE_CN == TRE_CN]
+      data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
+      data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
+    }
+  }
+  #climate projections
+  #current climate
+  cur_clim <- cur_clim %>%
+    ungroup() %>%
+    mutate(PLT_CN = as.numeric(PLT_CN))%>%
+    filter(Year <= 2019) %>%
+    filter(PLT_CN %in% unique(data$PLT_CN)) %>%
+    dplyr::select(PLT_CN,Year,ppt_pJunSep,tmax_JunAug,tmax_FebJul,tmax_pAug)
+  #future climate
+  fut_clim <- fut_clim %>%
+    ungroup() %>%
+    mutate(Year = as.numeric(year),
+           PLT_CN = as.numeric(PLT_CN)) %>%
+    filter(Year >= 2020) %>%
+    filter(PLT_CN %in% unique(data$PLT_CN)) %>%
+    dplyr::select(PLT_CN,Year,ppt_pJunSep,tmax_JunAug,tmax_FebJul,tmax_pAug)
+  #all climate
+  all_clim <- bind_rows(cur_clim,fut_clim)
+  #fill climate
+  data_rep <- left_join(data_rep,all_clim, by = c("PLT_CN","Year"))
+
+  #mod_obj - list of model objects for each species
+  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
+  ##will be used to standardize data covariates
+  #nonfocal - trees on the same plot as focal trees
+  nonfocal <- nonfocal %>%
+    ungroup() %>%
+    mutate(DIA = DIA_int,
+           Year = Year_int)
+  #TODO expand nonfocal -> will fill in...how??
+  ##will be used to compute density parameters
+  #bratio - dataframe of bark ratio constants for equation
+  #ccf - dataframe of crown competiton factor constants for equation
+  #CR_weib_df - dataframe of crown ratio constants for equation
+  #climate - dataframe of climate variables (ppt & tmax) for each tree
+  
+  #empty dataframe to add results
+  pred_df <- data_rep[FALSE,]
+  
+  # loop over plot
+  # to calculate density after MEASYR
+  for(i in unique(data_rep$PLT_CN)) {
+    #create plot dataframe to predict growth
+    plt_df <- data_rep[data_rep$PLT_CN == i,]
+    #assign projection start year
+    growthyr <- min(plt_df$Year) # assumes all trees on a plot have same MEASYEAR
+    while (growthyr <= max(plt_df$Year)-1){ #stops the year before last projection year
+      #filter dataframe for year of projection
+      plt_yr_df <- plt_df %>%
+        filter(Year == growthyr)
+      
+      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
+        Species <- plt_yr_df$SPCD[i]
+        
+        #standardize covariates
+        #get mean/sd for each species
+        if(Species == 202){para_std <- sp_stats$sp_202}
+        if(Species == 122){para_std <- sp_stats$sp_122}
+        if(Species == 93) {para_std <- sp_stats$sp_93}
+        
+        #first row is mean, second row is sd
+        #the inputs of the equation are from a list so output needs to be unlisted
+        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
+        #plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
+        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
+        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
+        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
+        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
+        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
+        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
+        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
         plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
                                                para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
+        plt_yr_df$z.n_ppt[i] = unlist((plt_yr_df[i,"n_ppt"] - 
+                                               para_std[1,"n_ppt"]) / para_std[2,"n_ppt"])
+        plt_yr_df$z.n_tmp[i] = unlist((plt_yr_df[i,"n_tmp"] - 
+                                               para_std[1,"n_tmp"]) / para_std[2,"n_tmp"])
+        
+        #TODO there must be a better way to do this? for loop?
+        
         #temperature different for each species
         sp_202 <- sp_stats$sp_202
         sp_122 <- sp_stats$sp_122
@@ -1182,15 +1787,39 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         plt_yr_df$z.tmax_pAug[i] = unlist((plt_yr_df[i,"tmax_pAug"] -
                                              sp_93[1,"tmax_pAug"]) / 
                                             sp_93[2,"tmax_pAug"])
-        #TODO there must be a better way to do this? for loop?
-        
-        #predict
-        # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, data = plt_yr_df[i,], 
-                                        re.form = NA, type = "response")
-        #re.form specify random effects to include
-        ##NA include none
-        
+      }
+      
+      #predict
+      plt_yr_df$dds <- NA
+      
+      #but first separate by species
+      # modobj will change with different species
+      #DF
+      plt_yr_df_df <- plt_yr_df %>% filter(SPCD == 202)
+      if(dim(plt_yr_df_df)[1] > 0){
+        plt_yr_df_df$dds <- predict(object = mod_df, newdata = plt_yr_df_df,
+                                    re.form = NA, type = "response")
+      }
+      #PP
+      plt_yr_df_pp <- plt_yr_df %>% filter(SPCD == 122)
+      if(dim(plt_yr_df_pp)[1] > 0){
+        plt_yr_df_pp$dds <- predict(object = mod_pp, newdata = plt_yr_df_pp,
+                                    re.form = NA, type = "response")
+      }
+      #ES
+      plt_yr_df_es <- plt_yr_df %>% filter(SPCD == 93)
+      if(dim(plt_yr_df_es)[1] > 0){
+        plt_yr_df_es$dds <- predict(object = mod_es, newdata = plt_yr_df_es,
+                                    re.form = NA, type = "response")
+      }
+      #re.form specify random effects to include
+      ##NA include none
+      
+      #bind rows again
+      plt_yr_df <- bind_rows(plt_yr_df_df,plt_yr_df_pp) %>% bind_rows(.,plt_yr_df_es) %>% arrange(TRE_CN)
+      
+      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
+        Species <- plt_yr_df$SPCD[i]
         #see page 53 of prognosis model
         #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
         # k = 1/BRATIO
@@ -1202,23 +1831,25 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
         #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
         k <- 1/BRATIO 
-        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
+        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$dds[i])) -
                                   (plt_yr_df$DIA[i]/k))
+        plt_yr_df$DIA2[i] <- plt_yr_df$DIA[i] + plt_yr_df$DG[i]
       }
       
       #so DBH0 + k*DG = DBH
       plt_yr2_df <- plt_df %>%
-        filter(Year == (growthyr+1))%>%
-        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
+        filter(Year == (growthyr+1)) %>%
+        arrange(TRE_CN)
+      for(i in 1:nrow(plt_yr2_df)){
+        plt_yr2_df$DIA[i] <- plt_yr_df$DIA2[i]
+      }
       
       #TODO grow nonfocal trees
       
       #join with nonfocal
       #fitler for trees on plots in validation set in same year
       non_foc_filt <- nonfocal %>%
-        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
-        mutate(DIA = DIA_int) %>%
+        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA) %>%
         filter(PLT_CN == plt_yr2_df$PLT_CN[1],
                Year == plt_yr2_df$Year[1])
       #join
@@ -1285,13 +1916,15 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
       #join with plt_df
       for(i in 1:nrow(plt_df)){
         TRE_CN <- plt_df$TRE_CN[i]
+        if(plt_df$Year[i] == (growthyr)){
+          plt_df$DG[i] <- plt_yr_df$DG[plt_yr_df$TRE_CN == TRE_CN]
+        }
         if(plt_df$Year[i] == (growthyr + 1)){
           plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
       #add density metrics in
@@ -1310,3 +1943,144 @@ project_fun <- function(data,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
 }
 
 
+load("./data/formatted/proj_tpa_foc.Rdata")
+
+df_stats <- varmt_df_z %>%
+  ungroup() %>%
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+                cos,sin,solrad_MayAug,ppt_pJunSep,tmax_FebJul,n_ppt,n_tmp) %>%
+  sapply(.,function(x) c(mean=mean(x,na.rm = T),
+                         sd=sd(x,na.rm = T)))
+pp_stats <- varmt_pp_z %>%
+  ungroup() %>%
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+                cos,sin,solrad_MayAug,ppt_pJunSep,tmax_JunAug,n_ppt,n_tmp) %>%
+  sapply(.,function(x) c(mean=mean(x,na.rm = T),
+                         sd=sd(x,na.rm = T)))
+es_stats <- varmt_es_z %>%
+  ungroup() %>%
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+                cos,sin,solrad_MayAug,ppt_pJunSep,tmax_pAug,n_ppt,n_tmp) %>%
+  sapply(.,function(x) c(mean=mean(x,na.rm = T),
+                         sd=sd(x,na.rm = T)))
+sp_stats <- list(sp_202 = df_stats, sp_122 = pp_stats,sp_93 = es_stats)
+
+load("./data/formatted/fut_clim/acc_rcp85.Rdata")
+red_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
+save(red_acc85, file = "./data/formatted/projection/red_acc85.Rdata")
+
+load("./data/formatted/fut_clim/bcc_rcp26.Rdata")
+red_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                         mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
+save(red_bcc26, file = "./data/formatted/projection/red_bcc26.Rdata")
+
+load("./data/formatted/fut_clim/bcc_rcp85.Rdata")
+red_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
+save(red_bcc85, file = "./data/formatted/projection/red_bcc85.Rdata")
+
+load("./data/formatted/fut_clim/bccm_rcp85.Rdata")
+red_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
+save(red_bccm85, file = "./data/formatted/projection/red_bccm85.Rdata")
+
+load("./data/formatted/fut_clim/can_rcp26.Rdata")
+red_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,cur_clim = proj_clim, fut_clim = can_rcp26)
+save(red_can26, file = "./data/formatted/projection/red_can26.Rdata")
+
+load("./data/formatted/fut_clim/can_rcp85.Rdata")
+red_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = can_rcp85)
+save(red_can85, file = "./data/formatted/projection/red_can85.Rdata")
+
+load("./data/formatted/fut_clim/ccs_rcp26.Rdata")
+red_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp26)
+save(red_ccs26, file = "./data/formatted/projection/red_ccs26.Rdata")
+
+load("./data/formatted/fut_clim/ccs_rcp85.Rdata")
+red_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
+save(red_ccs85, file = "./data/formatted/projection/red_ccs85.Rdata")
+
+load("./data/formatted/fut_clim/ces_rcp26.Rdata")
+red_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
+save(red_ces26, file = "./data/formatted/projection/red_ces26.Rdata")
+
+load("./data/formatted/fut_clim/ces_rcp85.Rdata")
+red_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
+                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
+save(red_ces85, file = "./data/formatted/projection/red_ces85.Rdata")
+
+#normals
+n_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                      mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
+save(n_acc85, file = "./data/formatted/projection/normals/n_acc85.Rdata")
+
+load("./data/formatted/fut_clim/bcc_rcp26.Rdata")
+n_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
+save(n_bcc26, file = "./data/formatted/projection/normals/n_bcc26.Rdata")
+
+load("./data/formatted/fut_clim/bcc_rcp85.Rdata")
+n_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
+save(n_bcc85, file = "./data/formatted/projection/normals/n_bcc85.Rdata")
+
+load("./data/formatted/fut_clim/bccm_rcp85.Rdata")
+n_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                         mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
+save(n_bccm85, file = "./data/formatted/projection/normals/n_bccm85.Rdata")
+
+load("./data/formatted/fut_clim/can_rcp26.Rdata")
+n_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,cur_clim = proj_clim, fut_clim = can_rcp26)
+save(n_can26, file = "./data/formatted/projection/n_can26.Rdata")
+
+load("./data/formatted/fut_clim/can_rcp85.Rdata")
+n_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                      mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = can_rcp85)
+save(n_can85, file = "./data/formatted/projection/n_can85.Rdata")
+
+load("./data/formatted/fut_clim/ccs_rcp26.Rdata")
+n_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp26)
+save(n_ccs26, file = "./data/formatted/projection/n_ccs26.Rdata")
+
+load("./data/formatted/fut_clim/ccs_rcp85.Rdata")
+n_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
+save(n_ccs85, file = "./data/formatted/projection/n_ccs85.Rdata")
+
+load("./data/formatted/fut_clim/ces_rcp26.Rdata")
+n_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
+save(n_ces26, file = "./data/formatted/projection/n_ces26.Rdata")
+
+load("./data/formatted/fut_clim/ces_rcp85.Rdata")
+n_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
+                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
+save(n_ces85, file = "./data/formatted/projection/n_ces85.Rdata")
