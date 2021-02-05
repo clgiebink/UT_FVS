@@ -7,10 +7,6 @@
 #all data is provided in
 load(file = './data/formatted/data_all_es')
 
-data_all_es <- data_all_es %>%
-  mutate(radians = tASPECT * (pi/180)) %>%
-  mutate(sin = sin(radians - 0.7854) * SLOPE,
-         cos = cos(radians - 0.7854) * SLOPE)
 
 #create new dataframe with only variables needed for linear mixed model
 #response: RW, dds
@@ -20,7 +16,7 @@ data_all_es <- data_all_es %>%
 min(data_all_es$MEASYEAR) #1992 -> 1962
 
 glmm_data_es <- data_all_es %>%
-  dplyr::select(PLT_CN, FVS_LOC_CD, TRE_CN, RW, dds, Year, DIA_C, 
+  dplyr::select(PLT_CN, FVS_LOC_CD, TRE_CN, RW, dds, Year, MEASYEAR, DIA_C, 
          SICOND, tASPECT, SLOPE, BAL, SDI, CR, CR_fvs, PCCF, CCF, 
          cos, sin, solrad_an, solrad_JanApr, solrad_MayAug, solrad_SepDec,
          ppt_Jul, ppt_Apr,
@@ -28,8 +24,10 @@ glmm_data_es <- data_all_es %>%
          ppt_pJunNov, wateryr, ppt_pAugJul, ppt_pJunSep,
          tmax_pAug, tmin_Feb, tmin_Mar,
          tmin_FebApr, tmax_pJulSep, tmin_JanMar, tmax_FebApr,
-         tmin_pNovApr, tmax_pNovApr) %>%
-  filter(Year >= 1962)
+         tmin_pNovApr, tmax_pNovApr,
+         n_ppt,n_tmp) %>%
+  group_by(TRE_CN) %>%
+  filter(Year >= (MEASYEAR - 29))
 
 #climate
 #total ppt
@@ -73,15 +71,6 @@ glmm_data_es <- glmm_data_es %>%
 which(is.na(glmm_data_es$RW)) #0
 which(glmm_data_es$dds == 0) #0
 
-#site index
-#wrong site species
-#fix
-for(i in 1:nrow(glmm_data_es)){
-  TRE_CN <- glmm_data_es$TRE_CN[i]
-  if(TRE_CN %in% si_match$TRE_CN){
-    glmm_data_es$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
-  }
-}
 
 #distribution of the response variable
 hist(glmm_data_es$RW,breaks = 50, main = "Histogram of RW (mm)", xlab = "Increment")
@@ -225,13 +214,6 @@ library(lmerTest)
 #standardize to encourage convergence
 library(MuMIn)
 glmm_es_z <- stdize(as.data.frame(glmm_data_es),append=TRUE)
-
-#site index incorrect
-#either reduce or calculate with height and age
-glmm_es_z <- glmm_es_z %>%
-  filter(!(TRE_CN %in% cal_si$TRE_CN))
-length(unique(glmm_es_z$TRE_CN))
-#95 -> 85
 save(glmm_es_z,file = "./data/formatted/glmm_es_z.Rdata")
 
 
