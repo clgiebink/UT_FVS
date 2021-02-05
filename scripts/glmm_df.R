@@ -16,7 +16,7 @@ min(data_all_df$MEASYEAR) #1988 -> 1958
 
 glmm_data_df <- data_all_df %>%
   ungroup() %>%
-  dplyr::select(PLT_CN, FVS_LOC_CD, TRE_CN, RW, dds, Year, DIA_C, LAT,
+  dplyr::select(PLT_CN, FVS_LOC_CD, TRE_CN, RW, dds, Year, MEASYEAR,DIA_C, LAT,
          SICOND, tASPECT, SLOPE, BAL, SDI, CR, CR_fvs, PCCF, CCF, 
          cos, sin, solrad_an, solrad_JanApr, solrad_MayAug, solrad_SepDec,
          ppt_pOct, ppt_pDec, ppt_Jun, ppt_Jul,
@@ -24,8 +24,10 @@ glmm_data_df <- data_all_df %>%
          ppt_pJunNov, ppt_FebJul, wateryr, ppt_pJunSep,
          tmin_Feb, tmax_Jul,
          tmax_JunAug, tmax_pJulSep, tmin_JanMar,
-         tmax_JanJun,tmin_JanJun,tmax_FebJul) %>%
-  filter(Year >= 1958)
+         tmax_JanJun,tmin_JanJun,tmax_FebJul,
+         n_ppt,n_tmp) %>%
+  group_by(TRE_CN) %>%
+  filter(Year >= (MEASYEAR-29))
 
 #climate
 #total ppt
@@ -224,19 +226,13 @@ library(lmerTest)
 #standardize to encourage convergence
 library(MuMIn)
 glmm_df_z <- stdize(as.data.frame(glmm_data_df),append=TRUE)
+
 #remove missing data
 glmm_df_z <- glmm_df_z %>%
   filter(!is.na(z.wateryr)) %>%
   filter(!is.na(z.SICOND))
 
-#site index incorrect
-load("./data/formatted/cal_si.Rdata")
-#either reduce or calculate with height and age
-glmm_df_z <- glmm_df_z %>%
-  filter(!(TRE_CN %in% cal_si$TRE_CN))
-length(unique(glmm_df_z$TRE_CN))
-#136 -> 113
-save(glmm_df_z,file = "./data/formatted/glmm_df_z.Rdata")
+save(glmm_df_z, file = "./data/formatted/glmm_df_z.Rdata")
 
 #collinearity
 library(car)
