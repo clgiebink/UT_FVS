@@ -53,7 +53,7 @@ colnames(miss_data)[colnames(miss_data)=="SUBP"] <- "SUBP_t"
 miss_data$MEASYEAR <- plot$MEASYEAR[match(miss_data$PLT_CN, plot$PLT_CN)]
 miss_data$DESIGNCD <- plot$DESIGNCD[match(miss_data$PLT_CN, plot$PLT_CN)]
 miss_data$CONDID <- cond$CONDID[match(miss_data$PLT_CN, cond$PLT_CN)]
-miss_data$SLOPE <- cond$SLOPE[match(miss_data$PLT_CN, cond$PLT_CN)]
+#miss_data$SLOPE <- cond$SLOPE[match(miss_data$PLT_CN, cond$PLT_CN)]
 
 #should I use slope from subplot?
 subp <- tbl(UT_FIA, sql("SELECT PLT_CN, SUBP, SLOPE, ASPECT FROM SUBPLOT")) %>%
@@ -88,10 +88,14 @@ write.csv(miss_mort,file = "./data/formatted/miss_mort.csv")
 #filter for alive and recently dead
 miss_data <- miss_data %>%
   filter(AGENTCD >= 0)
+#how many mortality trees on plots?
+plt_cal <- unique(var_cal$PLT_CN)
 miss_mort <- miss_data %>%
   filter(STATUSCD ==2) %>%
+  filter(PLT_CN %in% plt_cal) %>%
   group_by(PLT_CN) %>%
   summarise(n_tre = n())
+hist(miss_mort$n_tre, breaks = 50, xlab = "number of mort trees per plot", main = "calibration")
 
 #filter for live trees
 miss_data <- miss_data %>%
@@ -99,11 +103,21 @@ miss_data <- miss_data %>%
 
 #empty (year&DIA_C) dataframe?
 miss_data <- miss_data %>% 
+  group_by(TRE_CN) %>%
+  mutate(start = ifelse(STATUSCD == 1, 0,
+                        base::sample(0:9,1)))
+miss_data <- miss_data %>%
   slice(rep(1:n(), each = 40)) %>% #repeat each row 40 times
   group_by(TRE_CN) %>%
-  mutate(Year = c((MEASYEAR[1]-39):MEASYEAR[1])) %>% #40 yrs is arbitrary; model will likely go back 30 yrs
-  ungroup()
+  mutate(Year = c((MEASYEAR[1]-39-start):(MEASYEAR[1]-start))) %>% #40 yrs is arbitrary; model will likely go back 30 yrs
+  ungroup() %>%
+  filter(Year >= 1958)
 
+miss_mort_check <- miss_mort_imputed %>%
+  dplyr::select(TRE_CN,STATUSCD,start) %>%
+  distinct() %>%
+  filter(STATUSCD == 2)
+hist(miss_mort_check$start, breaks = 50, xlab = 'Difference in mortality year and inventory', main = "Estimated Calibration Mortality")
 
 #match BAR_av from incr_imputed to miss_data using plot, species and year information
 #match function does not work..why? NA values?
@@ -137,11 +151,11 @@ length(unique(miss_data$TRE_CN))
 #[1]  66 321 202 746  65 475  15 814 113  19 108  93  96 122 106 102
 
 #calculate DIA from BAR
-DIA_BAR <- function(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av){
+DIA_BAR <- function(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av,start){
   #create data frame with empty column for annualized dbh
-  tree_df <- data.frame(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av,DIA_C = NA)
+  tree_df <- data.frame(TRE_CN,DIA_t,MEASYEAR,start,Year,BAR_av,DIA_C = NA)
   #N is the row where measure year and year of growth are the same
-  N <- which(tree_df$Year == tree_df$MEASYEAR[1])
+  N <- which(tree_df$Year == (tree_df$MEASYEAR[1] - tree_df$start[1]))
   tree_df$DIA_C[N] <- tree_df$DIA_t[N] #dbh when year of growth and measure year are equal
   Curr_row <- N-1 #each time through subtract 1 and move up one row to the previous year
   while (Curr_row > 0) { #loop will stop when it gets to the end of data for that tree
@@ -159,26 +173,33 @@ DIA_BAR <- function(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av){
 miss_data_imputed <- miss_data %>%
   group_by(TRE_CN) %>%
   arrange(Year) %>%
-  mutate(DIA_C = DIA_BAR(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av))
+  mutate(DIA_C = DIA_BAR(TRE_CN,DIA_t,MEASYEAR,Year,BAR_av,start))
 
 #check limiting distance for variable radius plots
 #depends on slope
-var_ld <- read_csv("./data/formatted/var_ld.csv")
-miss_data_imputed$CF <- var_ld$CF_40BAF[match(miss_data_imputed$SLOPE, var_ld$slope)]
-miss_data_imputed <- miss_data_imputed %>%
-  mutate(LD = DIA_C * CF,
+#var_ld <- read_csv("./data/formatted/var_ld.csv")
+#miss_data_imputed$CF <- var_ld$CF_40BAF[match(miss_data_imputed$SLOPE, var_ld$slope)]
+#don't make it depend on slope b/c dist is horizontal dist, not hypotenuse
+miss_data_imputed <- miss_mort_imputed %>%
+  mutate(LD = DIA_C * 1.333, #if depended on slope would use CF
          out = ifelse(DESIGNCD != 410, 1,
                       ifelse(DIST <= LD, 1, 0)))
-miss_data_imputed <- miss_data_imputed %>%
-  mutate(LD2 = DIA_C * 1.333,
-         out2 = ifelse(DESIGNCD != 410, 1,
-                      ifelse(DIST <= LD2, 1, 0)))
-
-miss_data_check <- miss_data_imputed %>%
-  filter(out != out2) %>%
-  dplyr::select(TRE_CN, PLT_CN, STATUSCD, DIST, Year, MEASYEAR, DESIGNCD, DIA_C, SLOPE, LD, out, LD2, out2)
 
 save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
+
+#remove trees kicked out back in time
+#remove dead trees
+miss_data_imputed <- miss_data_imputed %>%
+  filter(STATUSCD == 1) %>%
+  filter(out != 0)
+miss_data_imputed$TRE_CN <- as.numeric(miss_data_imputed$TRE_CN)
+miss_data_imputed$PLT_CN <- as.numeric(miss_data_imputed$PLT_CN)
+#remove plots with no DIST
+dist_check <- miss_data_imputed %>%
+  dplyr::select(PLT_CN,TRE_CN,DIST) %>%
+  distinct() %>%
+  filter(is.na(DIST))
+plt_dist <- unique(dist_check$PLT_CN)
 
 #join two dataframes to compute stand variables
 #first - trees back calculated with tree rings
@@ -188,6 +209,12 @@ save(miss_data_imputed,file = "./data/formatted/miss_data_imputed.Rdata")
 density_data <- bind_rows(incr_imputed,miss_data_imputed)
 
 save(density_data,file = "./data/formatted/density_data.Rdata")
+
+#mort included
+miss_mort_imputed$TRE_CN <- as.numeric(miss_mort_imputed$TRE_CN)
+miss_mort_imputed$PLT_CN <- as.numeric(miss_mort_imputed$PLT_CN)
+dens_mort <- bind_rows(incr_imputed,miss_mort_imputed)
+save(dens_mort,file = "./data/formatted/dens_mort.Rdata")
 
 #check ----
 unique(incr_imputed$TRE_CN[incr_imputed$BAR > abs(1)])
