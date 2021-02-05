@@ -15,14 +15,16 @@ load(file = './data/formatted/data_all_pp')
 min(data_all_pp$MEASYEAR) #1992 -> 1962
 
 glmm_data_pp <- data_all_pp %>%
-  dplyr::select(PLT_CN,FVS_LOC_CD,TRE_CN, RW, dds, Year, DIA_C, 
+  dplyr::select(PLT_CN,FVS_LOC_CD,TRE_CN, RW, dds, Year, MEASYEAR, DIA_C, 
          SICOND, tASPECT, SLOPE, BAL, SDI, CR, CR_fvs, PCCF, CCF, 
          cos, sin, solrad_an, solrad_JanApr, solrad_MayAug, solrad_SepDec,
          ppt_pDec, ppt_Jun, ppt_Jul, ppt_pOct,
          ppt_pAugOct, ppt_pOctDec, ppt_pNovJan, ppt_MayJul,
          ppt_pAugJan, wateryr, ppt_pAugJul, ppt_pJunSep,
-         tmax_Jun, tmax_JunAug) %>%
-  filter(Year >= 1962)
+         tmax_Jun, tmax_JunAug,
+         n_ppt,n_tmp) %>%
+  group_by(TRE_CN) %>%
+  filter(Year >= (MEASYEAR - 29))
 
 #climate
 #total ppt
@@ -209,13 +211,6 @@ glmm_pp_z <- stdize(as.data.frame(glmm_data_pp),append=TRUE)
 glmm_pp_z <- glmm_pp_z %>%
   filter(!is.na(z.wateryr))
 
-#site index incorrect
-load("./data/formatted/cal_si.Rdata")
-#either reduce or calculate with height and age
-glmm_pp_z <- glmm_pp_z %>%
-  filter(!(TRE_CN %in% cal_si$TRE_CN))
-length(unique(glmm_pp_z$TRE_CN))
-#87 -> 81
 save(glmm_pp_z, file = "./data/formatted/glmm_pp_z.Rdata")
 
 
