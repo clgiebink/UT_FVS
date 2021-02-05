@@ -36,9 +36,12 @@ for(i in 1:nrow(incr_calcov)){
   incr_calcov$dds[i] <- (dib + (2*incr_calcov$RW[i]*0.0393701))^2 - dib^2
 }
 
+save(incr_calcov, file = "./data/formatted/incr_calcov.Rdata")
+
 #add climate variables
 #and make sure it is reproducible in case more are needed
 
+#time varying climate
 #already have some climate information
 processed.path <- "./data/formatted/"
 ppt.extr <- read.csv(paste(processed.path,"ppt_extr.csv",sep=''), header = T)
@@ -94,6 +97,17 @@ all_clim <- full_join(all_ppt,all_tmin, by = c("TRE_CN","Year")) %>%
 all_clim$Year <- as.integer(all_clim$Year)
 data_all <- full_join(incr_calcov,all_clim, by = c("TRE_CN","Year"))
 
+#or clim_all
+#data_all <- full_join(incr_calcov,clim_all, by = c("PLT_CN","TRE_CN","Year"))
+
+#climate normals
+processed.path <- "./data/formatted/"
+n.ppt.extr <- read.csv(paste(processed.path,"n_ppt_cal.csv",sep=''), header = T)
+n.tmp.extr <- read.csv(paste(processed.path,"n_tmp_cal.csv",sep=''), header = T)
+#tmax.extr <- read.csv(paste(processed.path,"tmax_extr.csv",sep=''), header = T)
+
+data_all$n_ppt <- n.ppt.extr$normalspptNormals[match(data_all$PLT_CN,n.ppt.extr$PLT_CN)]
+data_all$n_tmp <- n.tmp.extr$normalstmpNormals[match(data_all$PLT_CN,n.tmp.extr$PLT_CN)]
 
 #tranform aspect where appropriate
 #Na-> 0 when slope is less than or equal to 5
@@ -112,7 +126,7 @@ length(unique(data_all$TRE_CN)) #568
 
 #replace site index where fixed
 #see prac.R (site index check)
-load("./data/formatted/cal_si.csv")
+cal_si <- read_csv("./data/formatted/cal_si.csv")
 #after sending to John
 #load data with matched SI
 si_match <- read_csv(file = "./data/raw/Supplemental_SI.csv")
@@ -121,23 +135,22 @@ si_match <- si_match %>%
   group_by(TRE_CN) %>%
   summarise(SICOND = mean(SITREE, na.rm =T))
 
-fix_si <- function(data,new_si){
-  for(i in 1:nrow(data)){
-    TRE_CN <- data$TRE_CN[i]
-    if(TRE_CN %in% new_si$TRE_CN){
-      data$SICOND[i] <- new_si$SICOND[new_si$TRE_CN == TRE_CN]
-    }
+for(i in 1:nrow(data_all)){
+  TRE_CN <- data_all$TRE_CN[i]
+  if(TRE_CN %in% si_match$TRE_CN){
+    data_all$SICOND[i] <- si_match$SICOND[si_match$TRE_CN == TRE_CN]
   }
 }
 
-data_all <- fix_si(data = data_all, new_si = si_match)
-#fixed 28 trees
-
-#filter later
 #take out trees where SI is not fixed
 cal_si <- cal_si %>%
   filter(!(TRE_CN %in% si_match$TRE_CN))
 save(cal_si,file = "./data/formatted/cal_si.Rdata")
+
+#fixed 28 trees
+#filter
+data_all <- data_all %>%
+  filter(!(TRE_CN %in% cal_si$TRE_CN))
 save(data_all,file = "./data/formatted/data_all.Rdata")
 
 #make seasonal climate variables
@@ -147,7 +160,7 @@ save(data_all,file = "./data/formatted/data_all.Rdata")
 #DF
 data_all_df <- data_all %>%
   filter(SPCD == 202)
-length(unique(data_all_df$TRE_CN)) #136
+length(unique(data_all_df$TRE_CN)) #115
 
 #total ppt
 #1 month: pOct,pDec, Jun, Jul
@@ -208,7 +221,7 @@ save(data_all_df, file = "./data/formatted/data_all_df.Rdata")
 ##PP
 data_all_pp <- data_all %>%
   filter(SPCD == 122)
-length(unique(data_all_pp$TRE_CN)) #87
+length(unique(data_all_pp$TRE_CN)) #81
 
 #total ppt
 #1 month: ,pDec, Jun, Jul, pOct
@@ -258,7 +271,7 @@ save(data_all_pp, file = "./data/formatted/data_all_pp.Rdata")
 #ES
 data_all_es <- data_all %>%
   filter(SPCD == 93)
-length(unique(data_all_es$TRE_CN)) #95
+length(unique(data_all_es$TRE_CN)) #85
 
 #total ppt
 #1 month: Jul, Apr
@@ -314,3 +327,46 @@ data_all_es <- data_all_es %>%
          tmax_pNovApr = (lag(tmax_Nov) + lag(tmax_Dec) + tmax_Jan + tmax_Feb + tmax_Mar + tmax_Apr)/6)
 
 save(data_all_es, file = "./data/formatted/data_all_es.Rdata")
+
+#constant tpa ----
+library(tidyverse)
+library(MuMIn)
+
+#try with constant trees per acre
+load('./data/formatted/incr_calcov_con.Rdata')
+
+#DF
+#add new competition covariates to existing
+incr_con_df <- incr_calcov_con %>%
+  dplyr::select(TRE_CN,SPCD,Year,PCCF,CCF,BAL,SDI,CR_fvs) %>%
+  filter(SPCD == 202)
+load('./data/formatted/glmm_data_df.Rdata')
+glmm_con_df <- glmm_data_df %>%
+  dplyr::select(-c(PCCF,CCF,BAL,SDI,CR_fvs)) %>%
+  left_join(.,incr_con_df)
+con_df_z <- stdize(as.data.frame(glmm_con_df),append=TRUE)
+save(con_df_z, file = "./data/formatted/con_df_z.Rdata")
+
+#PP
+#add new competition covariates to existing
+incr_con_pp <- incr_calcov_con %>%
+  dplyr::select(TRE_CN,SPCD,Year,PCCF,CCF,BAL,SDI,CR_fvs) %>%
+  filter(SPCD == 122)
+load('./data/formatted/glmm_data_pp.Rdata')
+glmm_con_pp <- glmm_data_pp %>%
+  dplyr::select(-c(PCCF,CCF,BAL,SDI,CR_fvs)) %>%
+  left_join(.,incr_con_pp)
+con_pp_z <- stdize(as.data.frame(glmm_con_pp),append=TRUE)
+save(con_pp_z, file = "./data/formatted/con_pp_z.Rdata")
+
+#ES
+#add new competition covariates to existing
+incr_con_es <- incr_calcov_con %>%
+  dplyr::select(TRE_CN,SPCD,Year,PCCF,CCF,BAL,SDI,CR_fvs) %>%
+  filter(SPCD == 93)
+load('./data/formatted/glmm_data_es.Rdata')
+glmm_con_es <- glmm_data_es %>%
+  dplyr::select(-c(PCCF,CCF,BAL,SDI,CR_fvs)) %>%
+  left_join(.,incr_con_es)
+con_es_z <- stdize(as.data.frame(glmm_con_es),append=TRUE)
+save(con_es_z, file = "./data/formatted/con_es_z.Rdata")
