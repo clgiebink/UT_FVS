@@ -16,7 +16,7 @@ library(tidyverse)
 ## Data Summary
 
 ```{r include=FALSE}
-load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_es_z.Rdata')
+load(file = '/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata')
 ```
 
 My data comes from the U. S. Forest Service's Interior West - Forest Inventory and Analysis (IW-FIA) program (DeRose, Shaw, and Long 2017). The U.S. Forest Service’s Forest Inventory and Analysis program has established plots across the nation, which they use to collect data on forest stands. Recently, tree rings associated with plots in the Interior West states were discovered in storage. The IW-FIA program merged these two data sources: inventory data and tree-ring data. The data that I will use for my analysis is inventory and tree-ring data for *Picea engelmannii* (Engelmann Spruce) in Utah. 
@@ -27,7 +27,7 @@ m = map_data('state', region = 'Utah')
 
 ggplot() + 
   geom_polygon( data=m, aes(x=long, y=lat,group=group),colour="black", fill="white" )+
-  geom_point(data=glmm_es_z,aes(x=LON,y=LAT),colour="red")+
+  geom_point(data=varmt_es_z,aes(x=LON,y=LAT),colour="red")+
   ggtitle("Distribution of Engelmann spruce")+
   xlab('Longitude')+
   ylab('Latitude')+
@@ -81,11 +81,11 @@ The response variable, annual change in squared inside bark diameter (DDS), is c
 
 ```{r}
 par(mfrow=c(2,2))
-hist(glmm_es_z$RW,breaks = 50, 
+hist(varmt_es_z$RW,breaks = 50, 
      main = "Histogram of RW (mm)", xlab = "Increment")
-hist(glmm_es_z$dds,breaks = 100,
+hist(varmt_es_z$dds,breaks = 100,
      main = "Histogram of DDS (in^2)", xlab = "Increment")
-hist(log(glmm_es_z$dds),breaks = 100, 
+hist(log(varmt_es_z$dds),breaks = 100, 
      main = "Histogram of log(DDS)", xlab = "Increment")
 ```
 
@@ -94,8 +94,8 @@ The distribution of DDS is hightly skewed right, while the distribution of raw r
 ```{r}
 #Cleveland dotplot
 par(mfrow=c(1,2))
-dotchart(glmm_es_z$dds)
-dotchart(log(glmm_es_z$dds))
+dotchart(varmt_es_z$dds)
+dotchart(log(varmt_es_z$dds))
 ```
 
 A log transformation normalizes the distribution of DDS and gets rid of a majority of the outliers.
@@ -105,11 +105,11 @@ A log transformation normalizes the distribution of DDS and gets rid of a majori
 There is one missing ring (RW = 0) in the data set. To avoid adding an arbitrarily small number, such as 0.001, to every value in the dataset, we replaced missing rings with the smallest ring width value on the same core. 
 
 ```{r}
-length(which(glmm_es_z$RW == 0)) #missing rings
-which(is.na(glmm_es_z$RW)) 
-which(glmm_es_z$dds ==0)
+length(which(varmt_es_z$RW == 0)) #missing rings
+which(is.na(varmt_es_z$RW)) 
+which(varmt_es_z$dds ==0)
 
-range_df <- glmm_es_z %>%
+range_df <- varmt_es_z %>%
   select(TRE_CN,Year) %>%
   group_by(TRE_CN) %>%
   summarise(minyr = min(Year),
@@ -129,8 +129,8 @@ My data is unbalanced. All trees have a growth measurement for 1962, but the las
 In the linear mixed effects model, tree, stand, and climate variables will be fixed effects and a tree identifier and year of growth will be random effects.
 
 ```{r}
-length(unique(glmm_es_z$TRE_CN))
-length(unique(glmm_es_z$PLT_CN))
+length(unique(varmt_es_z$TRE_CN))
+length(unique(varmt_es_z$PLT_CN))
 ```
 
 There are almost as many unique plots as unique trees, so it is not necessary to have plots as a random effect as well.
@@ -139,7 +139,7 @@ Tree ID and year are appropriate random effects because selected trees and years
 
 ```{r}
 #understanding random effects: TRE_CN
-growth_yr_plots_es <- glmm_es_z %>% 
+growth_yr_plots_es <- varmt_es_z %>% 
   group_by(TRE_CN) %>%
   do(plots=ggplot(data=.) +
        aes(x=Year, y=RW) + geom_point() + ggtitle(unique(.$TRE_CN)))
@@ -154,7 +154,7 @@ growth_yr_plots_es$plots[[4]]
 
 ```{r}
 #understanding random effects: Year
-growth_wateryr_plots_es <- glmm_es_z %>% 
+growth_wateryr_plots_es <- varmt_es_z %>% 
   group_by(Year) %>%
   do(plots=ggplot(data=.) +
        aes(x=wateryr, y=RW) + geom_point() +
@@ -173,17 +173,17 @@ A proxy for age (time) is diameter at breast height, which is continuous. As a t
 ```{r}
 par(mfrow=c(2,2))
 #detrend
-ggplot(data = glmm_es_z, aes(x = DIA_C, y = RW)) +
+ggplot(data = varmt_es_z, aes(x = DIA_C, y = RW)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_es_z, aes(x = DIA_C, y = dds)) +
+ggplot(data = varmt_es_z, aes(x = DIA_C, y = dds)) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_es_z, aes(x = DIA_C, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = DIA_C, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
 #log to reduce heteroscedasticity
-ggplot(data = glmm_es_z, aes(x = log(DIA_C), y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = log(DIA_C), y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 #positive relationship
 ```
@@ -193,7 +193,7 @@ Log transformation of DIA_C homogenizes variance and allows for linear relations
 Site index is a measure of site quality. It is the estimated height in feet of a tree on the site at a specific age (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_es_z, aes(x = SICOND, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = SICOND, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -202,7 +202,7 @@ There is a postive relationship between growth and site index, meaning growth in
 Slope is an estimated average at the subplot level, or condition level (FIA Database Description and User Guide for Phase 2).
 
 ```{r}
-ggplot(data = glmm_es_z, aes(x = SLOPE, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = SLOPE, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -211,7 +211,7 @@ There is no relationship between growth and slope, and there is non-constant var
 Basal area of trees larger than the subject tree (BAL) is a calculated covariate at the plot level.
 
 ```{r}
-ggplot(data = glmm_es_z, aes(x = BAL, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = BAL, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -222,7 +222,7 @@ Crown competition factor is a measure of stand density (Krajicek et al. 1961). T
 Crown competitition factor on the inventory point where the tree is established (PCCF) is a calculated covariate on the plot level.
 
 ```{r}
-ggplot(data = glmm_es_z, aes(x = PCCF, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = PCCF, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -231,7 +231,7 @@ There is a negative relationship between growth and PCCF, and there is relativel
 Stand crown competition factor (CCF) is a calculated covariate on the plot level. It is a summation of PCCF on the plot.
 
 ```{r}
-ggplot(data = glmm_es_z, aes(x = CCF, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = CCF, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -241,10 +241,10 @@ Crown ratio (CR/CR_fvs) is the percentage of the length of the tree with healthy
 
 ```{r}
 par(mfrow=c(1,2))
-ggplot(data = glmm_es_z, aes(x = CR, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = CR, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 
-ggplot(data = glmm_es_z, aes(x = CR_fvs, y = log(dds))) +
+ggplot(data = varmt_es_z, aes(x = CR_fvs, y = log(dds))) +
   geom_point(alpha=0.1) + geom_smooth(method = "lm")
 ```
 
@@ -290,7 +290,7 @@ lm_es <- lm(log(dds)~
            SICOND+SLOPE+I(SLOPE^2)+
            I(sin(ASPECT-0.7854)*SLOPE)+
            I(cos(ASPECT-0.7854)*SLOPE),
-              data = glmm_es_z)
+              data = varmt_es_z)
 ```
 
 Since there is a lot of unaccounted for variability due to individual tree and year differences, the updated model will be a mixed effects model. A random intercept on Tree ID and Year will be added to account for different baselines. A random slope on DIA_C for each year will serve as a detrending method to reduce the age effect in growth.
@@ -298,6 +298,54 @@ Since there is a lot of unaccounted for variability due to individual tree and y
 For now, I will use `lme4` to fit models. To fit a covariance-variance structure other than compound symmetry, I can use `nlme`. I may also explore the model fit options with `glmmTMB`.
 
 Covariates are standardized, or mean-centered and divided by SD, to encourage model converage, which means there is no need for BAL and CCF to be divided by 100. In addition, the log transformation on DIA_C is problematic because a log of a negative number is impossible. Therefore, the log transformation on DIA_C will be removed.
+
+# Random Effects
+
+```{r}
+tre_es <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+#remove log due to standardization
+                    z.CR_fvs+I(z.CR_fvs^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1|TRE_CN),
+                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = varmt_es_z)
+tyre_es <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+#remove log due to standardization
+                    z.CR_fvs+I(z.CR_fvs^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1|TRE_CN)+(1|Year),
+                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = varmt_es_z)
+tsyre_es <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+#remove log due to standardization
+                    z.CR_fvs+I(z.CR_fvs^2)+
+                    #climate
+                    #competition/density
+                    z.BAL+z.CCF+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
+                    z.sin+z.cos+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = varmt_es_z)
+anova(tre_es,tyre_es,tsyre_es)
+```
 
 
 # Annual Model of Tree Growth
@@ -322,7 +370,7 @@ annual_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(annual_es)
 ```
 
@@ -347,7 +395,7 @@ an_al_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_al_es)
 ```
 
@@ -388,7 +436,7 @@ an_bal_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_bal_es)
 summary(an_bal_es)$coef
 an_ccf_es <- lmer(log(dds)~
@@ -404,7 +452,7 @@ an_ccf_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_ccf_es)
 summary(an_ccf_es)$coef
 an_pccf_es <- lmer(log(dds)~
@@ -420,7 +468,7 @@ an_pccf_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_pccf_es)
 summary(an_pccf_es)$coef
 an_sdi_es <- lmer(log(dds)~
@@ -436,7 +484,7 @@ an_sdi_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_sdi_es)
 summary(an_sdi_es)$coef
 ```
@@ -458,7 +506,7 @@ an_red_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red_es)
 summary(an_red_es)$coef
 an_smod_es <- lmer(log(dds)~
@@ -474,7 +522,7 @@ an_smod_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_smod_es)
 summary(an_smod_es)$coef
 an_rmod_es <- lmer(log(dds)~
@@ -490,7 +538,7 @@ an_rmod_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_rmod_es)
 summary(an_rmod_es)$coef
 an_red_es <- lmer(log(dds)~
@@ -505,7 +553,7 @@ an_red_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                     control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red_es)
 summary(an_red_es)$coef
 an_red2_es <- lmer(log(dds)~
@@ -520,7 +568,7 @@ an_red2_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                     control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red2_es)
 summary(an_red2_es)$coef
 ```
@@ -538,7 +586,7 @@ an_cr_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_cr_es)
 summary(an_cr_es)$coef
 an_red_es <- lmer(log(dds)~
@@ -553,7 +601,7 @@ an_red_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                     control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red_es)
 summary(an_red_es)$coef
 ```
@@ -572,7 +620,7 @@ an_red_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red_es)
 summary(an_red_es)$coef
 ```
@@ -592,9 +640,9 @@ an_red2_es <- lmer(log(dds)~
                     #site variables
                     z.SICOND+z.SLOPE+I(z.SLOPE^2)+
                     #random effects
-                    (1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
+                    (1+z.DIA_C|FVS_LOC_CD/TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red2_es)
 anova(an_red_es,an_red2_es)
 ```
@@ -620,7 +668,7 @@ an_al_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_al_es)
 vif(an_al_es)
 summary(an_al_es)$coef
@@ -641,7 +689,7 @@ an_bal_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_bal_es)
 summary(an_bal_es)$coef
 an_ccf_es <- lmer(log(dds)~
@@ -657,7 +705,7 @@ an_ccf_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_ccf_es)
 summary(an_ccf_es)$coef
 an_pccf_es <- lmer(log(dds)~
@@ -673,7 +721,7 @@ an_pccf_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_pccf_es)
 summary(an_pccf_es)$coef
 an_sdi_es <- lmer(log(dds)~
@@ -689,7 +737,7 @@ an_sdi_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_sdi_es)
 summary(an_sdi_es)$coef
 ```
@@ -708,7 +756,7 @@ an_red_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red_es)
 summary(an_red_es)$coef
 an_red2_es <- lmer(log(dds)~
@@ -723,7 +771,7 @@ an_red2_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red2_es)
 summary(an_red2_es)$coef
 an_red3_es <- lmer(log(dds)~
@@ -738,7 +786,7 @@ an_red3_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 AIC(an_red3_es)
 summary(an_red3_es)$coef
 ```
@@ -767,7 +815,7 @@ clim_al_es <- lmer(log(dds)~
                  #random effects
                  #(1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
                  (1+z.DIA_C|TRE_CN)+(1|Year),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_al_es)
 ```
 
@@ -790,7 +838,7 @@ clim_al_es <- lmer(log(dds)~
                  #(1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_al_es)
 ```
 
@@ -827,7 +875,7 @@ clim_bal_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_bal_es)
 summary(clim_bal_es)$coef
 clim_ccf_es <- lmer(log(dds)~
@@ -844,7 +892,7 @@ clim_ccf_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_ccf_es)
 summary(clim_ccf_es)$coef
 clim_pcf_es <- lmer(log(dds)~
@@ -861,7 +909,7 @@ clim_pcf_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_pcf_es)
 summary(clim_pcf_es)$coef
 clim_sdi_es <- lmer(log(dds)~
@@ -878,7 +926,7 @@ clim_sdi_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_sdi_es)
 summary(clim_sdi_es)$coef
 ```
@@ -899,7 +947,7 @@ clim_red_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_red_es)
 summary(clim_red_es)$coef
 clim_red2_es <- lmer(log(dds)~
@@ -914,7 +962,7 @@ clim_red2_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_red2_es)
 summary(clim_red2_es)$coef
 clim_red3_es <- lmer(log(dds)~
@@ -929,7 +977,7 @@ clim_red3_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_red3_es)
 summary(clim_red3_es)$coef
 ```
@@ -944,11 +992,11 @@ clim_red_es <- lmer(log(dds)~
                  #competition/density
                  z.BAL+ 
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_red_es)
 summary(clim_red_es)$coef
 ```
@@ -967,1032 +1015,15 @@ clim_red2_es <- lmer(log(dds)~
                  #site variables
                  z.SICOND+z.SLOPE+I(z.SLOPE^2)+
                  #random effects
-                 (1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
+                 (1+z.DIA_C|FVS_LOC_CD/TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_red2_es)
 anova(clim_red_es,clim_red2_es)
 ```
 
 ### Constant CR
 
-```{r}
-clim_al_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+I(z.CR^2)+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_al_es)
-vif(clim_al_es)
-summary(clim_al_es)$coef
-```
-
-```{r}
-#competition
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_ccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_ccf_es)
-summary(clim_ccf_es)$coef
-clim_pccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.PCCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_pccf_es)
-summary(clim_pccf_es)$coef
-clim_sdi_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_sdi_es)
-summary(clim_sdi_es)$coef
-
-```
-
-```{r}
-#solar radiation
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_mod_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_mod_es)
-summary(clim_mod_es)$coef
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_red2_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_red2_es)
-summary(clim_red2_es)$coef
-```
-
-
-### Constant TPA
-
-```{r}
-clim_al_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+I(z.CR^2)+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_al_es)
-vif(clim_al_es)
-summary(clim_al_es)$coef
-```
-
-```{r}
-#competition
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_ccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_ccf_es)
-summary(clim_ccf_es)$coef
-clim_pccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.PCCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_pccf_es)
-summary(clim_pccf_es)$coef
-clim_sdi_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_sdi_es)
-summary(clim_sdi_es)$coef
-
-```
-
-```{r}
-#solar radiation
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_mod_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_mod_es)
-summary(clim_mod_es)$coef
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_red2_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_red2_es)
-summary(clim_red2_es)$coef
-```
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.DIA_C:z.ppt_pJunSep+
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 z.SDI:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 z.SDI:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.SLOPE:z.ppt_pJunSep+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-```
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_n_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
-                 #z.ppt_pJunSep:z.tmax_pAug+
-                 #z.n_ppt+z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 z.n_tmp:z.ppt_pJunSep+
-                 z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = con_es_z)
-AIC(clim_n_es)
-summary(clim_n_es)$coef
-```
-
-
-#### with mortality
-
-
-```{r}
-clim_al_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+I(z.CR^2)+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_al_es)
-vif(clim_al_es)
-summary(clim_al_es)$coef
-```
-
-```{r}
-#competition
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_ccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_ccf_es)
-summary(clim_ccf_es)$coef
-clim_pccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.PCCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_pccf_es)
-summary(clim_pccf_es)$coef
-clim_sdi_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_sdi_es)
-summary(clim_sdi_es)$coef
-
-```
-
-```{r}
-#solar radiation
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 #z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_mod_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_mod_es)
-summary(clim_mod_es)$coef
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_red2_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_red2_es)
-summary(clim_red2_es)$coef
-```
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-```
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_n_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
-                 #z.ppt_pJunSep:z.tmax_pAug+
-                 #z.n_ppt+z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 z.n_tmp:z.ppt_pJunSep+
-                 z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = conmt_es_z)
-AIC(clim_n_es)
-summary(clim_n_es)$coef
-```
-
-
-### Variable
-
-```{r}
-clim_al_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+I(z.CR^2)+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_al_es)
-vif(clim_al_es)
-summary(clim_al_es)$coef
-```
-
-```{r}
-#competition
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_ccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_ccf_es)
-summary(clim_ccf_es)$coef
-clim_pccf_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.PCCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_pccf_es)
-summary(clim_pccf_es)$coef
-clim_sdi_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.SDI+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_sdi_es)
-summary(clim_sdi_es)$coef
-
-```
-
-```{r}
-#solar radiation
-clim_bal_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 #z.sin+z.cos+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_bal_es)
-summary(clim_bal_es)$coef
-clim_mod_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_mod_es)
-summary(clim_mod_es)$coef
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.solrad_MayAug+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_red2_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_red2_es)
-summary(clim_red2_es)$coef
-```
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.DIA_C:z.ppt_pJunSep+
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 z.BAL:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.SLOPE:z.ppt_pJunSep+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.DIA_C:z.ppt_pJunSep+
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #z.BAL:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.SLOPE:z.ppt_pJunSep+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-```
-
-
-```{r}
-clim_red_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_red_es)
-summary(clim_red_es)$coef
-clim_n_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
-                 #z.ppt_pJunSep:z.tmax_pAug+
-                 #z.n_ppt+z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 z.n_tmp:z.ppt_pJunSep+
-                 z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_n_es)
-summary(clim_n_es)$coef
-clim_nint_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
-                 #z.ppt_pJunSep:z.tmax_pAug+
-                 #z.n_ppt+z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 z.n_tmp:z.ppt_pJunSep+
-                 z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 z.BAL:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_nint_es)
-summary(clim_nint_es)$coef
-clim_nint_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
-                 #z.ppt_pJunSep:z.tmax_pAug+
-                 #z.n_ppt+z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 z.n_tmp:z.ppt_pJunSep+
-                 z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #z.BAL:z.ppt_pJunSep+
-                 #site variables
-                 z.SICOND+z.SLOPE+
-                 z.SLOPE:z.ppt_pJunSep+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = var_es_z)
-AIC(clim_nint_es)
-summary(clim_nint_es)$coef
-```
-
-
-#### with mortality
 
 ```{r}
 clim_al_es <- lmer(log(dds)~
@@ -2265,6 +1296,8 @@ AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
 
+### Normals
+
 ```{r}
 clim_red_es <- lmer(log(dds)~
                  #tree variables
@@ -2290,6 +1323,7 @@ clim_n_es <- lmer(log(dds)~
                  z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
                  #z.ppt_pJunSep:z.tmax_pAug+
                  #z.n_ppt+z.n_tmp+
+                 #z.n_ppt:z.tmax_pAug+
                  z.n_ppt:z.ppt_pJunSep+
                  z.n_tmp:z.ppt_pJunSep+
                  z.n_tmp:z.tmax_pAug+
@@ -2325,31 +1359,6 @@ clim_nint_es <- lmer(log(dds)~
                data = varmt_es_z)
 AIC(clim_nint_es)
 summary(clim_nint_es)$coef
-```
-
-
-### Normals
-
-```{r}
-clim_n_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 #climate
-                 z.ppt_pJunSep+z.tmax_pAug+
-                 z.ppt_pJunSep:z.tmax_pAug+ #significant interaction
-                 z.n_ppt+#z.n_tmp+
-                 z.n_ppt:z.ppt_pJunSep+
-                 #z.n_tmp:z.tmax_pAug+
-                 #competition/density
-                 z.BAL+
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-summary(clim_n_es)$coef
 ```
 
 
@@ -2371,28 +1380,7 @@ clim_int_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_int_es)
-summary(clim_int_es)$coef
-```
-
-```{r}
-AIC(clim_mod_es)
-clim_int_es <- lmer(log(dds)~
-                 #tree variables
-                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 z.CR+
-                 z.CR:z.ppt_pJunSep+
-                 #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                 #competition/density
-                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
-                 #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                 #random effects
-                 (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
@@ -2413,7 +1401,7 @@ clim_int_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
@@ -2434,7 +1422,7 @@ clim_int_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
@@ -2455,7 +1443,7 @@ clim_int_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
@@ -2477,7 +1465,7 @@ clim_int_es <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
 AIC(clim_int_es)
 summary(clim_int_es)$coef
 ```
@@ -2486,7 +1474,7 @@ summary(clim_int_es)$coef
 ### Random Effects
 
 ```{r}
-n_tre_floc <- glmm_es_z %>%
+n_tre_floc <- varmt_es_z %>%
   ungroup() %>%
   dplyr::select(TRE_CN,FVS_LOC_CD) %>%
   distinct() %>%
@@ -2506,10 +1494,10 @@ clim_rs_es <- lmer(log(dds)~
                  #site variables
                  z.SICOND+z.SLOPE+I(z.SLOPE^2)+
                  #random effects
-                 (1+z.DIA_C|TRE_CN)+(1+z.ppt_pJunSep|FVS_LOC_CD:TRE_CN)+(1|Year),
+                 (1+z.ppt_pJunSep|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-anova(clim_mod_es,clim_rs_es)
+               data = varmt_es_z)
+anova(clim_red_es,clim_rs_es)
 summary(clim_rs_es)
 ```
 
@@ -2531,7 +1519,7 @@ an_al_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 an_red_es <- lmer(log(dds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
@@ -2540,11 +1528,11 @@ an_red_es <- lmer(log(dds)~
                     #competition/density
                     z.BAL+ #remove /100 due to standardization
                     #site variables
-                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.SICOND+z.SLOPE+
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
+                        data = varmt_es_z)
 #tr + climate model
 clim_al_es <- lmer(log(dds)~
                  #tree variables
@@ -2559,7 +1547,7 @@ clim_al_es <- lmer(log(dds)~
                  z.sin+z.cos+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
-               data = glmm_es_z)
+               data = varmt_es_z)
 clim_red_es <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
@@ -2569,11 +1557,52 @@ clim_red_es <- lmer(log(dds)~
                  #competition/density
                  z.BAL+ 
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
+               data = varmt_es_z)
+#normals
+clim_n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 #z.n_ppt+z.n_tmp+
+                 #z.n_ppt:z.tmax_pAug+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+clim_nint_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 #z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
 ```
 
 ### Test of Normality
@@ -2634,26 +1663,26 @@ We can also test if residuals have a constant variance against predictor variabl
 ```{r echo=FALSE}
 par(mfrow=c(2,2))
 #dbh
-plotLowess(resid_clmred~z.DIA_C,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: DBH")
-#plotLowess(resid_lmm1~z.DIA_C,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.DIA_C,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: DBH")
+#plotLowess(resid_lmm1~z.DIA_C,data = varmt_es_z,ylab="Residuals",main="LMM1")
 #CR
-plotLowess(resid_clmred~z.CR_fvs,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: CR")
-#plotLowess(resid_lmm1~z.CR_fvs,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.CR_fvs,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: CR")
+#plotLowess(resid_lmm1~z.CR_fvs,data = varmt_es_z,ylab="Residuals",main="LMM1")
 #precip
-plotLowess(resid_clmred~z.ppt_pJunAug,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: Precip") 
-#plotLowess(resid_lmm1~z.ppt_pJunAug,data = glmm_es_z,ylab="Residuals",main="LMM1") 
+plotLowess(resid_clmred~z.ppt_pJunAug,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: Precip") 
+#plotLowess(resid_lmm1~z.ppt_pJunAug,data = varmt_es_z,ylab="Residuals",main="LMM1") 
 #temp
-plotLowess(resid_clmred~z.tmax_pAug,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: Temp")
-#plotLowess(resid_lmm1~z.tmax_pAug,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.tmax_pAug,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: Temp")
+#plotLowess(resid_lmm1~z.tmax_pAug,data = varmt_es_z,ylab="Residuals",main="LMM1")
 #CCF
-plotLowess(resid_clmred~z.BAL,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: CCF")
-#plotLowess(resid_lmm1~z.CCF,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.BAL,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: CCF")
+#plotLowess(resid_lmm1~z.CCF,data = varmt_es_z,ylab="Residuals",main="LMM1")
 #SI
-plotLowess(resid_clmred~z.SICOND,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: SI")
-#plotLowess(resid_lmm1~z.SICOND,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.SICOND,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: SI")
+#plotLowess(resid_lmm1~z.SICOND,data = varmt_es_z,ylab="Residuals",main="LMM1")
 #Slope
-plotLowess(resid_clmred~z.SLOPE,data = glmm_es_z,ylab="Residuals",main="Climate Reduced: Slope")
-#plotLowess(resid_lmm1~z.SLOPE,data = glmm_es_z,ylab="Residuals",main="LMM1")
+plotLowess(resid_clmred~z.SLOPE,data = varmt_es_z,ylab="Residuals",main="Climate Reduced: Slope")
+#plotLowess(resid_lmm1~z.SLOPE,data = varmt_es_z,ylab="Residuals",main="LMM1")
 ```
 
 
@@ -2899,7 +1928,7 @@ plot_model(clim_rs_es, type = "re")
 ```
 
 ```{r}
-sample_tre <- sample(glmm_es_z$TRE_CN, size = 9)
+sample_tre <- sample(varmt_es_z$TRE_CN, size = 9)
 pp1 <- ggpredict(clim_mod_es,
        terms=c("z.DIA_C","TRE_CN [sample_tre]"), type="random")
 plot(pp1)
