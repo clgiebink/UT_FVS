@@ -1238,63 +1238,422 @@ val_nint <- val_clim(newdata = val_dset,mod_df = clim_nint_df,mod_pp = clim_nint
 save(val_nint,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_nint.Rdata")
 ```
 
-
-## Annual
+## outputs
 
 ```{r}
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_full.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an2.Rdata")
-#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_fvs.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_cr.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_check_red.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_an_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_clim_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_an.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_n.Rdata")
+#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_int.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_nint.Rdata")
 ```
 
 
 ```{r}
-pred_an_full <- pred_an_full %>%
+#fvs
+fvs_check_red <- fvs_check_red %>%
+  dplyr::select(-DIA) %>%
+  mutate(DIA = eDBH) %>%
+  mutate(DG_obs = fDIA - DIA,
+         DG_pred = eDBH - DIA)
+#full annual
+pred_an_al <- pred_an_al %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_fan_fmy <- pred_an_full %>%
-  filter(Year == fMEASYEAR) %>%
-  filter(!is.na(DIA))
-```
-
-
-```{r}
-pred_an <- pred_an %>%
+pred_fan_fmy <- pred_an_al %>%
+  filter(Year == fMEASYEAR)
+#reduced annual
+pred_an <- val_an %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_an_fmy <- pred_an %>%
-  filter(Year == fMEASYEAR) 
-pred_an2 <- pred_an2 %>%
+  filter(Year == fMEASYEAR)
+#full climate
+pred_clim_al <- pred_clim_al %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_an2_fmy <- pred_an2 %>%
+pred_fclim_fmy <- pred_clim_al %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
-pred_an_cr <- pred_an_cr %>%
+#reduced climate
+pred_clim <- val_clim2 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_acr_fmy <- pred_an_cr %>%
+pred_rclim_fmy <- pred_clim %>%
+  filter(Year == fMEASYEAR)
+#normal
+pred_n <- val_n %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_n_fmy <- pred_n %>%
+  filter(Year == fMEASYEAR)#normal
+#interactions
+# pred_int <- val_int %>%
+#   group_by(TRE_CN) %>%
+#   mutate(DG_pred = max(DIA) - min(DIA),
+#          DG_obs = fDIA - min(DIA))
+# pred_int_fmy <- pred_int %>%
+#   filter(Year == fMEASYEAR)
+#normal + interactions
+pred_nint <- val_nint %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_nint_fmy <- pred_nint %>%
   filter(Year == fMEASYEAR)
 ```
 
+
+#Equivalence tests
+
 ```{r}
-rm(pred_an_full)
-rm(pred_an)
-rm(pred_an2)
-rm(pred_an_cr)
+library(equivalence)
+library(plot3D)
 ```
 
-### Residuals
+```{r}
+assess_dbh <- function(mods_fmy){
+  require(equivalence)
+  mod_comp_lst <- list()
+  for(i in 1:length(mods_fmy)){
+    mod_run <- mods_fmy[[i]]
+    fit_lm <- lm(fDIA~DIA, data = mod_run, na.action=na.omit)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_run$DIA, y = mod_run$fDIA)
+    mod_name <- names(mods_fmy)[i]
+    ntrees <- eq$n
+    #ci.b0.low <- eq$ci.b0[[1]]
+    #ci.b0.high <- eq$ci.b0[[2]]
+    #rs.b0.low <- eq$rs.b0[1]
+    #rs.b0.high <- eq$rs.b0[2]
+    #test.b0 <- eq$Test.b0[[1]]
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    #rs.b1.low <- eq$rs.b1[1]
+    #rs.b1.high <- eq$rs.b1[2]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_comp_lst[[i]] <- mod_df
+  }
+  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
+  return(mod_comp_df)
+}
+```
 
-#### Full
+
+```{r}
+assess_dg <- function(mods_fmy){
+  require(equivalence)
+  require(tidyverse)
+  mod_comp_lst <- list()
+  for(i in 1:length(mods_fmy)){
+    mod_run <- mods_fmy[[i]]
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_run)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_run$DG_pred, y = mod_run$DG_obs)
+    mod_name <- names(mods_fmy)[i]
+    ntrees <- eq$n
+    #ci.b0.low <- eq$ci.b0[[1]]
+    #ci.b0.high <- eq$ci.b0[[2]]
+    #rs.b0.low <- eq$rs.b0[1]
+    #rs.b0.high <- eq$rs.b0[2]
+    #test.b0 <- eq$Test.b0[[1]]
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    #rs.b1.low <- eq$rs.b1[1]
+    #rs.b1.high <- eq$rs.b1[2]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_comp_lst[[i]] <- mod_df
+  }
+  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
+  return(mod_comp_df)
+}
+```
+
+```{r}
+mods_fmy <- list("Current FVS" = fvs_check_red,
+                 "Full Annual" = pred_fan_fmy,
+                 "Reduced Annual" = pred_an_fmy, 
+                 "Full Climate" = pred_fclim_fmy,
+                 "Reduced Climate" = pred_rclim_fmy,
+                 "Climate Normals" = pred_n_fmy,
+                 #clim_int = pred_int_fmy,
+                 "Normals + Interactions" = pred_nint_fmy)
+```
+
+```{r}
+assess_dg_sp <- function(mods_fmy){
+  require(equivalence)
+  require(tidyverse)
+  mod_comp_lst <- list()
+  for(i in 1:length(mods_fmy)){
+    mod_name <- names(mods_fmy)[i]
+    mod_run <- mods_fmy[[i]]
+    #df
+    mod_df <- mod_run %>% filter(SPCD == 202)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_df)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_df$DG_pred, y = mod_df$DG_obs)
+    ntrees <- eq$n
+    #ci.b0.low <- eq$ci.b0[[1]]
+    #ci.b0.high <- eq$ci.b0[[2]]
+    #rs.b0.low <- eq$rs.b0[1]
+    #rs.b0.high <- eq$rs.b0[2]
+    #test.b0 <- eq$Test.b0[[1]]
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    #rs.b1.low <- eq$rs.b1[1]
+    #rs.b1.high <- eq$rs.b1[2]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_df$SPCD <- 202
+    #pp
+    mod_pp <- mod_run %>% filter(SPCD == 122)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_pp)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_pp$DG_pred, y = mod_pp$DG_obs)
+    ntrees <- eq$n
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_pp <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_pp$SPCD <- 122
+    #es
+    mod_es <- mod_run %>% filter(SPCD == 93)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_es)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_es$DG_pred, y = mod_es$DG_obs)
+    ntrees <- eq$n
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_es <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_es$SPCD <- 93
+    #all
+    mod_all <- bind_rows(mod_df,mod_pp) %>% bind_rows(.,mod_es)
+    mod_comp_lst[[i]] <- mod_all
+  }
+  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
+  return(mod_comp_df)
+}
+```
+
+```{r}
+mod_dg <- assess_dg_sp(mods_fmy = mods_fmy)
+mod_dg$mod_name <- factor(mod_dg$mod_name, levels = c("Current FVS","Full Annual", "Reduced Annual", "Full Climate",
+                                                      "Reduced Climate", "Climate Normals","Normals + Interactions"))
+mod_dg$SPCD <- factor(mod_dg$SPCD, levels = c(93, 122, 202),
+                  labels = c("Engelmann spruce", "Ponerosa pine", "Douglas fir"))
+val_dg_all <- ggplot(data = mod_dg, aes(x = RMSE, y = slope, shape = mod_name)) +
+  geom_point(aes(color = r2)) +  #guides(color = guide_legend(reverse = TRUE)) +
+  scale_shape_manual(values=c(10,16,1,17,2,3,8)) +# change shape
+  facet_wrap(~SPCD, nrow =2) +
+  theme_bw() + theme(legend.box = "horizontal",legend.position = c(0.8, 0.2))
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_all.png", val_dg_all,
+       width = 7, height = 5, units = "in")
+```
+
+### Douglas fir
+
+
+```{r}
+#fvs
+fvs_df <- fvs_check_red %>%
+  filter(SPCD == 202)
+#full annual
+pred_fan_df <- pred_fan_fmy %>%
+  filter(SPCD == 202)
+#reduced annual
+pred_an_df <- pred_an_fmy %>%
+  filter(SPCD == 202)
+#full climate
+pred_fclim_df <- pred_fclim_fmy %>%
+  filter(SPCD == 202)
+#reduced climate
+pred_rclim_df <- pred_rclim_fmy %>%
+  filter(SPCD == 202)
+#normal
+pred_n_df <- pred_n_fmy %>%
+  filter(SPCD == 202)
+# interactions
+#pred_int_df <- pred_int_fmy %>%
+#  filter(SPCD == 202)
+#normal + interactions
+pred_nint_df <- pred_nint_fmy %>%
+  filter(SPCD == 202)
+```
+
+```{r}
+mods_df <- list("Current FVS" = fvs_df,
+                 "Full Annual" = pred_fan_df,
+                 "Reduced Annual" = pred_an_df, 
+                 "Full Climate" = pred_fclim_df,
+                 "Reduced Climate" = pred_rclim_df, 
+                 "Climate Normals" = pred_n_df,
+                 #clim_int = pred_int_df,
+                 "Normals + Interactions" = pred_nint_df)
+```
+
+```{r}
+mod_df_dg <- assess_dg(mods_fmy = mods_df)
+val_dg_df <- ggplot(data = mod_df_dg, aes(x = RMSE, y = slope, color = mod_name)) +
+  geom_point(aes(size = r2)) + 
+  theme_bw() + 
+  xlim(NA,0.555) +
+  ggtitle("b)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_df.png", val_dg_df)
+```
+
+
+### Ponderosa pine
+
+```{r}
+#fvs
+fvs_pp <- fvs_check_red %>%
+  filter(SPCD == 122)
+#full annual
+pred_fan_pp <- pred_fan_fmy %>%
+  filter(SPCD == 122)
+#reduced annual
+pred_an_pp <- pred_an_fmy %>%
+  filter(SPCD == 122)
+#full climate
+pred_fclim_pp <- pred_fclim_fmy %>%
+  filter(SPCD == 122)
+#reduced climate
+pred_rclim_pp <- pred_rclim_fmy %>%
+  filter(SPCD == 122)
+pred_rclim2_pp <- pred_rclim2_fmy %>%
+  filter(SPCD == 122)
+#normal
+pred_n_pp <- pred_n_fmy %>%
+  filter(SPCD == 122)
+#normal + interactions
+pred_int_pp <- pred_int_fmy %>%
+  filter(SPCD == 122)
+pred_nint_pp <- pred_nint_fmy %>%
+  filter(SPCD == 122)
+```
+
+```{r}
+mods_pp <- list(cur_fvs = fvs_pp,
+                 an_full = pred_fan_pp,
+                 an_red = pred_an_pp,
+                 #an_red2 = pred_an2_pp,
+                 clim_full = pred_fclim_pp,
+                 clim_red = pred_rclim_pp, 
+                 clim_red2 = pred_rclim2_pp,
+                 clim_n = pred_n_pp,
+                 clim_int = pred_int_pp,
+                 #clim_nint = pred_nint_pp,
+                 clim_nint = pred_nint_pp)
+```
+
+```{r}
+mod_pp_dg <- assess_dg(mods_fmy = mods_pp)
+val_dg_pp <- ggplot(data = mod_pp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  theme_bw() + 
+  xlim(NA,0.544) +
+  ggtitle("c)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_pp.png", val_dg_pp)
+```
+
+### Engelmann spruce
+
+```{r}
+#fvs
+fvs_es <- fvs_check_red %>%
+  filter(SPCD == 93)
+#full annual
+pred_fan_es <- pred_fan_fmy %>%
+  filter(SPCD == 93)
+#reduced annual
+pred_an_es <- pred_an_fmy %>%
+  filter(SPCD == 93)
+pred_acr_es <- pred_acr_fmy %>%
+  filter(SPCD == 93)
+#full climate
+pred_fclim_es <- pred_fclim_fmy %>%
+  filter(SPCD == 93)
+#reduced climate
+pred_rclim_es <- pred_rclim_fmy %>%
+  filter(SPCD == 93)
+#constant CR
+pred_crclim_es <- pred_crclim_fmy %>%
+  filter(SPCD == 93)
+#normal
+pred_n_es <- pred_n_fmy %>%
+  filter(SPCD == 93)
+#normal + interactions
+pred_int_es <- pred_int_fmy %>%
+  filter(SPCD == 93)
+pred_nint_es <- pred_nint_fmy %>%
+  filter(SPCD == 93)
+pred_n2_es <- pred_nint3_fmy %>%
+  filter(SPCD == 93)
+pred_int2_es <- pred_nint4_fmy %>%
+  filter(SPCD == 93)
+```
+
+```{r}
+mods_es <- list(cur_fvs = fvs_es,
+                 an_full = pred_fan_es,
+                 an_red = pred_an_es,
+                 #an_cr = pred_acr_es,
+                 clim_full = pred_fclim_es,
+                 clim_red = pred_crclim_es,
+                 clim_n = pred_n_es,
+                 #clim_n2 = pred_n2_es,
+                 clim_int = pred_int_es,
+                 #clim_int2 = pred_int2_es,
+                 clim_nint = pred_nint_es)
+```
+
+```{r}
+mod_es_dg <- assess_dg(mods_fmy = mods_es)
+val_dg_es <- ggplot(data = mod_es_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  theme_bw() +
+  xlim(NA,0.545) + 
+  ggtitle("d)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_es.png", val_dg_es)
+```
+
+```{r}
+library(gridExtra)
+val_dg <- grid.arrange(val_dg_all,val_dg_df,val_dg_pp,val_dg_es,nrow=2)
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg.png", val_dg,
+       dpi = 300, height = 6, width = 10, units = "in")
+```
+
+
+## Residuals
+
+### Full Annual
 
 ```{r}
 pred_fan_fmy <- pred_fan_fmy %>%
@@ -1404,7 +1763,7 @@ ggplot(data = pred_fan_fmy, aes(x = FVS_LOC_CD,y = diff)) +
 ```
 
 
-#### Reduced
+### Reduced Annual
 
 ```{r}
 #qq of residuals
@@ -1507,164 +1866,8 @@ ggplot(data = pred_an_fmy, aes(x = FVS_LOC_CD,y = diff)) +
   theme_minimal()
 ```
 
-## Climate
 
-```{r}
-#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_fvs.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_full.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim2.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim21.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim22.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim3.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr2.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr21.Rdata")
-```
-
-
-```{r}
-pred_clim_full <- pred_clim_full %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_fclim_fmy <- pred_clim_full %>%
-  filter(Year == fMEASYEAR) %>%
-  filter(is.finite(PCCF) & is.finite(DIA)) #Size blows up due to pccf
-```
-
-
-```{r}
-pred_clim <- pred_clim %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_rclim_fmy <- pred_clim %>%
-  filter(Year == fMEASYEAR)
-pred_clim2 <- pred_clim2 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_clim2_fmy <- pred_clim2 %>%
-  filter(Year == fMEASYEAR)
-pred_clim21 <- pred_clim21 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_clim21_fmy <- pred_clim21 %>%
-  filter(Year == fMEASYEAR)
-pred_clim22 <- pred_clim22 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_clim22_fmy <- pred_clim22 %>%
-  filter(Year == fMEASYEAR)
-pred_clim3 <- pred_clim3 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_clim3_fmy <- pred_clim3 %>%
-  filter(Year == fMEASYEAR)
-```
-
-
-```{r}
-pred_clim_cr <- pred_clim_cr %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_ccr_fmy <- pred_clim_cr %>%
-  filter(Year == fMEASYEAR)
-pred_clim_cr2 <- pred_clim_cr2 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_ccr2_fmy <- pred_clim_cr2 %>%
-  filter(Year == fMEASYEAR)
-pred_clim_cr21 <- pred_clim_cr21 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_ccr21_fmy <- pred_clim_cr21 %>%
-  filter(Year == fMEASYEAR)
-```
-
-
-```{r}
-rm(pred_clim_full)
-rm(pred_clim)
-rm(pred_clim2)
-rm(pred_clim22)
-rm(pred_clim3)
-rm(pred_clim_cr)
-rm(pred_clim_cr2)
-rm(pred_clim_cr21)
-```
-
-
-### Interactions
-
-```{r}
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_int.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_n.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_rs.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_rint.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_frs.Rdata")
-```
-
-```{r}
-#interactions
-pred_clim_int <- pred_clim_int %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_int_fmy <- pred_clim_int %>%
-  filter(Year == fMEASYEAR)
-
-#normals
-pred_clim_n <- pred_clim_n %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_n_fmy <- pred_clim_n %>%
-  filter(Year == fMEASYEAR)
-
-#random slope on climate
-pred_rs <- pred_rs %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_rs_fmy <- pred_rs %>%
-  filter(Year == fMEASYEAR)
-
-#like above but with interactions
-pred_rint <- pred_rint %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_rint_fmy <- pred_rint %>%
-  filter(Year == fMEASYEAR)
-
-#add random forest into prediction
-pred_frs <- pred_frs %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_frs_fmy <- pred_frs %>%
-  filter(Year == fMEASYEAR)
-```
-
-```{r}
-rm(pred_clim_int)
-rm(pred_clim_n)
-rm(pred_rs)
-rm(pred_rint)
-rm(pred_frs)
-```
-
-
-
-### Residuals
+### Full Climate
 
 ```{r}
 #qq of residuals
@@ -1674,8 +1877,6 @@ qqline(fit_clim$residuals)
 pred_clim_fmy$residuals <- residuals(fit_clim)
 plot(pred_clim_fmy$DIA,pred_an_fmy$residuals, xlab = "Predicted", ylab = "Residuals")
 ```
-
-#### Full
 
 ```{r}
 pred_fclim_fmy <- pred_fclim_fmy %>%
@@ -1770,7 +1971,7 @@ ggplot(data = pred_fclim_fmy, aes(x = FVS_LOC_CD,y = diff)) +
   theme_minimal()
 ```
 
-#### Reduced
+### Reduced Climate
 
 ```{r}
 pred_rclim_fmy <- pred_rclim_fmy %>%
@@ -1878,18 +2079,10 @@ ggplot(data = pred_rclim_fmy, aes(x = DSTRBCD1,y = diff)) +
   theme_minimal()
 ```
 
-## current FVS growth model
-
-```{r echo=FALSE}
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_check_red.Rdata")
-```
-
+### Current FVS
 
 ```{r}
 #plot fvs predicted vs observed
-fvs_check_red <- fvs_check_red %>%
-  mutate(DG_obs = fDIA - DIA,
-         DG_pred = eDBH - DIA)
 par(mfrow=c(1,2))
 ggplot(fvs_check_red) +
   geom_point(aes(x = eDBH, y = fDIA, color = factor(SPCD))) +
@@ -2258,540 +2451,11 @@ ggplot(data = res_pmod_plot, aes(x = FVS_LOC_CD,y = diff)) +
 ```
 
 
-## outputs
-
-```{r}
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_al.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_cr.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_al.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_climcr.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_ncr.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint3.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint4.Rdata")
-```
-
-```{r}
-
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_an_al.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_clim_al.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_an.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
-#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_n.Rdata")
-#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_int.Rdata")
-load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_nint.Rdata")
-```
-
-
-
-```{r}
-#fvs
-fvs_check_red <- fvs_check_red %>%
-  dplyr::select(-DIA) %>%
-  mutate(DIA = eDBH)
-#full annual
-pred_an_al <- pred_an_al %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_fan_fmy <- pred_an_al %>%
-  filter(Year == fMEASYEAR)
-#reduced annual
-pred_an <- val_an %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_an_fmy <- pred_an %>%
-  filter(Year == fMEASYEAR)
-#full climate
-pred_clim_al <- pred_clim_al %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_fclim_fmy <- pred_clim_al %>%
-  filter(Year == fMEASYEAR)
-#reduced climate
-pred_clim <- val_clim2 %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_rclim_fmy <- pred_clim %>%
-  filter(Year == fMEASYEAR)
-#normal
-pred_n <- val_n %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_n_fmy <- pred_n %>%
-  filter(Year == fMEASYEAR)#normal
-#interactions
-# pred_int <- val_int %>%
-#   group_by(TRE_CN) %>%
-#   mutate(DG_pred = max(DIA) - min(DIA),
-#          DG_obs = fDIA - min(DIA))
-# pred_int_fmy <- pred_int %>%
-#   filter(Year == fMEASYEAR)
-#normal + interactions
-pred_nint <- val_nint %>%
-  group_by(TRE_CN) %>%
-  mutate(DG_pred = max(DIA) - min(DIA),
-         DG_obs = fDIA - min(DIA))
-pred_nint_fmy <- pred_nint %>%
-  filter(Year == fMEASYEAR)
-```
-
-
-
-#Equivalence tests
-
-```{r}
-library(equivalence)
-library(plot3D)
-```
-
-```{r}
-assess_dbh <- function(mods_fmy){
-  require(equivalence)
-  mod_comp_lst <- list()
-  for(i in 1:length(mods_fmy)){
-    mod_run <- mods_fmy[[i]]
-    fit_lm <- lm(fDIA~DIA, data = mod_run, na.action=na.omit)
-    r2 <- summary(fit_lm)$adj.r.squared
-    RMSE <- sqrt(mean(fit_lm$residuals^2))
-    slope <- summary(fit_lm)$coef[2,1]
-    eq <- equivalence::equiv.boot(x = mod_run$DIA, y = mod_run$fDIA)
-    mod_name <- names(mods_fmy)[i]
-    ntrees <- eq$n
-    #ci.b0.low <- eq$ci.b0[[1]]
-    #ci.b0.high <- eq$ci.b0[[2]]
-    #rs.b0.low <- eq$rs.b0[1]
-    #rs.b0.high <- eq$rs.b0[2]
-    #test.b0 <- eq$Test.b0[[1]]
-    ci.b1.low <- eq$ci.b1[[1]]
-    ci.b1.high <- eq$ci.b1[[2]]
-    #rs.b1.low <- eq$rs.b1[1]
-    #rs.b1.high <- eq$rs.b1[2]
-    test.b1 <- eq$Test.b1[[1]]
-    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
-                           ci.b1.low, ci.b1.high, test.b1)
-    mod_comp_lst[[i]] <- mod_df
-  }
-  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
-  return(mod_comp_df)
-}
-```
-
-
-```{r}
-assess_dg <- function(mods_fmy){
-  require(equivalence)
-  require(tidyverse)
-  mod_comp_lst <- list()
-  for(i in 1:length(mods_fmy)){
-    mod_run <- mods_fmy[[i]]
-    fit_lm <- lm(DG_obs~DG_pred, data = mod_run)
-    r2 <- summary(fit_lm)$adj.r.squared
-    RMSE <- sqrt(mean(fit_lm$residuals^2))
-    slope <- summary(fit_lm)$coef[2,1]
-    eq <- equivalence::equiv.boot(x = mod_run$DG_pred, y = mod_run$DG_obs)
-    mod_name <- names(mods_fmy)[i]
-    ntrees <- eq$n
-    #ci.b0.low <- eq$ci.b0[[1]]
-    #ci.b0.high <- eq$ci.b0[[2]]
-    #rs.b0.low <- eq$rs.b0[1]
-    #rs.b0.high <- eq$rs.b0[2]
-    #test.b0 <- eq$Test.b0[[1]]
-    ci.b1.low <- eq$ci.b1[[1]]
-    ci.b1.high <- eq$ci.b1[[2]]
-    #rs.b1.low <- eq$rs.b1[1]
-    #rs.b1.high <- eq$rs.b1[2]
-    test.b1 <- eq$Test.b1[[1]]
-    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
-                           ci.b1.low, ci.b1.high, test.b1)
-    mod_comp_lst[[i]] <- mod_df
-  }
-  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
-  return(mod_comp_df)
-}
-```
-
-```{r}
-mods_fmy <- list("Current FVS" = fvs_check_red,
-                 "Full Annual" = pred_fan_fmy,
-                 "Reduced Annual" = pred_an_fmy, 
-                 "Full Climate" = pred_fclim_fmy,
-                 "Reduced Climate" = pred_rclim_fmy,
-                 "Climate Normals" = pred_n_fmy,
-                 #clim_int = pred_int_fmy,
-                 "Normals + Interactions" = pred_nint_fmy)
-```
-
-```{r}
-assess_dg_sp <- function(mods_fmy){
-  require(equivalence)
-  require(tidyverse)
-  mod_comp_lst <- list()
-  for(i in 1:length(mods_fmy)){
-    mod_name <- names(mods_fmy)[i]
-    mod_run <- mods_fmy[[i]]
-    #df
-    mod_df <- mod_run %>% filter(SPCD == 202)
-    fit_lm <- lm(DG_obs~DG_pred, data = mod_df)
-    r2 <- summary(fit_lm)$adj.r.squared
-    RMSE <- sqrt(mean(fit_lm$residuals^2))
-    slope <- summary(fit_lm)$coef[2,1]
-    eq <- equivalence::equiv.boot(x = mod_df$DG_pred, y = mod_df$DG_obs)
-    ntrees <- eq$n
-    #ci.b0.low <- eq$ci.b0[[1]]
-    #ci.b0.high <- eq$ci.b0[[2]]
-    #rs.b0.low <- eq$rs.b0[1]
-    #rs.b0.high <- eq$rs.b0[2]
-    #test.b0 <- eq$Test.b0[[1]]
-    ci.b1.low <- eq$ci.b1[[1]]
-    ci.b1.high <- eq$ci.b1[[2]]
-    #rs.b1.low <- eq$rs.b1[1]
-    #rs.b1.high <- eq$rs.b1[2]
-    test.b1 <- eq$Test.b1[[1]]
-    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
-                           ci.b1.low, ci.b1.high, test.b1)
-    mod_df$SPCD <- 202
-    #pp
-    mod_pp <- mod_run %>% filter(SPCD == 122)
-    fit_lm <- lm(DG_obs~DG_pred, data = mod_pp)
-    r2 <- summary(fit_lm)$adj.r.squared
-    RMSE <- sqrt(mean(fit_lm$residuals^2))
-    slope <- summary(fit_lm)$coef[2,1]
-    eq <- equivalence::equiv.boot(x = mod_pp$DG_pred, y = mod_pp$DG_obs)
-    ntrees <- eq$n
-    ci.b1.low <- eq$ci.b1[[1]]
-    ci.b1.high <- eq$ci.b1[[2]]
-    test.b1 <- eq$Test.b1[[1]]
-    mod_pp <- data.frame(mod_name, ntrees, r2, RMSE, slope,
-                           ci.b1.low, ci.b1.high, test.b1)
-    mod_pp$SPCD <- 122
-    #es
-    mod_es <- mod_run %>% filter(SPCD == 93)
-    fit_lm <- lm(DG_obs~DG_pred, data = mod_es)
-    r2 <- summary(fit_lm)$adj.r.squared
-    RMSE <- sqrt(mean(fit_lm$residuals^2))
-    slope <- summary(fit_lm)$coef[2,1]
-    eq <- equivalence::equiv.boot(x = mod_es$DG_pred, y = mod_es$DG_obs)
-    ntrees <- eq$n
-    ci.b1.low <- eq$ci.b1[[1]]
-    ci.b1.high <- eq$ci.b1[[2]]
-    test.b1 <- eq$Test.b1[[1]]
-    mod_es <- data.frame(mod_name, ntrees, r2, RMSE, slope,
-                           ci.b1.low, ci.b1.high, test.b1)
-    mod_es$SPCD <- 93
-    #all
-    mod_all <- bind_rows(mod_df,mod_pp) %>% bind_rows(.,mod_es)
-    mod_comp_lst[[i]] <- mod_all
-  }
-  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
-  return(mod_comp_df)
-}
-```
-
-```{r}
-mod_dg <- assess_dg_sp(mods_fmy = mods_fmy)
-mod_dg$mod_name <- factor(mod_dg$mod_name, levels = c("Current FVS","Full Annual", "Reduced Annual", "Full Climate",
-                                                      "Reduced Climate", "Climate Normals","Normals + Interactions"))
-mod_dg$SPCD <- factor(mod_dg$SPCD, levels = c(93, 122, 202),
-                  labels = c("Engelmann spruce", "Ponerosa pine", "Douglas fir"))
-val_dg_all <- ggplot(data = mod_dg, aes(x = RMSE, y = slope, shape = mod_name)) +
-  geom_point(aes(color = r2)) +  #guides(color = guide_legend(reverse = TRUE)) +
-  scale_shape_manual(values=c(10,16,1,17,2,3,8)) +# change shape
-  facet_wrap(~SPCD, nrow =2) +
-  theme_bw() + theme(legend.box = "horizontal",legend.position = c(0.8, 0.2))
-ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_all.png", val_dg_all,
-       width = 7, height = 5, units = "in")
-```
-
-### Douglas fir
-
-
-```{r}
-#fvs
-fvs_df <- fvs_check_red %>%
-  filter(SPCD == 202)
-#full annual
-pred_fan_df <- pred_fan_fmy %>%
-  filter(SPCD == 202)
-#reduced annual
-pred_an_df <- pred_an_fmy %>%
-  filter(SPCD == 202)
-#full climate
-pred_fclim_df <- pred_fclim_fmy %>%
-  filter(SPCD == 202)
-#reduced climate
-pred_rclim_df <- pred_rclim_fmy %>%
-  filter(SPCD == 202)
-#normal
-pred_n_df <- pred_n_fmy %>%
-  filter(SPCD == 202)
-# interactions
-#pred_int_df <- pred_int_fmy %>%
-#  filter(SPCD == 202)
-#normal + interactions
-pred_nint_df <- pred_nint_fmy %>%
-  filter(SPCD == 202)
-```
-
-```{r}
-mods_df <- list("Current FVS" = fvs_df,
-                 "Full Annual" = pred_fan_df,
-                 "Reduced Annual" = pred_an_df, 
-                 "Full Climate" = pred_fclim_df,
-                 "Reduced Climate" = pred_rclim_df, 
-                 "Climate Normals" = pred_n_df,
-                 #clim_int = pred_int_df,
-                 "Normals + Interactions" = pred_nint_df)
-```
-
-```{r}
-mod_df_dg <- assess_dg(mods_fmy = mods_df)
-val_dg_df <- ggplot(data = mod_df_dg, aes(x = RMSE, y = slope, color = mod_name)) +
-  geom_point(aes(size = r2)) + 
-  theme_bw() + 
-  xlim(NA,0.555) +
-  ggtitle("b)")
-ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_df.png", val_dg_df)
-```
-
-
-### Ponderosa pine
-
-```{r}
-#fvs
-fvs_pp <- fvs_check_red %>%
-  filter(SPCD == 122)
-#full annual
-pred_fan_pp <- pred_fan_fmy %>%
-  filter(SPCD == 122)
-#reduced annual
-pred_an_pp <- pred_an_fmy %>%
-  filter(SPCD == 122)
-#full climate
-pred_fclim_pp <- pred_fclim_fmy %>%
-  filter(SPCD == 122)
-#reduced climate
-pred_rclim_pp <- pred_rclim_fmy %>%
-  filter(SPCD == 122)
-pred_rclim2_pp <- pred_rclim2_fmy %>%
-  filter(SPCD == 122)
-#normal
-pred_n_pp <- pred_n_fmy %>%
-  filter(SPCD == 122)
-#normal + interactions
-pred_int_pp <- pred_int_fmy %>%
-  filter(SPCD == 122)
-pred_nint_pp <- pred_nint_fmy %>%
-  filter(SPCD == 122)
-```
-
-```{r}
-mods_pp <- list(cur_fvs = fvs_pp,
-                 an_full = pred_fan_pp,
-                 an_red = pred_an_pp,
-                 #an_red2 = pred_an2_pp,
-                 clim_full = pred_fclim_pp,
-                 clim_red = pred_rclim_pp, 
-                 clim_red2 = pred_rclim2_pp,
-                 clim_n = pred_n_pp,
-                 clim_int = pred_int_pp,
-                 #clim_nint = pred_nint_pp,
-                 clim_nint = pred_nint_pp)
-```
-
-```{r}
-mod_pp_dg <- assess_dg(mods_fmy = mods_pp)
-val_dg_pp <- ggplot(data = mod_pp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
-  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
-  theme_bw() + 
-  xlim(NA,0.544) +
-  ggtitle("c)")
-ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_pp.png", val_dg_pp)
-```
-
-### Engelmann spruce
-
-```{r}
-#fvs
-fvs_es <- fvs_check_red %>%
-  filter(SPCD == 93)
-#full annual
-pred_fan_es <- pred_fan_fmy %>%
-  filter(SPCD == 93)
-#reduced annual
-pred_an_es <- pred_an_fmy %>%
-  filter(SPCD == 93)
-pred_acr_es <- pred_acr_fmy %>%
-  filter(SPCD == 93)
-#full climate
-pred_fclim_es <- pred_fclim_fmy %>%
-  filter(SPCD == 93)
-#reduced climate
-pred_rclim_es <- pred_rclim_fmy %>%
-  filter(SPCD == 93)
-#constant CR
-pred_crclim_es <- pred_crclim_fmy %>%
-  filter(SPCD == 93)
-#normal
-pred_n_es <- pred_n_fmy %>%
-  filter(SPCD == 93)
-#normal + interactions
-pred_int_es <- pred_int_fmy %>%
-  filter(SPCD == 93)
-pred_nint_es <- pred_nint_fmy %>%
-  filter(SPCD == 93)
-pred_n2_es <- pred_nint3_fmy %>%
-  filter(SPCD == 93)
-pred_int2_es <- pred_nint4_fmy %>%
-  filter(SPCD == 93)
-```
-
-```{r}
-mods_es <- list(cur_fvs = fvs_es,
-                 an_full = pred_fan_es,
-                 an_red = pred_an_es,
-                 #an_cr = pred_acr_es,
-                 clim_full = pred_fclim_es,
-                 clim_red = pred_crclim_es,
-                 clim_n = pred_n_es,
-                 #clim_n2 = pred_n2_es,
-                 clim_int = pred_int_es,
-                 #clim_int2 = pred_int2_es,
-                 clim_nint = pred_nint_es)
-```
-
-```{r}
-mod_es_dg <- assess_dg(mods_fmy = mods_es)
-val_dg_es <- ggplot(data = mod_es_dg, aes(x = RMSE, y = slope, label = mod_name)) +
-  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
-  theme_bw() +
-  xlim(NA,0.545) + 
-  ggtitle("d)")
-ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_es.png", val_dg_es)
-```
-
-```{r}
-library(gridExtra)
-val_dg <- grid.arrange(val_dg_all,val_dg_df,val_dg_pp,val_dg_es,nrow=2)
-ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg.png", val_dg,
-       dpi = 300, height = 6, width = 10, units = "in")
-```
-
-
-## Climate during validation period
-
-```{r}
-val_clim_df <- pred_clim %>%
-  filter(SPCD == 202) %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep),
-            m_tmax = mean(tmax_FebJul))
-val_clim_df$data <- "val_df"
-cal_clim_df <- varmt_df_z %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
-            m_tmax = mean(tmax_FebJul))
-cal_clim_df$data <- "cal_df"
-val_clim_pp <- pred_clim %>%
-  filter(SPCD == 122) %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep),
-            m_tmax = mean(tmax_JunAug))
-val_clim_pp$data <- "val_pp"
-cal_clim_pp <- varmt_pp_z %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
-            m_tmax = mean(tmax_JunAug))
-cal_clim_pp$data <- "cal_pp"
-val_clim_es <- pred_clim %>%
-  filter(SPCD == 93) %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep),
-            m_tmax = mean(tmax_pAug))
-val_clim_es$data <- "val_es"
-cal_clim_es <- varmt_es_z %>%
-  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
-  distinct() %>%
-  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
-            m_tmax = mean(tmax_pAug))
-cal_clim_es$data <- "cal_es"
-clim_comp <- bind_rows(val_clim_df, cal_clim_df, val_clim_pp, cal_clim_pp, val_clim_es, cal_clim_es)
-```
-
-
-## Visualize
-
-```{r}
-ggplot(eq_comp_df, aes(mod_name, y=1)) + geom_linerange(aes(ymin = ci.b1.low, ymax = ci.b1.high))
-```
-
-
-```{r}
-#all
-ggplot(data = mod_comp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
-  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
-  theme_bw()
-```
-
-```{r}
-ggplot(data = mod_clim_dg, aes(x = RMSE, y = slope, label = mod_name)) +
-  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
-  geom_linerange(aes(ymin = ci.b1.low, ymax = ci.b1.high)) +
-  theme_bw()
-ggplot(data = mod_clim_dg, aes(x = RMSE, y = slope, label = mod_name)) +
-  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
-  theme_bw()
-```
-
-```{r}
-#plot r2
-r2_df <- as.data.frame(r2beta(clim_mod_df))
-r2_df$model <- "Douglas fir"
-r2_pp <- as.data.frame(r2beta(clim_mod_pp))
-r2_pp$model <- "Ponderosa pine"
-r2_es <- as.data.frame(r2beta(clim_mod2_es))
-r2_es$model <- "Engelmann spruce"
-r2_df <- bind_rows(r2_df,r2_pp) %>%
-  bind_rows(.,r2_es)
-```
-
-```{r}
-#write.csv(r2_df,file = "./data/formatted/r2_df.csv")
-#edit effect names and reload
-#r2_df <- read_csv("./data/formatted/r2_df.csv")
-r2_df_red <- r2_df %>%
-  filter(Effect != "Model")
-```
-
-```{r}
-ggplot(data = r2_df_red,aes(color = model)) + 
-  geom_pointrange(data = r2_df_red,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL)) +
-    scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
-                                 "Engelmann spruce" = "gold1"))
-ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) + 
-  geom_point()
-```
-
 # Choose and Explore
 
 ```{r}
 library(Metrics)
 ```
-
 
 ## Full Annual
 
@@ -2882,21 +2546,6 @@ sqrt(mean(fit_rclim$residuals^2))
 fit_rclim_dg <- lm(DG_obs~DG_pred,data = pred_rclim_fmy)
 summary(fit_rclim_dg)
 sqrt(mean(fit_rclim_dg$residuals^2))
-#constant cr
-par(mfrow=c(1,2))
-ggplot(pred_ccr2_fmy) +
-  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DBH - Constant CR", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-ggplot(pred_ccr2_fmy) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - Constant CR", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-fit_ccr2_dg <- lm(DG_obs~DG_pred,data = pred_ccr2_fmy)
-summary(fit_ccr2_dg)
-sqrt(mean(fit_ccr2_dg$residuals^2))
 #normals
 par(mfrow=c(1,2))
 ggplot(pred_n_fmy) +
@@ -2914,3 +2563,47 @@ summary(fit_n_dg)
 sqrt(mean(fit_n_dg$residuals^2))
 ```
 
+## Climate during validation period
+
+```{r}
+val_clim_df <- pred_clim %>%
+  filter(SPCD == 202) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_FebJul))
+val_clim_df$data <- "val_df"
+cal_clim_df <- varmt_df_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_FebJul))
+cal_clim_df$data <- "cal_df"
+val_clim_pp <- pred_clim %>%
+  filter(SPCD == 122) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_JunAug))
+val_clim_pp$data <- "val_pp"
+cal_clim_pp <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_JunAug))
+cal_clim_pp$data <- "cal_pp"
+val_clim_es <- pred_clim %>%
+  filter(SPCD == 93) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_pAug))
+val_clim_es$data <- "val_es"
+cal_clim_es <- varmt_es_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_pAug))
+cal_clim_es$data <- "cal_es"
+clim_comp <- bind_rows(val_clim_df, cal_clim_df, val_clim_pp, cal_clim_pp, val_clim_es, cal_clim_es)
+```
