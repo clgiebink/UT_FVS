@@ -22,9 +22,11 @@ For each species, fit 2 growth models: 1) annualized with tree rings and 2) annu
 
 ### Douglas fir
 
-```{r}
-#load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_df_z.Rdata")
+```{r echo=FALSE}
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata")
+varmt_df_an <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
 #tree ring model
 an_al_df <- lmer(log(dds)~
                     #tree variables
@@ -39,7 +41,7 @@ an_al_df <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_df_z)
+                        data = varmt_df_an)
 an_red_df <- lmer(log(dds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
@@ -49,16 +51,18 @@ an_red_df <- lmer(log(dds)~
                     z.SDI+ #remove /100 due to standardization
                     #site variables
                     z.SICOND+z.SLOPE+
-                    z.solrad_MayAug+
+                    #z.solrad_MayAug+
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                      control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_df_z)
-#try without radiation
-an_red2_df <- lmer(log(dds)~
+                        data = varmt_df_an)
+varmt_df_an <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
+an_cred_df <- lmer(log(dds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    z.CR_fvs+
+                    z.CR+
                     #climate
                     #competition/density
                     z.SDI+ #remove /100 due to standardization
@@ -67,7 +71,30 @@ an_red2_df <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                      control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_df_z)
+                        data = varmt_df_an)
+varmt_df <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.ppt_pJunSep,z.tmax_FebJul,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
+clim_cred_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+ 
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df)
+varmt_df <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.ppt_pJunSep,z.tmax_FebJul,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
 #tr+climate model
 clim_al_df <- lmer(log(dds)~
                   #tree variables
@@ -83,7 +110,7 @@ clim_al_df <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_df_z)
+               data = varmt_df)
 clim_red_df <- lmer(log(dds)~
                   #tree variables
                  z.DIA_C+I(z.DIA_C^2)+#remove log due to standardization
@@ -98,76 +125,75 @@ clim_red_df <- lmer(log(dds)~
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_df_z)
-#Constand CR
-an_mod_df <- lmer(log(dds)~
-                    #tree variables
-                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    z.CR+
-                    #climate
-                    #competition/density
-                    z.SDI+ #remove /100 due to standardization
-                    #site variables
-                    z.SICOND+z.SLOPE+
-                    z.solrad_MayAug+
-                    #random effects
-                    # (1|FVS_LOC_CD)+(1+z.DIA_C|TRE_CN:FVS_LOC_CD)+(1|Year),
-                   (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_df_z)
-clim_mod_df <- lmer(log(dds)~
+               data = varmt_df)
+#normals
+clim_n_df <- lmer(log(dds)~
                   #tree variables
                  z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
-                 z.CR+
+                 z.CR_fvs+
                  #climate
-                 z.ppt_pJunSep*z.tmax_FebJul+
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_ppt:z.tmax_FebJul+
                  #competition/density
                  z.SDI+#remove /100 due to standardization
                  #site variables
                  z.SICOND+z.SLOPE+
-                 #z.solrad_MayAug+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_df_z)
-```
-
-```{r}
-library(r2glmm)
-r2beta(an_al_df)
-r2beta(an_red_df)
-r2beta(clim_al_df)
-r2beta(clim_red_df)
-r2beta(clim_mod_df)
-```
-
-```{r}
-#plot r2
-r2_aclim_df <- as.data.frame(r2beta(clim_al_df))
-r2_aclim_df$model <- "All Climate"
-r2_rclim_df <- as.data.frame(r2beta(clim_red_df))
-r2_rclim_df$model <- "Reduced Climate"
-r2_df <- bind_rows(r2_aclim_df,r2_rclim_df)
-```
-
-```{r}
-#write.csv(r2_df,file = "./data/formatted/r2_df.csv")
-#edit effect names and reload
-#r2_df <- read_csv("./data/formatted/r2_df.csv")
-```
-
-```{r}
-ggplot(data = r2_df,aes(color = model)) + 
-  geom_pointrange(data = r2_df,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
-ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) + 
-  geom_point()
+               data = varmt_df)
+clim_int_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 #z.DIA_C:z.tmax_FebJul+
+                 z.CR_fvs+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SICOND:z.tmax_FebJul+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df)
+clim_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR_fvs+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 z.SDI:z.n_ppt+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SICOND:z.tmax_FebJul+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df)
 ```
 
 ### Ponderosa pine
 
-```{r}
-#load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_pp_z.Rdata")
+```{r echo=FALSE}
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata")
+varmt_pp_an <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
 #tree ring model
 an_al_pp <- lmer(log(dds)~
                     #tree variables
@@ -182,38 +208,26 @@ an_al_pp <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_pp_z)
-AIC(an_al_pp)
+                        data = varmt_pp_an)
+varmt_pp_an <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
 an_red_pp <- lmer(log(dds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    z.CR_fvs+
                     #climate
                     #competition/density
                     z.BAL+ #remove /100 due to standardization
                     #site variables
-                    z.SICOND+
+                    z.SICOND+z.SLOPE+
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_pp_z)
-AIC(an_red_pp)
-#try also
-an_red2_pp <- lmer(log(dds)~
-                    #tree variables
-                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    z.CR_fvs+
-                    #climate
-                    #competition/density
-                    z.BAL+ #remove /100 due to standardization
-                    #site variables
-                    z.SICOND+
-                    z.solrad_MayAug+
-                    #random effects
-                    (1+z.DIA_C|TRE_CN)+(1|Year),
-                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_pp_z)
-AIC(an_red2_pp)
+                        data = varmt_pp_an)
+varmt_pp <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.ppt_pJunSep,z.tmax_JunAug,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
 #tr + climate model
 clim_al_pp <- lmer(log(dds)~
                      #tree variables
@@ -229,107 +243,84 @@ clim_al_pp <- lmer(log(dds)~
                      #random effects
                      (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                   data = glmm_pp_z)
-AIC(clim_al_pp)
+                   data = varmt_pp)
+varmt_pp <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.ppt_pJunSep,z.tmax_JunAug,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
 clim_red_pp <- lmer(log(dds)~
                        #tree variables
                        z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                       z.CR_fvs+I(z.CR_fvs^2)+
                        #climate
                        z.ppt_pJunSep*z.tmax_JunAug+
                        #competition/density
-                       z.CCF+ #remove /100 due to standardization
-                       #site variables
-                       z.SICOND+
-                       #random effects
-                       (1+z.DIA_C|TRE_CN)+(1|Year),
-                     control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                     data = glmm_pp_z)
-AIC(clim_red_pp)
-#also try
-#slope and solrad have about same AIC
-clim_red2_pp <- lmer(log(dds)~
-                       #tree variables
-                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                       #climate
-                       z.ppt_pJunSep*z.tmax_JunAug+
-                       #competition/density
-                       z.CCF+ #remove /100 due to standardization
+                       z.BAL+ #remove /100 due to standardization
                        #site variables
                        z.SICOND+z.SLOPE+
                        #z.solrad_MayAug+
                        #random effects
                        (1+z.DIA_C|TRE_CN)+(1|Year),
                      control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                     data = glmm_pp_z)
-AIC(clim_red2_pp)
-#constant CR
-#bal, ccf, and sdi all have about same AIC
-an_mod_pp <- lmer(log(dds)~
+                     data = varmt_pp)
+#normals
+clim_n_pp <- lmer(log(dds)~
                      #tree variables
                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                     #z.CR+
+                     #z.DIA_C:z.BAL+
                      #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
                      #competition/density
-                     z.CCF+ #remove /100 due to standardization
+                     z.BAL+ #remove /100 due to standardization
                      #site variables
-                     z.SICOND+
+                     z.SICOND+z.SLOPE+
                      #random effects
                      (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                   data = glmm_pp_z)
-AIC(an_mod_pp)
-clim_mod_pp <- lmer(log(dds)~
+                   data = varmt_pp)
+clim_int_pp <- lmer(log(dds)~
                      #tree variables
                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                     #z.CR+
+                     z.DIA_C:z.BAL+
                      #climate
                      z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
                      #competition/density
-                     z.CCF+ #remove /100 due to standardization
+                     z.BAL+ #remove /100 due to standardization
                      #site variables
-                     z.SICOND+
+                     z.SICOND+z.SLOPE+
                      #random effects
                      (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                   data = glmm_pp_z)
-AIC(clim_mod_pp)
+                   data = varmt_pp_z)
+clim_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     z.BAL:z.n_ppt+
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp)
 ```
 
-```{r}
-r2beta(an_al_pp)
-r2beta(an_red_pp)
-r2beta(clim_al_pp)
-r2beta(clim_red_pp)
-```
-
-```{r}
-#plot r2
-r2_aclim_pp <- as.data.frame(r2beta(clim_al_pp))
-r2_aclim_pp$model <- "Full Climate"
-r2_rclim_pp <- as.data.frame(r2beta(clim_red_pp))
-r2_rclim_pp$model <- "Reduced Climate"
-r2_pp <- bind_rows(r2_aclim_pp,r2_rclim_pp)
-```
-
-```{r}
-#write.csv(r2_pp,file = "./data/formatted/r2_pp.csv")
-#edit effect names and reload
-#r2_pp <- read_csv("./data/formatted/r2_pp.csv")
-```
-
-```{r}
-ggplot(data = r2_pp,aes(color = model)) + 
-  geom_pointrange(data = r2_pp,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
-ggplot(data = r2_pp,aes(x = Effect, y = Rsq, color = model)) + 
-  geom_point()
-```
 
 ### Engelmann spruce
 
 ```{r}
-#load data
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/glmm_es_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata")
+varmt_es_an <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
 #tree ring model
 an_al_es <- lmer(log(dds)~
                     #tree variables
@@ -344,22 +335,41 @@ an_al_es <- lmer(log(dds)~
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
-AIC(an_al_es)
+                        data = varmt_es_an)
 an_red_es <- lmer(log(dds)~
                     #tree variables
                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    #z.CR_fvs+ #reduces AIC by 4
+                    z.CR_fvs+
                     #climate
                     #competition/density
                     z.BAL+ #remove /100 due to standardization
                     #site variables
-                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                    z.SICOND+z.SLOPE+
                     #random effects
                     (1+z.DIA_C|TRE_CN)+(1|Year),
                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
-AIC(an_red_es)
+                        data = varmt_es_an)
+varmt_es_an <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.sin,z.cos,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
+an_cred_es <- lmer(log(dds)~
+                    #tree variables
+                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                    #z.CR_fvs+ #reduces AIC by 4
+                    z.CR+
+                    #climate
+                    #competition/density
+                    z.BAL+ #remove /100 due to standardization
+                    #site variables
+                    z.SICOND+z.SLOPE+
+                    #random effects
+                    (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                        data = varmt_es_an)
+varmt_es <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,z.ppt_pJunSep,z.tmax_pAug,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
 #tr + climate model
 clim_al_es <- lmer(log(dds)~
                  #tree variables
@@ -374,40 +384,60 @@ clim_al_es <- lmer(log(dds)~
                  z.sin+z.cos+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
-                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_al_es)
+               data = varmt_es)
 clim_red_es <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                 #z.CR_fvs+
+                 z.CR_fvs+
                  #climate
                  z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
                  #competition/density
                  z.BAL+ 
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_red_es)
-#constant CR
-an_mod_es <- lmer(log(dds)~
-                    #tree variables
-                    z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                    z.CR+
-                    #climate
-                    #competition/density
-                    z.BAL+#remove /100 due to standardization
-                    #site variables
-                    z.SICOND+z.SLOPE+I(z.SLOPE^2)+
-                    #random effects
-                    (1+z.DIA_C|TRE_CN)+(1|Year),
+               data = varmt_es)
+varmt_es <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.ppt_pJunSep,z.tmax_pAug,
+                z.BAL,z.PCCF,z.CCF,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.sin,z.cos,
+                z.n_ppt,z.n_tmp)
+clim_cred_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+ 
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                        data = glmm_es_z)
-AIC(an_mod_es)
-clim_mod_es <- lmer(log(dds)~
+               data = varmt_es)
+#normals
+clim_n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+ #might not be necessary
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es)
+clim_int_es <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR+
@@ -415,59 +445,34 @@ clim_mod_es <- lmer(log(dds)~
                  z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
                  #competition/density
                  z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
                  #site variables
-                 z.SICOND+z.SLOPE+I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
+                 z.SLOPE:z.ppt_pJunSep+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-AIC(clim_mod_es)
-clim_mod2_es <- lmer(log(dds)~
+               data = varmt_es)
+clim_nint_es <- lmer(log(dds)~
                  #tree variables
                  z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
                  z.CR+
                  #climate
-                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
                  #competition/density
                  z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
                  #site variables
-                 z.SICOND+z.SLOPE+#I(z.SLOPE^2)+
+                 z.SICOND+z.SLOPE+
                  #random effects
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-               data = glmm_es_z)
-```
-
-```{r}
-r2beta(an_al_es)
-r2beta(an_red_es)
-r2beta(clim_al_es)
-r2beta(clim_red_es)
-r2beta(clim_mod_es)
-```
-
-```{r}
-#plot r2
-r2_aclim_es <- as.data.frame(r2beta(clim_al_es))
-r2_aclim_es$model <- "Full Climate"
-r2_rclim_es <- as.data.frame(r2beta(clim_red_es))
-r2_rclim_es$model <- "Reduced Climate"
-r2_cr_es <- as.data.frame(r2beta(clim_mod_es))
-r2_cr_es$model <- "Modified CR"
-r2_es <- bind_rows(r2_weib_es,r2_cr_es)
-```
-
-```{r}
-#write.csv(r2_es,file = "./data/formatted/r2_es.csv")
-#edit effect names and reload
-#r2_es <- read_csv("./data/formatted/r2_es.csv")
-```
-
-```{r}
-ggplot(data = r2_es,aes(color = model)) + 
-  geom_pointrange(data = r2_es,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
-ggplot(data = r2_es,aes(x = Effect, y = Rsq, color = model)) + 
-  geom_point()
+               data = varmt_es)
 ```
 
 
@@ -475,348 +480,14 @@ ggplot(data = r2_es,aes(x = Effect, y = Rsq, color = model)) +
 
 Validate models by using them to predict growth and compare to observed values. The validation data set is independent from the calibration data set. The calibration data set has trees measured in the 1990s. The validation data set has different trees measured twice between the years of 2000-2017. For example, one tree could be measured in 2000 and again in 2010. I will take the measurement from 2000, predict growth every year until 2010, and compare the prediction with the observed value for 2010.
 
-### Inputs
-
-```{r}
-#data frames to standardize covariates in the model
-df_stats <- glmm_df_z %>%
-  ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_fvs,CR,CR_fvs,PCCF,CCF,
-         cos,sin,solrad_MayAug,ppt_pJunSep,tmax_FebJul) %>%
-  sapply(.,function(x) c(mean=mean(x,na.rm = T),
-                         sd=sd(x,na.rm = T)))
-pp_stats <- glmm_pp_z %>%
-  ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_fvs,CR,CR_fvs,PCCF,CCF,
-         cos,sin,solrad_MayAug,ppt_pJunSep,tmax_JunAug) %>%
-  sapply(.,function(x) c(mean=mean(x,na.rm = T),
-                         sd=sd(x,na.rm = T)))
-es_stats <- glmm_es_z %>%
-  ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR_fvs,CR,CR_fvs,PCCF,CCF,
-         cos,sin,solrad_MayAug,ppt_pJunSep,tmax_pAug) %>%
-  sapply(.,function(x) c(mean=mean(x,na.rm = T),
-                         sd=sd(x,na.rm = T)))
-sp_stats <- list(sp_202 = df_stats, sp_122 = pp_stats,sp_93 = es_stats)
-```
-
-```{r}
-#data frame for density/competition equations
-bratio_df <- data.frame(species=c(93,202,122),
-                        #93=ES,202=DF,122=PP
-                        b1 = c(0.9502,0.867,0.8967),
-                        b2 = c(-0.2528, 0, -0.4448),
-                        exp = c(1,0,1))
-ccf_df <- data.frame(species=c(93,202,122),
-                     #93=ES,202=DF,122=PP,
-                     r1 = c(0.03,0.11,0.03),
-                     r2 = c(0.0173,0.0333,0.0180),
-                     r3 = c(0.00259,0.00259,0.00281),
-                     r4 = c(0.007875,0.017299,0.007813),
-                     r5 = c(1.7360,1.5571,1.7680),
-                     dbrk = c(1,1,1))
-CR_fvs_df <- data.frame(species=c(93,202,122),
-                         #93=ES,202=DF,122=PP
-                         SDIMAX = c(620,570,446),
-                         a0 = c(1,1,1),
-                         b0 = c(-0.90648,-0.24217,-0.82631),
-                         b1 = c(1.08122,0.96529,1.06217),
-                         c0 = c(3.48889,-7.94832,-1.02873),
-                         c1 = c(0,1.93832,0.80143),
-                         d0 = c(6.81087,7.46296,6.19911),
-                         d1 = c(-0.01037,-0.02944,-0.02216))
-```
-
 ### Function
 
 The function must take the validation trees and predict growth for the next year. Then use that prediction to calculate density/competition covariates for that year on the plot level. Then use the covariates to predict growth for the next year. Repeat until it has reached the remeasurement year (`fMEASYEAR`).
 
-
 ```{r}
-val_an <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_fvs_df) {
-  #parameters:
-  #newdata - validataion trees from FIADB
-  newdata_rep <- newdata %>%
-    ungroup() %>%
-    mutate(census_int = fMEASYEAR - MEASYEAR) %>%
-    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD, census_int,
-                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA) %>%
-    mutate(Year = NA,
-           DIA = NA,
-           CCF = NA,
-           PCCF = NA,
-           BAL = NA,
-           SDI = NA,
-           CR_fvs = NA)
-  newdata_rep <- newdata_rep %>% 
-    group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = census_int+1)) %>%
-    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
-    ungroup()
-  ##density for new data in MEASYEAR will already be calculated
-  #fill in DIA,CCF, PCCF, BAL, SDI, CR_fvs, where year = measyear
-  for(i in 1:nrow(newdata_rep)){
-    TRE_CN <- newdata_rep$TRE_CN[i]
-    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
-      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
-      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
-      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
-      newdata_rep$CR_fvs[i] <- newdata$CR[newdata$TRE_CN == TRE_CN]
-    }
-  }
-  #mod_obj - list of model objects for each species
-  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
-  ##will be used to standardize newdata covariates
-  #nonfocal - trees on the same plot as validation trees
-  nonfocal <- nonfocal %>%
-    ungroup()
-  ##will be used to compute density parameters
-  #bratio - dataframe of bark ratio constants for equation
-  #ccf - dataframe of crown competiton factor constants for equation
-  #CR_fvs_df - dataframe of crown ratio constants for equation
-  
-  #empty dataframe to add results
-  pred_df <- newdata_rep[FALSE,]
-  
-  # loop over plot
-  # to calculate density after MEASYR
-  for(i in unique(newdata_rep$PLT_CN)) {
-    #create plot dataframe to predict growth
-    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
-    #assign projection start year
-    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
-    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
-      #filter dataframe for year of projection
-      plt_yr_df <- plt_df %>%
-        filter(Year == growthyr)
-      
-      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
-        Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
-        
-        #standardize covariates
-        #get mean/sd for each species
-        if(Species == 202){para_std <- sp_stats$sp_202}
-        if(Species == 122){para_std <- sp_stats$sp_122}
-        if(Species == 93) {para_std <- sp_stats$sp_93}
 
-        #first row is mean, second row is sd
-        #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
-        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
-        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
-        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
-        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
-        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
-        #TODO there must be a better way to do this? for loop?
-
-        #predict
-        # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
-                                        re.form = NA, type = "response")
-        #re.form specify random effects to include
-        ##NA include none
-        
-        #see page 53 of prognosis model
-        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
-        # k = 1/BRATIO
-        #see UT variant guide
-        #BRATIO = b1+b2/(DBH^exp)
-        b1 <- bratio$b1[bratio$species == Species]
-        b2 <- bratio$b2[bratio$species == Species]
-        exp <- bratio$exp[bratio$species == Species]
-        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
-        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
-        k <- 1/BRATIO 
-        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
-                                  (plt_yr_df$DIA[i]/k))
-      }
-      
-      #so DBH0 + k*DG = DBH
-      plt_yr2_df <- plt_df %>%
-        filter(Year == (growthyr+1))%>%
-        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
-      
-      #join with nonfocal
-      #fitler for trees on plots in validation set in same year
-      non_foc_filt <- nonfocal %>%
-        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
-        mutate(DIA = DIA_int) %>%
-        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
-               Year == plt_yr2_df$Year[1])
-      #join
-      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
-      
-      #compute density parameters
-      #ccf
-      for(i in 1:nrow(density_cal)){
-        Species <- density_cal$SPCD[i]
-        r1 <- ccf_df$r1[ccf_df$species == Species]
-        r2 <- ccf_df$r2[ccf_df$species == Species]
-        r3 <- ccf_df$r3[ccf_df$species == Species]
-        r4 <- ccf_df$r4[ccf_df$species == Species]
-        r5 <- ccf_df$r5[ccf_df$species == Species]
-        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
-        if(Species == 475){
-          ifelse(density_cal$DIA[i] < dbrk,
-                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
-                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
-        }
-        if(Species != 475){
-          ifelse(is.na(density_cal$DIA[i]), 
-                 CCF_t <- NA,
-                 ifelse(density_cal$DIA[i] <= 0.1, 
-                        CCF_t <- 0.0001,
-                        ifelse(density_cal$DIA[i] < dbrk, 
-                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
-                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
-        }
-        density_cal$CCF_t[i] <- CCF_t
-      }
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,SUBP,Year) %>%
-        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
-      
-      #stand CCF = sum(CCFt on a plot) on a per acre basis
-      #TPA measured on a plot/stand level
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
-      
-      #bal
-      density_cal <- density_cal %>%
-        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
-      
-      #rank trees per year per plot
-      #sum BApa of trees larger on the same plot in same year
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
-        #min assigns lowest value to ties (1,2,3,3,5,6)
-        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
-               num_t = length(unique(TRE_CN)))
-      
-      #filter for focal trees
-      plt_yr2_df <- density_cal %>%
-        filter(TRE_CN %in% plt_yr_df$TRE_CN)
-      
-      #cr
-      for(i in 1:nrow(plt_yr2_df)){
-        #Function arguments:
-        #SPCD - is number code of species of tree record
-        #SDI - is SDI of stand (Stage 1968)
-        Species <- plt_yr2_df$SPCD[i]
-        #SDI max values for each species were pulled from UT Variant overview
-        SDIMAX <- ifelse(is.na(plt_yr2_df$SDIMAX_RMRS[i]),
-                         CR_fvs_df$SDIMAX[CR_fvs_df$species == Species],
-                         plt_yr2_df$SDIMAX_RMRS[i])
-        #Calculate relative density
-        RD <- plt_yr2_df$SDI[i]/SDIMAX
-        
-        #Calculate average stand crown ratio (ACR) for each species in the stand
-        d0 <- CR_fvs_df$d0[CR_fvs_df$species == Species]
-        d1 <- CR_fvs_df$d1[CR_fvs_df$species == Species]
-        ACR <- d0 + d1 * RD * 100
-        
-        #Parameters of Weibull distribution: A,B,C
-        a0 <- CR_fvs_df$a0[CR_fvs_df$species == Species]
-        b0 <- CR_fvs_df$b0[CR_fvs_df$species == Species]
-        b1 <- CR_fvs_df$b1[CR_fvs_df$species == Species]
-        c0 <- CR_fvs_df$c0[CR_fvs_df$species == Species]
-        c1 <- CR_fvs_df$c1[CR_fvs_df$species == Species]
-        
-        #A parameter
-        WEIBA <-a0
-        #B parameter
-        WEIBB <- b0 + b1*ACR
-        #C parameter
-        WEIBC <- c0 + c1*ACR
-        
-        #Function arguments:
-        
-        #CCF - crown competition factor of stand
-        #rank_pltyr - tree's rank in diameter distribution by plot by year
-        #N  - number of records in the stand by year
-        
-        #Calculate scale parameter
-        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
-        if(SCALE < 0.3){SCALE = 0.3}
-        if(SCALE > 1.0){SCALE = 1.0}
-        
-        N <- plt_yr2_df$num_t[i]
-        #X is tree's rank in diameter distribution
-        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
-        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
-        if(Y < 0.05){Y = 0.05}
-        if(Y > 0.95){Y = 0.95}
-        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
-        
-        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
-        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
-        #X = a tree’s crown ratio expressed as a percent / 10
-        CR_fvs <- X * 10
-        
-        #get CR the year before
-        TRE_CN <- plt_yr2_df$TRE_CN[i]
-        #growthyr is still previous year
-        CR_1 <- plt_df$CR_fvs[plt_df$TRE_CN == TRE_CN & 
-                                plt_df$Year == growthyr] #or CR_fvs[N] for the first round
-        #bound to 1% change per year
-        cr_bound1 <- CR_1 * .01
-        plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_fvs, 
-                                          CR_1 - cr_bound1,
-                                          CR_1 + cr_bound1)
-      }
-
-      #join with plt_df
-      for(i in 1:nrow(plt_df)){
-        TRE_CN <- plt_df$TRE_CN[i]
-        if(plt_df$Year[i] == (growthyr + 1)){
-          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
-        }
-      }
-      #add density metrics in
-      
-      
-      #loop over next year
-      growthyr = growthyr + 1
-    }
-    #join plt_df with empty data frame
-    #output
-    pred_df <- bind_rows(pred_df,plt_df)
-    
-    #loop over next plot
-  }
-
-  return(pred_df)
-}
 ```
+
 
 ```{r}
 val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_fvs_df,climate) {
@@ -898,13 +569,6 @@ val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
       
       for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
         Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
         
         #standardize covariates
         #get mean/sd for each species
@@ -914,40 +578,75 @@ val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
-        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
-        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
-        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
-        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
-        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
-        plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
+        z.DIA_C = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
+        z.CR_fvs = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        z.BAL = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
+        z.CCF = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
+        z.PCCF = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
+        z.SDI = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
+        z.SICOND = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
+        z.SLOPE = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
+        z.sin = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
+        z.cos = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
+        z.solrad_MayAug = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
+        z.ppt_pJunSep = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
                                                para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
         #temperature different for each species
-        sp_202 <- sp_stats$sp_202
-        sp_122 <- sp_stats$sp_122
-        sp_93 <- sp_stats$sp_93
-        plt_yr_df$z.tmax_FebJul[i] = unlist((plt_yr_df[i,"tmax_FebJul"] -
-                                               sp_202[1,"tmax_FebJul"]) /
-                                              sp_202[2,"tmax_FebJul"])
-        plt_yr_df$z.tmax_JunAug[i] = unlist((plt_yr_df[i,"tmax_JunAug"] -
-                                               sp_122[1,"tmax_JunAug"]) /
-                                              sp_122[2,"tmax_JunAug"])
-        plt_yr_df$z.tmax_pAug[i] = unlist((plt_yr_df[i,"tmax_pAug"] -
-                                             sp_93[1,"tmax_pAug"]) / 
-                                            sp_93[2,"tmax_pAug"])
+        
+       
+        
         #TODO there must be a better way to do this? for loop?
         
         #predict
         # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
-                                        re.form = NA, type = "response")
+        #plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
+        #re.form = NA, type = "response")
         #re.form specify random effects to include
         ##NA include none
+        if(Species == 202) {
+          z.tmax_FebJul = unlist((plt_yr_df[i,"tmax_FebJul"] -
+                                    para_std[1,"tmax_FebJul"]) /
+                                   para_std[2,"tmax_FebJul"])
+          plt_yr_df$log_dds[i] <- summary(mod_df)$coef["(Intercept)",1] +
+            summary(mod_df)$coef["z.DIA_C",1] * z.DIA_C +
+            summary(mod_df)$coef["I(z.DIA_C^2)",1] * (z.DIA_C^2) +
+            summary(mod_df)$coef["z.CR",1] * z.CR +
+            summary(mod_df)$coef["z.ppt_pJunSep",1] * z.ppt_pJunSep +
+            summary(mod_df)$coef["z.tmax_FebJul",1] * z.tmax_FebJul +
+            summary(mod_df)$coef["z.SDI",1] * z.SDI +
+            summary(mod_df)$coef["z.SICOND",1] * z.SICOND +
+            summary(mod_df)$coef["z.SLOPE",1] * z.SLOPE +
+            summary(mod_df)$coef["z.ppt_pJunSep:z.tmax_FebJul",1] * z.ppt_pJunSep * z.tmax_FebJul
+        }
+        if(Species == 122) {
+          z.tmax_JunAug = unlist((plt_yr_df[i,"tmax_JunAug"] -
+                                    para_std[1,"tmax_JunAug"]) /
+                                   para_std[2,"tmax_JunAug"])
+          plt_yr_df$log_dds[i] <- summary(mod_pp)$coef["(Intercept)",1] +
+            summary(mod_pp)$coef["z.DIA_C",1] * z.DIA_C +
+            summary(mod_pp)$coef["I(z.DIA_C^2)",1] * (z.DIA_C^2) +
+            summary(mod_pp)$coef["z.ppt_pJunSep",1] * z.ppt_pJunSep +
+            summary(mod_pp)$coef["z.tmax_JunAug",1] * z.tmax_JunAug +
+            summary(mod_pp)$coef["z.BAL",1] * z.BAL +
+            summary(mod_pp)$coef["z.SICOND",1] * z.SICOND +
+            summary(mod_pp)$coef["z.SLOPE",1] * z.SLOPE +
+            summary(mod_pp)$coef["z.ppt_pJunSep:z.tmax_JunAug",1] * z.ppt_pJunSep * z.tmax_JunAug
+        }
+        if(Species == 93) {
+          z.tmax_pAug = unlist((plt_yr_df[i,"tmax_pAug"] -
+                                               para_std[1,"tmax_pAug"]) / 
+                                              para_std[2,"tmax_pAug"])
+          plt_yr_df$log_dds[i] <- summary(mod_es)$coef["(Intercept)",1] +
+            summary(mod_es)$coef["z.DIA_C",1] * z.DIA_C +
+            summary(mod_es)$coef["I(z.DIA_C^2)",1] * (z.DIA_C^2) +
+            summary(mod_es)$coef["z.CR",1] * z.CR +
+            summary(mod_es)$coef["z.ppt_pJunSep",1] * z.ppt_pJunSep +
+            summary(mod_es)$coef["z.tmax_pAug",1] * z.tmax_pAug +
+            summary(mod_es)$coef["z.BAL",1] * z.BAL +
+            summary(mod_es)$coef["z.SICOND",1] * z.SICOND +
+            summary(mod_es)$coef["z.SLOPE",1] * z.SLOPE +
+            summary(mod_es)$coef["z.ppt_pJunSep:z.tmax_pAug",1] * z.ppt_pJunSep * z.tmax_pAug
+        }
         
         #see page 53 of prognosis model
         #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
@@ -1102,8 +801,8 @@ val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
         #bound to 1% change per year
         cr_bound1 <- CR_1 * .01
         plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_fvs, 
-                                          CR_1 - cr_bound1,
-                                          CR_1 + cr_bound1)
+                                       CR_1 - cr_bound1,
+                                       CR_1 + cr_bound1)
       }
       
       #join with plt_df
@@ -1134,808 +833,7 @@ val_clim <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_d
 }
 ```
 
-#### CR constant
 
-```{r}
-val_an_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_fvs_df) {
-  #parameters:
-  #newdata - validataion trees from FIADB
-  newdata_rep <- newdata %>%
-    ungroup() %>%
-    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD, tCONDID, census_int,
-                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA,
-                  CR_fvs) %>%
-    mutate(Year = NA,
-           DIA = NA,
-           CCF = NA,
-           PCCF = NA,
-           BAL = NA,
-           SDI = NA)
-  newdata_rep <- newdata_rep %>% 
-    group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = census_int+1)) %>%
-    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
-    ungroup()
-  ##density for new data in MEASYEAR will already be calculated
-  #fill in DIA,CCF, PCCF, BAL, SDI, CR_fvs, where year = measyear
-  for(i in 1:nrow(newdata_rep)){
-    TRE_CN <- newdata_rep$TRE_CN[i]
-    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
-      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
-      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
-      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
-    }
-  }
-  #mod_obj - list of model objects for each species
-  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
-  ##will be used to standardize newdata covariates
-  #nonfocal - trees on the same plot as validation trees
-  nonfocal <- nonfocal %>%
-    ungroup()
-  ##will be used to compute density parameters
-  #bratio - dataframe of bark ratio constants for equation
-  #ccf - dataframe of crown competiton factor constants for equation
-  #CR_fvs_df - dataframe of crown ratio constants for equation
-  
-  #empty dataframe to add results
-  pred_df <- newdata_rep[FALSE,]
-  
-  # loop over plot
-  # to calculate density after MEASYR
-  for(i in unique(newdata_rep$PLT_CN)) {
-    #create plot dataframe to predict growth
-    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
-    #assign projection start year
-    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
-    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
-      #filter dataframe for year of projection
-      plt_yr_df <- plt_df %>%
-        filter(Year == growthyr)
-      
-      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
-        Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
-        
-        #standardize covariates
-        #get mean/sd for each species
-        if(Species == 202){para_std <- sp_stats$sp_202}
-        if(Species == 122){para_std <- sp_stats$sp_122}
-        if(Species == 93) {para_std <- sp_stats$sp_93}
-
-        #first row is mean, second row is sd
-        #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
-        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
-        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
-        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
-        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
-        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
-        #TODO there must be a better way to do this? for loop?
-
-        #predict
-        # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
-                                        re.form = NA, type = "response")
-        #re.form specify random effects to include
-        ##NA include none
-        
-        #see page 53 of prognosis model
-        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
-        # k = 1/BRATIO
-        #see UT variant guide
-        #BRATIO = b1+b2/(DBH^exp)
-        b1 <- bratio$b1[bratio$species == Species]
-        b2 <- bratio$b2[bratio$species == Species]
-        exp <- bratio$exp[bratio$species == Species]
-        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
-        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
-        k <- 1/BRATIO 
-        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
-                                  (plt_yr_df$DIA[i]/k))
-      }
-      
-      #so DBH0 + k*DG = DBH
-      plt_yr2_df <- plt_df %>%
-        filter(Year == (growthyr+1))%>%
-        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
-      
-      #join with nonfocal
-      #fitler for trees on plots in validation set in same year
-      non_foc_filt <- nonfocal %>%
-        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
-        mutate(DIA = DIA_int) %>%
-        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
-               Year == plt_yr2_df$Year[1])
-      #join
-      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
-      
-      #compute density parameters
-      #ccf
-      for(i in 1:nrow(density_cal)){
-        Species <- density_cal$SPCD[i]
-        r1 <- ccf_df$r1[ccf_df$species == Species]
-        r2 <- ccf_df$r2[ccf_df$species == Species]
-        r3 <- ccf_df$r3[ccf_df$species == Species]
-        r4 <- ccf_df$r4[ccf_df$species == Species]
-        r5 <- ccf_df$r5[ccf_df$species == Species]
-        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
-        if(Species == 475){
-          ifelse(density_cal$DIA[i] < dbrk,
-                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
-                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
-        }
-        if(Species != 475){
-          ifelse(is.na(density_cal$DIA[i]), 
-                 CCF_t <- NA,
-                 ifelse(density_cal$DIA[i] <= 0.1, 
-                        CCF_t <- 0.0001,
-                        ifelse(density_cal$DIA[i] < dbrk, 
-                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
-                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
-        }
-        density_cal$CCF_t[i] <- CCF_t
-      }
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,SUBP,Year) %>%
-        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
-      
-      #stand CCF = sum(CCFt on a plot) on a per acre basis
-      #TPA measured on a plot/stand level
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
-      
-      #bal
-      density_cal <- density_cal %>%
-        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
-      
-      #rank trees per year per plot
-      #sum BApa of trees larger on the same plot in same year
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
-        #min assigns lowest value to ties (1,2,3,3,5,6)
-        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
-               num_t = length(unique(TRE_CN)))
-      
-      #filter for focal trees
-      plt_yr2_df <- density_cal %>%
-        filter(TRE_CN %in% plt_yr_df$TRE_CN)
-
-      #join with plt_df
-      for(i in 1:nrow(plt_df)){
-        TRE_CN <- plt_df$TRE_CN[i]
-        if(plt_df$Year[i] == (growthyr + 1)){
-          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
-        }
-      }
-      #add density metrics in
-      
-      #loop over next year
-      growthyr = growthyr + 1
-    }
-    #join plt_df with empty data frame
-    #output
-    pred_df <- bind_rows(pred_df,plt_df)
-    
-    #loop over next plot
-  }
-
-  return(pred_df)
-}
-```
-
-```{r}
-val_clim_cr <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,climate) {
-  #parameters:
-  #newdata - validataion trees from FIADB
-  newdata_rep <- newdata %>%
-    ungroup() %>%
-    mutate(census_int = fMEASYEAR - MEASYEAR) %>%
-    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD, census_int,
-                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA,
-                  CR) %>%
-    mutate(Year = NA,
-           DIA = NA,
-           CCF = NA,
-           PCCF = NA,
-           BAL = NA,
-           SDI = NA)
-  newdata_rep <- newdata_rep %>% 
-    group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = census_int+1)) %>%
-    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
-    ungroup()
-  ##density for new data in MEASYEAR will already be calculated
-  #fill in DIA,CCF, PCCF, BAL, SDI, CR_fvs, where year = measyear
-  #fill climate
-  climate <- climate %>%
-    ungroup()
-  for(i in 1:nrow(newdata_rep)){
-    TRE_CN <- newdata_rep$TRE_CN[i]
-    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
-      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
-      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
-      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
-    }
-    #add climate
-    PLT_CN <- newdata_rep$PLT_CN[i]
-    #match over tree and year
-    newdata_rep$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_JunAug[i] <- climate$tmax_JunAug[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_FebJul[i] <- climate$tmax_FebJul[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$PLT_CN == PLT_CN &
-                                                    climate$Year == newdata_rep$Year[i]]
-  }
-  
-  #mod_obj - list of model objects for each species
-  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
-  ##will be used to standardize newdata covariates
-  #nonfocal - trees on the same plot as validation trees
-  nonfocal <- nonfocal %>%
-    ungroup()
-  ##will be used to compute density parameters
-  #bratio - dataframe of bark ratio constants for equation
-  #ccf - dataframe of crown competiton factor constants for equation
-  #CR_fvs_df - dataframe of crown ratio constants for equation
-  #climate - dataframe of climate variables (ppt & tmax) for each tree
-  
-  #empty dataframe to add results
-  pred_df <- newdata_rep[FALSE,]
-  
-  # loop over plot
-  # to calculate density after MEASYR
-  for(i in unique(newdata_rep$PLT_CN)) {
-    #create plot dataframe to predict growth
-    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
-    #assign projection start year
-    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
-    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
-      #filter dataframe for year of projection
-      plt_yr_df <- plt_df %>%
-        filter(Year == growthyr)
-      
-      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
-        Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
-        
-        #standardize covariates
-        #get mean/sd for each species
-        if(Species == 202){para_std <- sp_stats$sp_202}
-        if(Species == 122){para_std <- sp_stats$sp_122}
-        if(Species == 93) {para_std <- sp_stats$sp_93}
-        
-        #first row is mean, second row is sd
-        #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
-        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
-        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
-        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
-        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
-        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
-        plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
-                                               para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
-        #temperature different for each species
-        sp_202 <- sp_stats$sp_202
-        sp_122 <- sp_stats$sp_122
-        sp_93 <- sp_stats$sp_93
-        plt_yr_df$z.tmax_FebJul[i] = unlist((plt_yr_df[i,"tmax_FebJul"] -
-                                               sp_202[1,"tmax_FebJul"]) /
-                                              sp_202[2,"tmax_FebJul"])
-        plt_yr_df$z.tmax_JunAug[i] = unlist((plt_yr_df[i,"tmax_JunAug"] -
-                                               sp_122[1,"tmax_JunAug"]) /
-                                              sp_122[2,"tmax_JunAug"])
-        plt_yr_df$z.tmax_pAug[i] = unlist((plt_yr_df[i,"tmax_pAug"] -
-                                             sp_93[1,"tmax_pAug"]) / 
-                                            sp_93[2,"tmax_pAug"])
-        #TODO there must be a better way to do this? for loop?
-        
-        #predict
-        # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
-                                        re.form = NA, type = "response")
-        #re.form specify random effects to include
-        ##NA include none
-        
-        #see page 53 of prognosis model
-        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
-        # k = 1/BRATIO
-        #see UT variant guide
-        #BRATIO = b1+b2/(DBH^exp)
-        b1 <- bratio$b1[bratio$species == Species]
-        b2 <- bratio$b2[bratio$species == Species]
-        exp <- bratio$exp[bratio$species == Species]
-        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
-        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
-        k <- 1/BRATIO 
-        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
-                                  (plt_yr_df$DIA[i]/k))
-      }
-      
-      #so DBH0 + k*DG = DBH
-      plt_yr2_df <- plt_df %>%
-        filter(Year == (growthyr+1))%>%
-        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
-      
-      #join with nonfocal
-      #fitler for trees on plots in validation set in same year
-      non_foc_filt <- nonfocal %>%
-        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
-        mutate(DIA = DIA_int) %>%
-        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
-               Year == plt_yr2_df$Year[1])
-      #join
-      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
-      
-      #compute density parameters
-      #ccf
-      for(i in 1:nrow(density_cal)){
-        Species <- density_cal$SPCD[i]
-        r1 <- ccf_df$r1[ccf_df$species == Species]
-        r2 <- ccf_df$r2[ccf_df$species == Species]
-        r3 <- ccf_df$r3[ccf_df$species == Species]
-        r4 <- ccf_df$r4[ccf_df$species == Species]
-        r5 <- ccf_df$r5[ccf_df$species == Species]
-        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
-        if(Species == 475){
-          ifelse(density_cal$DIA[i] < dbrk,
-                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
-                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
-        }
-        if(Species != 475){
-          ifelse(is.na(density_cal$DIA[i]), 
-                 CCF_t <- NA,
-                 ifelse(density_cal$DIA[i] <= 0.1, 
-                        CCF_t <- 0.0001,
-                        ifelse(density_cal$DIA[i] < dbrk, 
-                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
-                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
-        }
-        density_cal$CCF_t[i] <- CCF_t
-      }
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,SUBP,Year) %>%
-        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
-      
-      #stand CCF = sum(CCFt on a plot) on a per acre basis
-      #TPA measured on a plot/stand level
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
-      
-      #bal
-      density_cal <- density_cal %>%
-        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
-      
-      #rank trees per year per plot
-      #sum BApa of trees larger on the same plot in same year
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
-        #min assigns lowest value to ties (1,2,3,3,5,6)
-        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
-               num_t = length(unique(TRE_CN)))
-      
-      #filter for focal trees
-      plt_yr2_df <- density_cal %>%
-        filter(TRE_CN %in% plt_yr_df$TRE_CN)
-      
-      #join with plt_df
-      for(i in 1:nrow(plt_df)){
-        TRE_CN <- plt_df$TRE_CN[i]
-        if(plt_df$Year[i] == (growthyr + 1)){
-          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
-        }
-      }
-      #add density metrics in
-      
-      #loop over next year
-      growthyr = growthyr + 1
-    }
-    #join plt_df with empty data frame
-    #output
-    pred_df <- bind_rows(pred_df,plt_df)
-    
-    #loop over next plot
-  }
-  
-  return(pred_df)
-}
-
-```
-
-#### Forest code
-
-```{r}
-val_clim_fc <- function(newdata,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,climate) {
-  #parameters:
-  #newdata - validataion trees from FIADB
-  newdata_rep <- newdata %>%
-    ungroup() %>%
-    mutate(census_int = fMEASYEAR - MEASYEAR) %>%
-    dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
-                  TPA_UNADJ, DESIGNCD, census_int,
-                  ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
-                  FVS_LOC_CD,SDIMAX_RMRS,SICOND_c,solrad_MayAug, fMEASYEAR, fDIA,
-                  CR) %>%
-    mutate(Year = NA,
-           DIA = NA,
-           CCF = NA,
-           PCCF = NA,
-           BAL = NA,
-           SDI = NA)
-  newdata_rep <- newdata_rep %>% 
-    group_by(TRE_CN) %>%
-    slice(rep(1:n(), each = census_int+1)) %>%
-    mutate(Year = (MEASYEAR[1]:fMEASYEAR[1])) %>% #repeated data frame ready  to fill in
-    ungroup()
-  ##density for new data in MEASYEAR will already be calculated
-  #fill in DIA,CCF, PCCF, BAL, SDI, CR_fvs, where year = measyear
-  #fill climate
-  climate <- climate %>%
-    ungroup()
-  for(i in 1:nrow(newdata_rep)){
-    TRE_CN <- newdata_rep$TRE_CN[i]
-    if(newdata_rep$Year[i] == newdata_rep$MEASYEAR[i]){
-      newdata_rep$DIA[i] <- newdata$DIA[newdata$TRE_CN == TRE_CN]
-      newdata_rep$CCF[i] <- newdata$CCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$PCCF[i] <- newdata$PCCF[newdata$TRE_CN == TRE_CN]
-      newdata_rep$BAL[i] <- newdata$BAL[newdata$TRE_CN == TRE_CN]
-      newdata_rep$SDI[i] <- newdata$SDI[newdata$TRE_CN == TRE_CN]
-    }
-    #add climate
-    PLT_CN <- newdata_rep$PLT_CN[i]
-    #match over tree and year
-    newdata_rep$ppt_pJunSep[i] <- climate$ppt_pJunSep[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_JunAug[i] <- climate$tmax_JunAug[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_FebJul[i] <- climate$tmax_FebJul[climate$PLT_CN == PLT_CN &
-                                                        climate$Year == newdata_rep$Year[i]]
-    newdata_rep$tmax_pAug[i] <- climate$tmax_pAug[climate$PLT_CN == PLT_CN &
-                                                    climate$Year == newdata_rep$Year[i]]
-  }
-  
-  #mod_obj - list of model objects for each species
-  #sp_stats - list of species statistics (mean and standard deviation) for each covariate
-  ##will be used to standardize newdata covariates
-  #nonfocal - trees on the same plot as validation trees
-  nonfocal <- nonfocal %>%
-    ungroup()
-  ##will be used to compute density parameters
-  #bratio - dataframe of bark ratio constants for equation
-  #ccf - dataframe of crown competiton factor constants for equation
-  #CR_fvs_df - dataframe of crown ratio constants for equation
-  #climate - dataframe of climate variables (ppt & tmax) for each tree
-  
-  #empty dataframe to add results
-  pred_df <- newdata_rep[FALSE,]
-  
-  # loop over plot
-  # to calculate density after MEASYR
-  for(i in unique(newdata_rep$PLT_CN)) {
-    #create plot dataframe to predict growth
-    plt_df <- newdata_rep[newdata_rep$PLT_CN == i,]
-    #assign projection start year
-    growthyr <- plt_df$MEASYEAR[1] # assumes all trees on a plot have same MEASYEAR
-    while (growthyr <= (plt_df$fMEASYEAR[1]-1)){ #stops the year before fMEASYEAR
-      #filter dataframe for year of projection
-      plt_yr_df <- plt_df %>%
-        filter(Year == growthyr)
-      
-      for(i in 1:nrow(plt_yr_df)) {#for each tree on plot in given year
-        Species <- plt_yr_df$SPCD[i]
-        TRE_CN <- plt_yr_df$TRE_CN[i]
-        
-        #select model to predict growth
-        #models are species specific
-        if(Species == 202){mod_obj <- mod_df} 
-        if(Species == 122){mod_obj <- mod_pp} 
-        if(Species == 93){mod_obj <- mod_es} 
-        
-        #standardize covariates
-        #get mean/sd for each species
-        if(Species == 202){para_std <- sp_stats$sp_202}
-        if(Species == 122){para_std <- sp_stats$sp_122}
-        if(Species == 93) {para_std <- sp_stats$sp_93}
-        
-        #first row is mean, second row is sd
-        #the inputs of the equation are from a list so output needs to be unlisted
-        plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
-        plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
-        plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
-        plt_yr_df$z.PCCF[i] = unlist((plt_yr_df[i,"PCCF"] - para_std[1,"PCCF"]) / para_std[2,"PCCF"])
-        plt_yr_df$z.SDI[i] = unlist((plt_yr_df[i,"SDI"] - para_std[1,"SDI"]) / para_std[2,"SDI"])
-        plt_yr_df$z.SICOND[i] = unlist((plt_yr_df[i,"SICOND_c"] - para_std[1,"SICOND"]) / para_std[2,"SICOND"])
-        plt_yr_df$z.SLOPE[i] = unlist((plt_yr_df[i,"SLOPE"] - para_std[1,"SLOPE"]) / para_std[2,"SLOPE"])
-        plt_yr_df$z.sin[i] = unlist((plt_yr_df[i,"sin"] - para_std[1,"sin"]) / para_std[2,"sin"])
-        plt_yr_df$z.cos[i] = unlist((plt_yr_df[i,"cos"] - para_std[1,"cos"]) / para_std[2,"cos"])
-        plt_yr_df$z.solrad_MayAug[i] = unlist((plt_yr_df[i,"solrad_MayAug"] - para_std[1,"solrad_MayAug"]) / para_std[2,"solrad_MayAug"])
-        plt_yr_df$z.ppt_pJunSep[i] = unlist((plt_yr_df[i,"ppt_pJunSep"] - 
-                                               para_std[1,"ppt_pJunSep"]) / para_std[2,"ppt_pJunSep"])
-        #temperature different for each species
-        sp_202 <- sp_stats$sp_202
-        sp_122 <- sp_stats$sp_122
-        sp_93 <- sp_stats$sp_93
-        plt_yr_df$z.tmax_FebJul[i] = unlist((plt_yr_df[i,"tmax_FebJul"] -
-                                               sp_202[1,"tmax_FebJul"]) /
-                                              sp_202[2,"tmax_FebJul"])
-        plt_yr_df$z.tmax_JunAug[i] = unlist((plt_yr_df[i,"tmax_JunAug"] -
-                                               sp_122[1,"tmax_JunAug"]) /
-                                              sp_122[2,"tmax_JunAug"])
-        plt_yr_df$z.tmax_pAug[i] = unlist((plt_yr_df[i,"tmax_pAug"] -
-                                             sp_93[1,"tmax_pAug"]) / 
-                                            sp_93[2,"tmax_pAug"])
-        #TODO there must be a better way to do this? for loop?
-        
-        #predict
-        # modobj will change with different species
-        plt_yr_df$log_dds[i] <- predict(object = mod_obj, newdata = plt_yr_df[i,], 
-                                        re.form = ~(1+z.|FVS_LOC_CD), type = "response")
-        #re.form specify random effects to include
-        ##NA include none
-        
-        #see page 53 of prognosis model
-        #DG = sqrt((DBH/k)^2 + dds) - (DBH/k)
-        # k = 1/BRATIO
-        #see UT variant guide
-        #BRATIO = b1+b2/(DBH^exp)
-        b1 <- bratio$b1[bratio$species == Species]
-        b2 <- bratio$b2[bratio$species == Species]
-        exp <- bratio$exp[bratio$species == Species]
-        BRATIO <- b1 + b2/(plt_yr_df$DIA[i]^exp) 
-        #exp determines if use equation 4.2.1/3 or 4.2.2 in UT variant guide
-        k <- 1/BRATIO 
-        #DG = sqrt((DBH/k)^2 + dds - (DBH/k))
-        plt_yr_df$DG[i] <- k * (sqrt((plt_yr_df$DIA[i]/k)^2 + exp(plt_yr_df$log_dds[i])) -
-                                  (plt_yr_df$DIA[i]/k))
-      }
-      
-      #so DBH0 + k*DG = DBH
-      plt_yr2_df <- plt_df %>%
-        filter(Year == (growthyr+1))%>%
-        mutate(DIA = plt_yr_df$DIA + plt_yr_df$DG)
-      
-      #join with nonfocal
-      #fitler for trees on plots in validation set in same year
-      non_foc_filt <- nonfocal %>%
-        dplyr::select(PLT_CN, TRE_CN, SUBP, SPCD,TPA_UNADJ,Year,DIA_int) %>%
-        mutate(DIA = DIA_int) %>%
-        filter(PLT_CN == plt_yr2_df$PLT_CN[1],
-               Year == plt_yr2_df$Year[1])
-      #join
-      density_cal <- bind_rows(plt_yr2_df,non_foc_filt)
-      
-      #compute density parameters
-      #ccf
-      for(i in 1:nrow(density_cal)){
-        Species <- density_cal$SPCD[i]
-        r1 <- ccf_df$r1[ccf_df$species == Species]
-        r2 <- ccf_df$r2[ccf_df$species == Species]
-        r3 <- ccf_df$r3[ccf_df$species == Species]
-        r4 <- ccf_df$r4[ccf_df$species == Species]
-        r5 <- ccf_df$r5[ccf_df$species == Species]
-        dbrk <- ccf_df$dbrk[ccf_df$species == Species]
-        if(Species == 475){
-          ifelse(density_cal$DIA[i] < dbrk,
-                 CCF_t <- density_cal$DIA[i]*(r1+r2+r3),
-                 CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))
-        }
-        if(Species != 475){
-          ifelse(is.na(density_cal$DIA[i]), 
-                 CCF_t <- NA,
-                 ifelse(density_cal$DIA[i] <= 0.1, 
-                        CCF_t <- 0.0001,
-                        ifelse(density_cal$DIA[i] < dbrk, 
-                               CCF_t <- r4 * (density_cal$DIA[i]^r5),
-                               CCF_t <- r1 + (r2 * density_cal$DIA[i]) + (r3 * density_cal$DIA[i]^2))))
-        }
-        density_cal$CCF_t[i] <- CCF_t
-      }
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,SUBP,Year) %>%
-        mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
-      
-      #stand CCF = sum(CCFt on a plot) on a per acre basis
-      #TPA measured on a plot/stand level
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE))
-      
-      #bal
-      density_cal <- density_cal %>%
-        mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)
-      
-      #rank trees per year per plot
-      #sum BApa of trees larger on the same plot in same year
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(rank_pltyr = rank(DIA, na.last = TRUE, ties.method = "min")) %>%
-        #min assigns lowest value to ties (1,2,3,3,5,6)
-        mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
-      
-      density_cal <- density_cal %>%
-        group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
-               num_t = length(unique(TRE_CN)))
-      
-      #filter for focal trees
-      plt_yr2_df <- density_cal %>%
-        filter(TRE_CN %in% plt_yr_df$TRE_CN)
-      
-      #join with plt_df
-      for(i in 1:nrow(plt_df)){
-        TRE_CN <- plt_df$TRE_CN[i]
-        if(plt_df$Year[i] == (growthyr + 1)){
-          plt_df$DIA[i] <- plt_yr2_df$DIA[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$CCF[i] <- plt_yr2_df$CCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
-          plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
-        }
-      }
-      #add density metrics in
-      
-      #loop over next year
-      growthyr = growthyr + 1
-    }
-    #join plt_df with empty data frame
-    #output
-    pred_df <- bind_rows(pred_df,plt_df)
-    
-    #loop over next plot
-  }
-  
-  return(pred_df)
-}
-
-```
-
-
-### Predict
-
-```{r}
-#load validation trees
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/val_dset.Rdata")
-#load other trees on plot
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/non_focal_exp.Rdata")
-```
-
-Predict growth using annualized with tree rings only models for each species.
-
-```{r}
-pred_an_full <- val_an(newdata = val_dset,mod_df = an_al_df, mod_pp = an_al_pp, 
-                              mod_es = an_al_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
-```
-
-```{r}
-pred_an <- val_an(newdata = val_dset,mod_df = an_red_df, mod_pp = an_red_pp, 
-                              mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
-```
-
-Predict growth using annualized with tree rings and climate models for each species.
-
-```{r}
-#load climate
-load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/clim_val.Rdata")
-```
-
-```{r}
-pred_clim_full <- val_an_clim(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_al_pp, 
-                              mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
-```
-
-```{r}
-#reduced climate models
-#
-pred_clim <- val_clim(newdata = val_dset,mod_df = clim_red_df, mod_pp = clim_red_pp, 
-                              mod_es = clim_red_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
-```
-
-```{r}
-pred_clim2 <- val_clim(newdata = val_dset,mod_df = clim_red2_df, mod_pp = clim_red2_pp, 
-                              mod_es = clim_red_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = clim_val)
-```
-
-```{r}
-#save
-save(pred_an_full,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_full.Rdata")
-save(pred_an,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an.Rdata")
-save(pred_clim_full,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_full.Rdata")
-save(pred_clim,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim.Rdata")
-save(pred_clim2,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim2.Rdata")
-```
-
-
-### Predict CR
-
-Predict growth using annualized with tree rings only models for each species.
-
-```{r}
-pred_fan_cr <- val_an_cr(newdata = val_dset,mod_df = an_al_df, mod_pp = an_al_pp, 
-                              mod_es = an_al_es,sp_stats = sp_stats,nonfocal = non_focal,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
-```
-
-```{r}
-pred_an_cr <- val_an_cr(newdata = val_dset,mod_df = an_red_df, mod_pp = an_red_pp, 
-                              mod_es = an_red_es,sp_stats = sp_stats,nonfocal = non_focal,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df)
-```
-
-Predict growth using annualized with tree rings and climate models for each species.
-
-```{r}
-pred_fclim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_al_pp, 
-                              mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal,
-                              bratio = bratio_df ,ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, climate = val_clim)
-```
-
-```{r}
-pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
-                              mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
-                              bratio = bratio_df ,ccf_df = ccf_df, climate = clim_val)
-```
 
 ## Annual
 
@@ -1956,23 +854,6 @@ pred_an_full <- pred_an_full %>%
 pred_fan_fmy <- pred_an_full %>%
   filter(Year == fMEASYEAR) %>%
   filter(!is.na(DIA))
-par(mfrow=c(1,2))
-ggplot(pred_fan_fmy) +
-  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DBH - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-ggplot(pred_fan_fmy) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-fit_fan <- lm(fDIA~DIA, data = pred_fan_fmy)
-summary(fit_fan)
-sqrt(mean(fit_fan$residuals^2))
-fit_fan_dg <- lm(DG_obs~DG_pred, data = pred_fan_fmy)
-summary(fit_fan_dg)
-sqrt(mean(fit_fan_dg$residuals^2))
 ```
 
 
@@ -1983,26 +864,6 @@ pred_an <- pred_an %>%
          DG_obs = fDIA - min(DIA))
 pred_an_fmy <- pred_an %>%
   filter(Year == fMEASYEAR) 
-par(mfrow=c(1,2))
-ggplot(pred_an_fmy) +
-  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DBH - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-ggplot(pred_an_fmy) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-fit_an <- lm(fDIA~DIA, data = pred_an_fmy)
-summary(fit_an)
-sqrt(mean(fit_an$residuals^2))
-fit_an_dg <- lm(DG_obs~DG_pred, data = pred_an_fmy)
-summary(fit_an_dg)
-sqrt(mean(fit_an_dg$residuals^2))
-```
-
-```{r}
 pred_an2 <- pred_an2 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
@@ -2024,7 +885,6 @@ pred_acr_fmy <- pred_an_cr %>%
 rm(pred_an_full)
 rm(pred_an)
 rm(pred_an2)
-rm(pred_an_fvs)
 rm(pred_an_cr)
 ```
 
@@ -2267,23 +1127,6 @@ pred_clim_full <- pred_clim_full %>%
 pred_fclim_fmy <- pred_clim_full %>%
   filter(Year == fMEASYEAR) %>%
   filter(is.finite(PCCF) & is.finite(DIA)) #Size blows up due to pccf
-par(mfrow=c(1,2))
-ggplot(pred_fclim_fmy) +
-  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DBH - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-ggplot(pred_fclim_fmy) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-fit_fclim <- lm(fDIA~DIA,data = pred_fclim_fmy)
-summary(fit_fclim)
-sqrt(mean(fit_fclim$residuals^2))
-fit_fclim_dg <- lm(DG_obs~DG_pred,data = pred_fclim_fmy)
-summary(fit_fclim_dg)
-sqrt(mean(fit_fclim_dg$residuals^2))
 ```
 
 
@@ -2294,53 +1137,24 @@ pred_clim <- pred_clim %>%
          DG_obs = fDIA - min(DIA))
 pred_rclim_fmy <- pred_clim %>%
   filter(Year == fMEASYEAR)
-par(mfrow=c(1,2))
-ggplot(pred_rclim_fmy) +
-  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DBH - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-ggplot(pred_rclim_fmy) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
-  geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
-fit_rclim <- lm(fDIA~DIA,data = pred_rclim_fmy)
-summary(fit_rclim)
-sqrt(mean(fit_rclim$residuals^2))
-fit_rclim_dg <- lm(DG_obs~DG_pred,data = pred_rclim_fmy)
-summary(fit_rclim_dg)
-sqrt(mean(fit_rclim_dg$residuals^2))
-```
-
-```{r}
 pred_clim2 <- pred_clim2 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_clim2_fmy <- pred_clim2 %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
-pred_clim2 <- pred_clim2 %>%
+pred_clim21 <- pred_clim21 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
-pred_clim2_fmy <- pred_clim2 %>%
+pred_clim21_fmy <- pred_clim21 %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
 pred_clim22 <- pred_clim22 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_clim22_fmy <- pred_clim22 %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
 pred_clim3 <- pred_clim3 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
@@ -2349,6 +1163,7 @@ pred_clim3_fmy <- pred_clim3 %>%
   filter(Year == fMEASYEAR)
 ```
 
+
 ```{r}
 pred_clim_cr <- pred_clim_cr %>%
   group_by(TRE_CN) %>%
@@ -2356,18 +1171,12 @@ pred_clim_cr <- pred_clim_cr %>%
          DG_obs = fDIA - min(DIA))
 pred_ccr_fmy <- pred_clim_cr %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
 pred_clim_cr2 <- pred_clim_cr2 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_ccr2_fmy <- pred_clim_cr2 %>%
   filter(Year == fMEASYEAR)
-```
-
-```{r}
 pred_clim_cr21 <- pred_clim_cr21 %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
@@ -2376,8 +1185,8 @@ pred_ccr21_fmy <- pred_clim_cr21 %>%
   filter(Year == fMEASYEAR)
 ```
 
+
 ```{r}
-rm(pred_clim_fvs)
 rm(pred_clim_full)
 rm(pred_clim)
 rm(pred_clim2)
@@ -2388,6 +1197,9 @@ rm(pred_clim_cr2)
 rm(pred_clim_cr21)
 ```
 
+
+### Interactions
+
 ```{r}
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_int.Rdata")
 load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_n.Rdata")
@@ -2397,56 +1209,39 @@ load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_
 ```
 
 ```{r}
+#interactions
 pred_clim_int <- pred_clim_int %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_int_fmy <- pred_clim_int %>%
   filter(Year == fMEASYEAR)
-```
 
-```{r}
+#normals
 pred_clim_n <- pred_clim_n %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_n_fmy <- pred_clim_n %>%
   filter(Year == fMEASYEAR)
-par(mfrow=c(1,2))
-plot(pred_n_fmy$DIA,pred_n_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH")
-plot(pred_n_fmy$DG_pred,pred_n_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG")
-```
 
-```{r}
+#random slope on climate
 pred_rs <- pred_rs %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_rs_fmy <- pred_rs %>%
   filter(Year == fMEASYEAR)
-```
 
-```{r}
+#like above but with interactions
 pred_rint <- pred_rint %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
          DG_obs = fDIA - min(DIA))
 pred_rint_fmy <- pred_rint %>%
   filter(Year == fMEASYEAR)
-par(mfrow=c(1,2))
-plot(pred_rint_fmy$DIA,pred_rint_fmy$fDIA,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DBH")
-plot(pred_rint_fmy$DG_pred,pred_rint_fmy$DG_obs,
-     xlab = "Predicted", ylab = "Observed",
-     main = "DG")
-```
 
-```{r}
+#add random forest into prediction
 pred_frs <- pred_frs %>%
   group_by(TRE_CN) %>%
   mutate(DG_pred = max(DIA) - min(DIA),
@@ -3059,6 +1854,92 @@ ggplot(data = res_pmod_plot, aes(x = FVS_LOC_CD,y = diff)) +
 ```
 
 
+## outputs
+
+```{r}
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_an_cr.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_climcr.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_ncr.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint3.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint4.Rdata")
+```
+
+```{r}
+
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_an_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/pred_clim_al.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_an.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
+#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_n.Rdata")
+#load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_int.Rdata")
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_nint.Rdata")
+```
+
+
+
+```{r}
+#fvs
+fvs_check_red <- fvs_check_red %>%
+  dplyr::select(-DIA) %>%
+  mutate(DIA = eDBH)
+#full annual
+pred_an_al <- pred_an_al %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fan_fmy <- pred_an_al %>%
+  filter(Year == fMEASYEAR)
+#reduced annual
+pred_an <- val_an %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_an_fmy <- pred_an %>%
+  filter(Year == fMEASYEAR)
+#full climate
+pred_clim_al <- pred_clim_al %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_fclim_fmy <- pred_clim_al %>%
+  filter(Year == fMEASYEAR)
+#reduced climate
+pred_clim <- val_clim2 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_rclim_fmy <- pred_clim %>%
+  filter(Year == fMEASYEAR)
+#normal
+pred_n <- val_n %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_n_fmy <- pred_n %>%
+  filter(Year == fMEASYEAR)#normal
+#interactions
+# pred_int <- val_int %>%
+#   group_by(TRE_CN) %>%
+#   mutate(DG_pred = max(DIA) - min(DIA),
+#          DG_obs = fDIA - min(DIA))
+# pred_int_fmy <- pred_int %>%
+#   filter(Year == fMEASYEAR)
+#normal + interactions
+pred_nint <- val_nint %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_nint_fmy <- pred_nint %>%
+  filter(Year == fMEASYEAR)
+```
 
 
 
@@ -3103,32 +1984,6 @@ assess_dbh <- function(mods_fmy){
 
 
 ```{r}
-fvs_check_red <- fvs_check_red %>%
-  dplyr::select(-DIA) %>%
-  mutate(DIA = eDBH)
-mods_fmy <- list(cur_fvs = fvs_check_red,
-                 #an_fvs = pred_afvs_fmy,
-                 #an_full = pred_fan_fmy,
-                 #an_red = pred_an_fmy,
-                 #an2_red = pred_an2_fmy,
-                 #clim_fvs = pred_cfvs_fmy,
-                 #clim_full = pred_fclim_fmy,
-                 #clim_red = pred_rclim_fmy, 
-                 #clim2_red = pred_clim2_fmy,
-                 #clim3_red = pred_clim3_fmy,
-                 clim22_red = pred_clim22_fmy,
-                 an_cr = pred_acr_fmy,
-                 clim_cr = pred_ccr_fmy,
-                 clim_cr2 = pred_ccr2_fmy,
-                 clim_int = pred_int_fmy,
-                 clim_n = pred_n_fmy,
-                 clim_rs = pred_rs_fmy,
-                 clim_rint = pred_rint_fmy,
-                 clim_frs = pred_frs_fmy)
-#mod_comp_dbh <- assess_dbh(mods_fmy = mods_fmy)
-```
-
-```{r}
 assess_dg <- function(mods_fmy){
   require(equivalence)
   require(tidyverse)
@@ -3162,7 +2017,315 @@ assess_dg <- function(mods_fmy){
 ```
 
 ```{r}
-mod_comp_dg <- assess_dg(mods_fmy = mods_fmy)
+mods_fmy <- list("Current FVS" = fvs_check_red,
+                 "Full Annual" = pred_fan_fmy,
+                 "Reduced Annual" = pred_an_fmy, 
+                 "Full Climate" = pred_fclim_fmy,
+                 "Reduced Climate" = pred_rclim_fmy,
+                 "Climate Normals" = pred_n_fmy,
+                 #clim_int = pred_int_fmy,
+                 "Normals + Interactions" = pred_nint_fmy)
+```
+
+```{r}
+assess_dg_sp <- function(mods_fmy){
+  require(equivalence)
+  require(tidyverse)
+  mod_comp_lst <- list()
+  for(i in 1:length(mods_fmy)){
+    mod_name <- names(mods_fmy)[i]
+    mod_run <- mods_fmy[[i]]
+    #df
+    mod_df <- mod_run %>% filter(SPCD == 202)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_df)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_df$DG_pred, y = mod_df$DG_obs)
+    ntrees <- eq$n
+    #ci.b0.low <- eq$ci.b0[[1]]
+    #ci.b0.high <- eq$ci.b0[[2]]
+    #rs.b0.low <- eq$rs.b0[1]
+    #rs.b0.high <- eq$rs.b0[2]
+    #test.b0 <- eq$Test.b0[[1]]
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    #rs.b1.low <- eq$rs.b1[1]
+    #rs.b1.high <- eq$rs.b1[2]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_df$SPCD <- 202
+    #pp
+    mod_pp <- mod_run %>% filter(SPCD == 122)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_pp)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_pp$DG_pred, y = mod_pp$DG_obs)
+    ntrees <- eq$n
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_pp <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_pp$SPCD <- 122
+    #es
+    mod_es <- mod_run %>% filter(SPCD == 93)
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_es)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_es$DG_pred, y = mod_es$DG_obs)
+    ntrees <- eq$n
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_es <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_es$SPCD <- 93
+    #all
+    mod_all <- bind_rows(mod_df,mod_pp) %>% bind_rows(.,mod_es)
+    mod_comp_lst[[i]] <- mod_all
+  }
+  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
+  return(mod_comp_df)
+}
+```
+
+```{r}
+mod_dg <- assess_dg_sp(mods_fmy = mods_fmy)
+mod_dg$mod_name <- factor(mod_dg$mod_name, levels = c("Current FVS","Full Annual", "Reduced Annual", "Full Climate",
+                                                      "Reduced Climate", "Climate Normals","Normals + Interactions"))
+mod_dg$SPCD <- factor(mod_dg$SPCD, levels = c(93, 122, 202),
+                  labels = c("Engelmann spruce", "Ponerosa pine", "Douglas fir"))
+val_dg_all <- ggplot(data = mod_dg, aes(x = RMSE, y = slope, shape = mod_name)) +
+  geom_point(aes(color = r2)) +  #guides(color = guide_legend(reverse = TRUE)) +
+  scale_shape_manual(values=c(10,16,1,17,2,3,8)) +# change shape
+  facet_wrap(~SPCD, nrow =2) +
+  theme_bw() + theme(legend.box = "horizontal",legend.position = c(0.8, 0.2))
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_all.png", val_dg_all,
+       width = 7, height = 5, units = "in")
+```
+
+### Douglas fir
+
+
+```{r}
+#fvs
+fvs_df <- fvs_check_red %>%
+  filter(SPCD == 202)
+#full annual
+pred_fan_df <- pred_fan_fmy %>%
+  filter(SPCD == 202)
+#reduced annual
+pred_an_df <- pred_an_fmy %>%
+  filter(SPCD == 202)
+#full climate
+pred_fclim_df <- pred_fclim_fmy %>%
+  filter(SPCD == 202)
+#reduced climate
+pred_rclim_df <- pred_rclim_fmy %>%
+  filter(SPCD == 202)
+#normal
+pred_n_df <- pred_n_fmy %>%
+  filter(SPCD == 202)
+# interactions
+#pred_int_df <- pred_int_fmy %>%
+#  filter(SPCD == 202)
+#normal + interactions
+pred_nint_df <- pred_nint_fmy %>%
+  filter(SPCD == 202)
+```
+
+```{r}
+mods_df <- list("Current FVS" = fvs_df,
+                 "Full Annual" = pred_fan_df,
+                 "Reduced Annual" = pred_an_df, 
+                 "Full Climate" = pred_fclim_df,
+                 "Reduced Climate" = pred_rclim_df, 
+                 "Climate Normals" = pred_n_df,
+                 #clim_int = pred_int_df,
+                 "Normals + Interactions" = pred_nint_df)
+```
+
+```{r}
+mod_df_dg <- assess_dg(mods_fmy = mods_df)
+val_dg_df <- ggplot(data = mod_df_dg, aes(x = RMSE, y = slope, color = mod_name)) +
+  geom_point(aes(size = r2)) + 
+  theme_bw() + 
+  xlim(NA,0.555) +
+  ggtitle("b)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_df.png", val_dg_df)
+```
+
+
+### Ponderosa pine
+
+```{r}
+#fvs
+fvs_pp <- fvs_check_red %>%
+  filter(SPCD == 122)
+#full annual
+pred_fan_pp <- pred_fan_fmy %>%
+  filter(SPCD == 122)
+#reduced annual
+pred_an_pp <- pred_an_fmy %>%
+  filter(SPCD == 122)
+#full climate
+pred_fclim_pp <- pred_fclim_fmy %>%
+  filter(SPCD == 122)
+#reduced climate
+pred_rclim_pp <- pred_rclim_fmy %>%
+  filter(SPCD == 122)
+pred_rclim2_pp <- pred_rclim2_fmy %>%
+  filter(SPCD == 122)
+#normal
+pred_n_pp <- pred_n_fmy %>%
+  filter(SPCD == 122)
+#normal + interactions
+pred_int_pp <- pred_int_fmy %>%
+  filter(SPCD == 122)
+pred_nint_pp <- pred_nint_fmy %>%
+  filter(SPCD == 122)
+```
+
+```{r}
+mods_pp <- list(cur_fvs = fvs_pp,
+                 an_full = pred_fan_pp,
+                 an_red = pred_an_pp,
+                 #an_red2 = pred_an2_pp,
+                 clim_full = pred_fclim_pp,
+                 clim_red = pred_rclim_pp, 
+                 clim_red2 = pred_rclim2_pp,
+                 clim_n = pred_n_pp,
+                 clim_int = pred_int_pp,
+                 #clim_nint = pred_nint_pp,
+                 clim_nint = pred_nint_pp)
+```
+
+```{r}
+mod_pp_dg <- assess_dg(mods_fmy = mods_pp)
+val_dg_pp <- ggplot(data = mod_pp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  theme_bw() + 
+  xlim(NA,0.544) +
+  ggtitle("c)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_pp.png", val_dg_pp)
+```
+
+### Engelmann spruce
+
+```{r}
+#fvs
+fvs_es <- fvs_check_red %>%
+  filter(SPCD == 93)
+#full annual
+pred_fan_es <- pred_fan_fmy %>%
+  filter(SPCD == 93)
+#reduced annual
+pred_an_es <- pred_an_fmy %>%
+  filter(SPCD == 93)
+pred_acr_es <- pred_acr_fmy %>%
+  filter(SPCD == 93)
+#full climate
+pred_fclim_es <- pred_fclim_fmy %>%
+  filter(SPCD == 93)
+#reduced climate
+pred_rclim_es <- pred_rclim_fmy %>%
+  filter(SPCD == 93)
+#constant CR
+pred_crclim_es <- pred_crclim_fmy %>%
+  filter(SPCD == 93)
+#normal
+pred_n_es <- pred_n_fmy %>%
+  filter(SPCD == 93)
+#normal + interactions
+pred_int_es <- pred_int_fmy %>%
+  filter(SPCD == 93)
+pred_nint_es <- pred_nint_fmy %>%
+  filter(SPCD == 93)
+pred_n2_es <- pred_nint3_fmy %>%
+  filter(SPCD == 93)
+pred_int2_es <- pred_nint4_fmy %>%
+  filter(SPCD == 93)
+```
+
+```{r}
+mods_es <- list(cur_fvs = fvs_es,
+                 an_full = pred_fan_es,
+                 an_red = pred_an_es,
+                 #an_cr = pred_acr_es,
+                 clim_full = pred_fclim_es,
+                 clim_red = pred_crclim_es,
+                 clim_n = pred_n_es,
+                 #clim_n2 = pred_n2_es,
+                 clim_int = pred_int_es,
+                 #clim_int2 = pred_int2_es,
+                 clim_nint = pred_nint_es)
+```
+
+```{r}
+mod_es_dg <- assess_dg(mods_fmy = mods_es)
+val_dg_es <- ggplot(data = mod_es_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  theme_bw() +
+  xlim(NA,0.545) + 
+  ggtitle("d)")
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_es.png", val_dg_es)
+```
+
+```{r}
+library(gridExtra)
+val_dg <- grid.arrange(val_dg_all,val_dg_df,val_dg_pp,val_dg_es,nrow=2)
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg.png", val_dg,
+       dpi = 300, height = 6, width = 10, units = "in")
+```
+
+
+## Climate during validation period
+
+```{r}
+val_clim_df <- pred_clim %>%
+  filter(SPCD == 202) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_FebJul))
+val_clim_df$data <- "val_df"
+cal_clim_df <- varmt_df_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_FebJul) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_FebJul))
+cal_clim_df$data <- "cal_df"
+val_clim_pp <- pred_clim %>%
+  filter(SPCD == 122) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_JunAug))
+val_clim_pp$data <- "val_pp"
+cal_clim_pp <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_JunAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_JunAug))
+cal_clim_pp$data <- "cal_pp"
+val_clim_es <- pred_clim %>%
+  filter(SPCD == 93) %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep),
+            m_tmax = mean(tmax_pAug))
+val_clim_es$data <- "val_es"
+cal_clim_es <- varmt_es_z %>%
+  dplyr::select(PLT_CN,ppt_pJunSep,tmax_pAug) %>%
+  distinct() %>%
+  summarise(m_ppt = mean(ppt_pJunSep, na.rm = T),
+            m_tmax = mean(tmax_pAug))
+cal_clim_es$data <- "cal_es"
+clim_comp <- bind_rows(val_clim_df, cal_clim_df, val_clim_pp, cal_clim_pp, val_clim_es, cal_clim_es)
 ```
 
 
@@ -3174,11 +2337,19 @@ ggplot(eq_comp_df, aes(mod_name, y=1)) + geom_linerange(aes(ymin = ci.b1.low, ym
 
 
 ```{r}
+#all
 ggplot(data = mod_comp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
   geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
   theme_bw()
-ggplot(data = mod_comp_dg, aes(x = r2, y = slope, label = mod_name)) +
-  geom_point(aes(size = RMSE)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+```
+
+```{r}
+ggplot(data = mod_clim_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  geom_linerange(aes(ymin = ci.b1.low, ymax = ci.b1.high)) +
+  theme_bw()
+ggplot(data = mod_clim_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
   theme_bw()
 ```
 
@@ -3213,13 +2384,129 @@ ggplot(data = r2_df,aes(x = Effect, y = Rsq,color = model)) +
 
 # Choose and Explore
 
+```{r}
+library(Metrics)
+```
+
+
 ## Full Annual
+
+```{r}
+par(mfrow=c(1,2))
+ggplot(pred_fan_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_fan_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Full: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_fan <- lm(fDIA~DIA, data = pred_fan_fmy)
+summary(fit_fan)
+sqrt(mean(fit_fan$residuals^2))
+fit_fan_dg <- lm(DG_obs~DG_pred, data = pred_fan_fmy)
+summary(fit_fan_dg)
+sqrt(mean(fit_fan_dg$residuals^2))
+```
 
 
 ## Reduced Annual
 
+```{r}
+par(mfrow=c(1,2))
+ggplot(pred_an_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_an_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Reduced: Tree Rings", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_an <- lm(fDIA~DIA, data = pred_an_fmy)
+summary(fit_an)
+sqrt(mean(fit_an$residuals^2))
+fit_an_dg <- lm(DG_obs~DG_pred, data = pred_an_fmy)
+summary(fit_an_dg)
+sqrt(mean(fit_an_dg$residuals^2))
+```
+
 
 ## Full Climate
 
+```{r}
+par(mfrow=c(1,2))
+ggplot(pred_fclim_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_fclim_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Full: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_fclim <- lm(fDIA~DIA,data = pred_fclim_fmy)
+summary(fit_fclim)
+sqrt(mean(fit_fclim$residuals^2))
+fit_fclim_dg <- lm(DG_obs~DG_pred,data = pred_fclim_fmy)
+summary(fit_fclim_dg)
+sqrt(mean(fit_fclim_dg$residuals^2))
+```
+
 
 ## Reduced Climate
+
+```{r}
+par(mfrow=c(1,2))
+ggplot(pred_rclim_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_rclim_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Reduced: Tree Rings + Climate", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_rclim <- lm(fDIA~DIA,data = pred_rclim_fmy)
+summary(fit_rclim)
+sqrt(mean(fit_rclim$residuals^2))
+fit_rclim_dg <- lm(DG_obs~DG_pred,data = pred_rclim_fmy)
+summary(fit_rclim_dg)
+sqrt(mean(fit_rclim_dg$residuals^2))
+#constant cr
+par(mfrow=c(1,2))
+ggplot(pred_ccr2_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Constant CR", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_ccr2_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Constant CR", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_ccr2_dg <- lm(DG_obs~DG_pred,data = pred_ccr2_fmy)
+summary(fit_ccr2_dg)
+sqrt(mean(fit_ccr2_dg$residuals^2))
+#normals
+par(mfrow=c(1,2))
+ggplot(pred_n_fmy) +
+  geom_point(aes(x = DIA, y = fDIA, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DBH - Climate Normals", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+ggplot(pred_n_fmy) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "DG - Climate Normals", x = "Predicted", y = "Observed", color = "Species") +
+  theme_bw()
+fit_n_dg <- lm(DG_obs~DG_pred,data = pred_n_fmy)
+summary(fit_n_dg)
+sqrt(mean(fit_n_dg$residuals^2))
+```
+
