@@ -1,0 +1,1131 @@
+---
+title: "Projection"
+author: "Courtney Giebink"
+date: "1/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Models
+
+```{r echo=FALSE}
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(r2glmm)
+library(stringr)
+```
+
+
+### Tree ring only
+
+```{r}
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata")
+varmt_df_an <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR_fvs,
+                z.BAL,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,)
+an_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR_fvs+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_an)
+varmt_pp_an <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,
+                z.BAL,z.SDI,z.SICOND)
+an_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_an)
+varmt_es_an <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,
+                z.BAL,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug)
+an_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_an)
+```
+
+```{r}
+#plot r2
+r2_df <- as.data.frame(r2beta(an_df))
+r2_df$model <- "Douglas fir"
+r2_pp <- as.data.frame(r2beta(an_pp))
+r2_pp$model <- "Ponderosa pine"
+r2_es <- as.data.frame(r2beta(an_es))
+r2_es$model <- "Engelmann spruce"
+r2_an <- bind_rows(r2_df,r2_pp) %>%
+  bind_rows(.,r2_es)
+#write.csv(r2_an,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_an.csv")
+#edit effect names and reload
+```
+
+```{r }
+r2_an <- read_csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_an.csv")
+ggplot(data = r2_an,aes(color = model)) + 
+  geom_pointrange(data = r2_an,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+```
+
+
+### Tree ring & Climate
+
+```{r}
+varmt_df <- varmt_df_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.ppt_pJunSep,z.tmax_FebJul,
+                z.BAL,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug, z.n_ppt, z.n_tmp)
+clim_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df)
+varmt_pp <- varmt_pp_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.ppt_pJunSep,z.tmax_JunAug,
+                z.BAL,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.n_ppt,z.n_tmp)
+clim_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp)
+varmt_es <- varmt_es_z %>%
+  dplyr::select(PLT_CN,TRE_CN,Year,dds,z.DIA_C,z.CR,z.ppt_pJunSep,z.tmax_pAug,
+                z.BAL,z.SDI,z.SICOND,z.SLOPE,z.solrad_MayAug,z.n_ppt,z.n_tmp)
+clim_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                data = varmt_es)
+```
+
+```{r}
+lclim_df <- lmer(log(dds)~
+                  #tree variables
+                 I(log(DIA_C))+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+clim_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+#z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+clim_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+```
+
+#### random effect climate
+
+```{r}
+clim_rs_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+ 
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+ (1+z.ppt_pJunSep|FVS_LOC_CD)+(1|Year),
+                control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+clim_rs_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #z.CR+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1+z.tmax_JunAug|FVS_LOC_CD)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+clim_rs_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1+z.ppt_pJunSep|FVS_LOC_CD)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+VarCorr(clim_rs_df)
+VarCorr(clim_rs_pp)
+VarCorr(clim_rs_es)
+```
+
+```{r}
+#plot r2
+r2_df <- as.data.frame(r2beta(clim_rs_df))
+r2_df$model <- "Douglas fir"
+r2_pp <- as.data.frame(r2beta(clim_rs_pp))
+r2_pp$model <- "Ponderosa pine"
+r2_es <- as.data.frame(r2beta(clim_rs_es))
+r2_es$model <- "Engelmann spruce"
+r2_rs <- bind_rows(r2_df,r2_pp) %>%
+  bind_rows(.,r2_es)
+#write.csv(r2_rs,file = "./data/formatted/r2_rs.csv")
+#edit effect names and reload
+```
+```{r }
+r2_rs <- read_csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_rs.csv")
+ggplot(data = r2_rs,aes(color = model)) + 
+  geom_pointrange(data = r2_rs,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+```
+
+
+```{r }
+r2_clim <- read_csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_clim.csv")
+ggplot(data = r2_clim,aes(color = model)) + 
+  geom_pointrange(data = r2_clim,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+```
+
+
+### Climate Normals
+
+```{r}
+n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 #z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 #z.n_tmp:z.ppt_pJunSep+
+                 #z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df)
+n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     #z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp)
+n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es)
+```
+
+```{r}
+#plot r2
+r2_df <- as.data.frame(r2beta(n_df))
+r2_df$model <- "Douglas fir"
+r2_pp <- as.data.frame(r2beta(n_pp))
+r2_pp$model <- "Ponderosa pine"
+r2_es <- as.data.frame(r2beta(n_es))
+r2_es$model <- "Engelmann spruce"
+r2_n <- bind_rows(r2_df,r2_pp) %>%
+  bind_rows(.,r2_es)
+#write.csv(r2_n,file = "./data/formatted/r2_n.csv")
+#edit effect names and reload
+```
+
+```{r }
+r2_n <- read_csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_n.csv")
+ggplot(data = r2_n,aes(color = model)) + 
+  geom_pointrange(data = r2_n,aes(x = Effect, y = Rsq,ymin = lower.CL, ymax = upper.CL))
+```
+
+## Description
+
+```{r}
+#load fvs output
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/proj_foc.Rdata")
+```
+
+```{r}
+proj_foc <- proj_foc %>%
+  mutate(PLT_CN = as.numeric(PLT_CN),
+         DIA_fvs = DBH) %>%
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA_fvs) %>%
+  filter(Year <= 2060)
+```
+
+
+## Reduced Climate Model
+
+load data
+
+```{r}
+#reduced tree ring
+#load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/tr_an.Rdata")
+#reduced climate model
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_acc85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_bcc26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_bcc85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_bccm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_can26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_can85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ccs26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ccs85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ces26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ces85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_cesb85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_cmcb85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_cnm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_csr26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_csr85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_fgl26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_fgl85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_fio26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_fio85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfc26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfc85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfg26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfg85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfm26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gfm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gis26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_gis85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_had26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_had85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_hada26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_hada85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_hadc85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_inm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ipl85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ipm26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_ipm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mir26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mir85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mpl26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mpl85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mpm26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mpm85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mrc26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mrc85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mre26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mre85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mri26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_mri85.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_nor26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/normals/nint_nor85.Rdata")
+```
+
+
+
+```{r}
+#condense and combine tree ring only
+proj_tr <- tr_an %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_tr = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_tr) %>%
+  inner_join(.,proj_foc)%>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_tr = DIA_tr - lag(DIA_tr),
+         dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_dff = dg_tr - dg_fvs,
+         dbh_dff = DIA_tr - DIA_fvs,
+         pct_tr = ((DIA_tr - lag(DIA_tr))/lag(DIA_tr))*100,
+         pct_fvs = ((DIA_fvs - lag(DIA_fvs))/lag(DIA_fvs))*100,
+         pct_dff = pct_tr - pct_fvs)
+proj_tr <- proj_tr %>%
+  group_by(Year,SPCD) %>%
+  summarise(mnint_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff),
+            mn_pct = mean(pct_dff),
+            sd_pct = sd(pct_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "Reduced Annual")
+
+```
+
+
+```{r}
+ggplot(data=proj_tr, aes(x=Year, y=mn_dg, color=as.factor(SPCD))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dg-sd_dg), ymax=(mn_dg+sd_dg)), linetype=2, alpha = .2) +
+  ylab("Mean Difference in Diameter Increment") +
+  labs(y = "Mean Difference in Diameter Increment", color = "Species") +
+  theme_bw()
+ggplot(data=proj_tr, aes(x=Year, y=mn_dbh, color=as.factor(SPCD))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dbh-sd_dbh), ymax=(mn_dbh+sd_dbh)), linetype=2, alpha = .2) +
+  ylab("Mean Difference in Diameter Increment") +
+  labs(y = "Mean Difference in Diameter Increment", color = "Species") +
+  theme_bw()
+ggplot(data=proj_tr, aes(x=Year, y=mn_pct, color=as.factor(SPCD))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_pct-sd_pct), ymax=(mn_pct+sd_pct)), linetype=2, alpha = .2) +
+  labs(y = "Mean Difference in Diameter Increment Percent Change", color = "Species") +
+  theme_bw()
+#need to standardize sd/mean for different sample sizes?
+```
+
+
+```{r}
+plt_no_fclim <- red_bcc85 %>% filter(is.na(DIA))
+plt_no_fclim <- unique(plt_no_fclim$PLT_CN)
+#condense and combine tree ring only
+proj_red26 <- red_bcc26 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_red26 <- proj_red26 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "red26")
+
+proj_red85 <- red_bcc85 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_red85 <- proj_red85 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "Reduced Climate")
+```
+
+```{r}
+proj_n26 <- n_bcc26 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_n26 <- proj_n26 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "n26")
+
+proj_n85 <- n_bcc85 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_n85 <- proj_n85 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "Reduced Climate Normals")
+```
+
+```{r}
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/nint_bcc26.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/nint_bcc85.Rdata")
+proj_nint26 <- nint_bcc26 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_nint26 <- proj_nint26 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "nint26")
+
+proj_nint85 <- nint_bcc85 %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>%
+  mutate(DIA_red = DIA) %>%
+  dplyr::select(PLT_CN, TRE_CN, SPCD, Year, DIA_red) %>%
+  inner_join(.,proj_foc) %>%
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_fvs = DIA_fvs - lag(DIA_fvs),
+         dg_red = DIA_red - lag(DIA_red),
+         dg_dff = dg_red - dg_fvs,
+         dbh_dff = DIA_red - DIA_fvs)
+proj_nint85 <- proj_nint85 %>%
+  group_by(Year,SPCD) %>%
+  summarise(mn_dg = mean(dg_dff),
+            sd_dg = sd(dg_dff),
+            mn_dbh = mean(dbh_dff),
+            sd_dbh = sd(dbh_dff)) %>%
+  filter(Year >= 2020) %>%
+  mutate(model = "Normals + Interactions")
+```
+
+
+```{r}
+proj_all <- bind_rows(proj_tr,proj_red85) %>%
+  #bind_rows(.,proj_tr) %>%
+  #bind_rows(.,proj_n26) %>%
+  bind_rows(.,proj_n85) %>%
+  #bind_rows(.,proj_nint26) %>%
+  bind_rows(.,proj_nint85)
+proj_dg_all <- ggplot(data=proj_all, aes(x=Year, y=mn_dg, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dg-sd_dg), ymax=(mn_dg+sd_dg)), linetype=2, alpha = .2) +
+  facet_wrap(~ SPCD, ncol = 2, scales = "free") +
+  labs(y = "Mean Difference in Diameter Increment (inches per 5 years)", color = "model") +
+  theme_bw() +
+  theme(legend.position = c(0.8, 0.2))
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dg_all.png", proj_dg_all)
+```
+
+```{r}
+proj_df <- proj_all %>%
+  filter(SPCD == 202)
+proj_dg_df <- ggplot(data=proj_df, aes(x=Year, y=mn_dg, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dg-sd_dg), ymax=(mn_dg+sd_dg)), linetype=2, alpha = .2) +
+  labs(title = "Douglas fir",y = "Mean Difference in Diameter Increment (inches per 5 years)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dg_df.png", proj_dg_df)
+proj_dbh_df <- ggplot(data=proj_df, aes(x=Year, y=mn_dbh, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dbh-sd_dbh), ymax=(mn_dbh+sd_dbh)), linetype=2, alpha = .2) +
+  labs(title = "Douglas fir",y = "Mean Difference in Diameter (inches)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dbh_df.png", proj_dbh_df)
+#need to standardize sd/mean for different sample sizes?
+```
+
+
+```{r}
+proj_pp <- proj_all %>%
+  filter(SPCD == 122)
+proj_dg_pp <- ggplot(data=proj_pp, aes(x=Year, y=mn_dg, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dg-sd_dg), ymax=(mn_dg+sd_dg)), linetype=2, alpha = .2) +
+  labs(title = "Ponderosa pine",y = "Mean Difference in Diameter Increment (inches per 5 years)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dg_pp.png", proj_dg_pp,
+       height = , width = )
+proj_dbh_pp <- ggplot(data=proj_pp, aes(x=Year, y=mn_dbh, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dbh-sd_dbh), ymax=(mn_dbh+sd_dbh)), linetype=2, alpha = .2) +
+  labs(title = "Ponderosa pine",y = "Mean Difference in Diameter (inches)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dbh_pp.png", proj_dbh_pp)
+```
+
+```{r}
+proj_es <- proj_all %>%
+  filter(SPCD == 93)
+proj_dg_es <- ggplot(data=proj_es, aes(x=Year, y=mn_dg, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dg-sd_dg), ymax=(mn_dg+sd_dg)), linetype=2, alpha = .2) +
+  labs(title = "Engelmann spruce",y = "Mean Difference in Diameter Increment (inches per 5 years)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dg_es.png", proj_dg_es)
+proj_dbh_es <- ggplot(data=proj_es, aes(x=Year, y=mn_dbh, color=as.factor(model))) + 
+  geom_line() +
+  geom_ribbon(aes(ymin=(mn_dbh-sd_dbh), ymax=(mn_dbh+sd_dbh)), linetype=2, alpha = .2) +
+  labs(title = "Engelmann spruce",y = "Mean Difference in Diameter (inches)", color = "model") +
+  theme_bw()
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dbh_es.png", proj_dbh_es)
+```
+
+## Summarize output
+
+```{r}
+#prep fvs
+#load fvs output
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/proj_foc.Rdata")
+#get observations
+#don't want second projection before 2020
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/red clim/red_acc85.Rdata')
+obs <-  red_acc85 %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR) %>%
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA)
+plt_no_fclim <- red_acc85 %>% filter(Year < 2060) %>% filter(is.na(DIA)) #error - some climate data didn't match
+plt_no_fclim <- unique(plt_no_fclim$PLT_CN) #remove these plots
+rm(red_acc85)
+
+colnames(proj_foc)[colnames(proj_foc)=="DIA"] <- "DIA_0" #more intuitive column names
+colnames(proj_foc)[colnames(proj_foc)=="DBH"] <- "DIA"
+fvs <- proj_foc %>%
+  mutate(PLT_CN = as.numeric(PLT_CN)) %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>% #remove
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA_0,DIA) %>%
+  filter(Year >= 2020 & Year <= 2060) %>% #remove projection before 2020
+  bind_rows(obs) %>% #add back observations
+  arrange(Year) %>%
+  group_by(TRE_CN) %>%
+  mutate(dg_5 = DIA - lag(DIA),
+         pct_5 = ((DIA - lag(DIA))/lag(DIA))*100,
+         dg_cum = max(DIA) - min(DIA),
+         pct_cum = ((max(DIA) - min(DIA))/min(DIA))*100,
+         model = as.factor("fvs"))
+rm(proj_foc)
+
+#dbh summary output
+dia_sum_op <- fvs %>%
+    dplyr::select(PLT_CN,TRE_CN,SPCD,model,Year,DIA,dg_5,pct_5) %>%
+    filter(Year > 2020) %>%
+    mutate(bins = cut(DIA, 
+                      breaks=c(3,8,13,18,23,28,33,38), 
+                      labels=c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))) %>%
+    group_by(SPCD,model,bins) %>%
+    summarise(mn_dg = mean(dg_5),
+              mn_pct = mean(pct_5))
+saveRDS(dia_sum_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_sum_op.rds")
+
+#mixed model output
+mm_op <- data.frame(model = character(), SPCD = double(),
+                      dg.diff = double(),
+                      dg.se = double(),
+                      pct.diff = double(),
+                      pct.se = double(),
+                      rcp = factor())
+saveRDS(mm_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/mm_op.rds")
+
+#t test output
+ttest_op <- data.frame(model = character(), SPCD = double(),
+                     dg.diff = double(),
+                     dg.cilo = double(),
+                     dg.cihi = double(),
+                     pct.diff = double(),
+                     pct.cilo = double(),
+                     pct.cihi = double(),
+                     rcp = factor())
+saveRDS(ttest_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/ttest_op.rds")
+```
+
+```{r}
+#get file names
+full_paths <- paste0('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/', 
+                     dir('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/'))
+
+#run function over each file, or model output
+lapply(full_paths, function(x) {
+  
+  filename <- word(x, -1, sep = '/')
+  file_string <- str_remove(filename, '.rds')
+  model_name <- word(file_string, 1, sep = "_")
+  rcp <- str_sub(file_string, start = -2)
+  
+  fvs_red <- fvs %>%
+    dplyr::select(TRE_CN,SPCD,Year)
+  
+  new_mod <- readRDS(file = x)
+  new_mod <- new_mod %>%
+    filter(!(PLT_CN %in% plt_no_fclim)) %>% #remove
+    dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA) %>%
+    inner_join(fvs_red) %>% #should filter for every five years and remove plots where climate didn't match
+    arrange(Year) %>%
+    group_by(TRE_CN) %>%
+    mutate(dg_5 = DIA - lag(DIA),
+           pct_5 = ((DIA - lag(DIA))/lag(DIA))*100,
+           dg_cum = max(DIA) - min(DIA),
+           pct_cum = ((max(DIA) - min(DIA))/min(DIA))*100,
+           model = model_name)
+  
+  #dbh summary script
+  dia_sum_df <- new_mod %>%
+    dplyr::select(PLT_CN,TRE_CN,SPCD,model,Year,DIA,dg_5,pct_5) %>%
+    filter(Year > 2020) %>%
+    mutate(bins = cut(DIA, 
+                      breaks=c(3,8,13,18,23,28,33,38), 
+                      labels=c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))) %>%
+    group_by(SPCD,model,bins) %>%
+    summarise(mn_dg = mean(dg_5),
+              mn_pct = mean(pct_5)) %>%
+    mutate(rcp = rcp)
+  #bind to all model summary
+  dia_sum_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_sum_op.rds")
+  dia_sum_op <- bind_rows(dia_sum_op,dia_sum_df)
+  saveRDS(dia_sum_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_sum_op.rds")
+  rm(dia_sum_op)
+  
+  #mixed model script
+  require(lme4)
+  #stacked df
+  mm_df <- bind_rows(new_mod,fvs) %>%
+    filter(Year == 2060) %>%
+    dplyr::select(PLT_CN, TRE_CN, SPCD, model, dg_cum, pct_cum) %>%
+    distinct() #just to make sure not getting replicate trees in there
+  #make sure fvs is first level in order to get difference in estimate
+  mm_df$model <- factor(mm_df$model, levels = c("fvs", model_name))
+  mm_df$SPCD <- factor(mm_df$SPCD, levels = c("93", "122", "202"))
+  
+  mod_comp_dg <- lmer(dg_cum ~ model*SPCD + (1|TRE_CN),
+                        data = mm_df)
+  mod_comp_pct <- lmer(pct_cum ~ model*SPCD + (1|TRE_CN),
+                        data = mm_df)
+  mm_comp_df <- data.frame(model = model_name, SPCD = c(93,122,202),
+                      dg.diff = summary(mod_comp_dg)$coef[c(2,5,6),1],
+                      dg.se = summary(mod_comp_dg)$coef[c(2,5,6),2],
+                      pct.diff = summary(mod_comp_pct)$coef[c(2,5,6),1],
+                      pct.se = summary(mod_comp_pct)$coef[c(2,5,6),2],
+                      rcp = rcp)
+  mm_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/mm_op.rds")
+  mm_op <- bind_rows(mm_op,mm_comp_df)
+  saveRDS(mm_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/mm_op.rds")
+  rm(mm_op)
+  
+  #t.test script
+  #join
+  fvs_t <- fvs %>%
+    mutate(fvs_dg = dg_cum,
+           fvs_pct = pct_cum) %>%
+    dplyr::select(PLT_CN,TRE_CN,SPCD,fvs_dg,fvs_pct) %>%
+    distinct()
+  t_df <- new_mod %>%
+    dplyr::select(PLT_CN,TRE_CN,SPCD,dg_cum,pct_cum) %>%
+    distinct() %>%
+    inner_join(.,fvs_t)
+  #dg
+  test_dg_df <- t.test(t_df$dg_cum[t_df$SPCD == 202],t_df$fvs_dg[t_df$SPCD == 202], 
+                       paired = TRUE, alternative = "two.sided")
+  test_dg_pp <- t.test(t_df$dg_cum[t_df$SPCD == 122],t_df$fvs_dg[t_df$SPCD == 122], 
+                       paired = TRUE, alternative = "two.sided")
+  test_dg_es <- t.test(t_df$dg_cum[t_df$SPCD == 93],t_df$fvs_dg[t_df$SPCD == 93], 
+                       paired = TRUE, alternative = "two.sided")
+  #pct
+  test_pct_df <- t.test(t_df$pct_cum[t_df$SPCD == 202],t_df$fvs_pct[t_df$SPCD == 202], 
+                       paired = TRUE, alternative = "two.sided")
+  test_pct_pp <- t.test(t_df$pct_cum[t_df$SPCD == 122],t_df$fvs_pct[t_df$SPCD == 122], 
+                       paired = TRUE, alternative = "two.sided")
+  test_pct_es <- t.test(t_df$pct_cum[t_df$SPCD == 93],t_df$fvs_pct[t_df$SPCD == 93], 
+                       paired = TRUE, alternative = "two.sided")
+  
+  t_op <- data.frame(model = model_name, SPCD = c(93, 122, 202),
+                     dg.diff = c(test_dg_es$estimate,test_dg_pp$estimate,test_dg_df$estimate),
+                     dg.cilo = c(test_dg_es$conf.int[1],test_dg_pp$conf.int[1],test_dg_df$conf.int[1]),
+                     dg.cihi = c(test_dg_es$conf.int[2],test_dg_pp$conf.int[2],test_dg_df$conf.int[2]),
+                     pct.diff = c(test_pct_es$estimate,test_pct_pp$estimate,test_pct_df$estimate),
+                     pct.cilo = c(test_pct_es$conf.int[1],test_pct_pp$conf.int[1],test_pct_df$conf.int[1]),
+                     pct.cihi = c(test_pct_es$conf.int[2],test_pct_pp$conf.int[2],test_pct_df$conf.int[2]),
+                     rcp = rcp)
+  ttest_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/ttest_op.rds")
+  ttest_op <- bind_rows(ttest_op,t_op)
+  saveRDS(ttest_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/ttest_op.rds")
+  rm(new_mod,ttest_op)
+})
+
+```
+
+```{r}
+#should check out validation dataset
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/val_dset.Rdata')
+ggplot(val_dset, aes(x = DIA, color = as.factor(SPCD))) +
+  geom_histogram(fill="white", position="dodge") +
+  theme_bw() + labs(main = 'Validation Data Set')
+#projection
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/proj_dset.Rdata')
+ggplot(proj_dset, aes(x = DIA, color = as.factor(SPCD))) +
+  geom_histogram(fill="white", position="dodge") +
+  theme_bw() + labs(main = 'Projection Data Set')
+
+ggplot(proj_dset[proj_dset$SPCD == 202,],aes(x = DIA)) +
+  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
+  theme_bw() + labs(main = 'Projection Data Set')
+
+ggplot(proj_dset[proj_dset$SPCD == 122,],aes(x = DIA)) +
+  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
+  theme_bw() + labs(main = 'Projection Data Set')
+
+ggplot(proj_dset[proj_dset$SPCD == 93,],aes(x = DIA)) +
+  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
+  theme_bw() + labs(main = 'Projection Data Set')
+
+#rug
+rug_dg <- ggplot(proj_dset[proj_dset$SPCD == 202,],aes(x = DIA, y = DIA)) +
+  geom_rug(alpha = 0.5, sides = "b") +
+  theme_bw() + theme(axis.ticks = element_blank()) +
+  xlim(0,40)
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/rug_df.png",
+       width = 10, height = 3, units = "in")
+
+ggplot(proj_dset[proj_dset$SPCD == 122,],aes(x = DIA, y = DIA)) +
+  geom_rug(alpha = 0.5, sides = "b") +
+  theme_bw() + labs(main = 'Projection Data Set') +
+  xlim(0,40)
+
+ggplot(proj_dset[proj_dset$SPCD == 93,],aes(x = DIA, y = DIA)) +
+  geom_rug(alpha = 0.3, sides = "b") +
+  theme_bw() + labs(main = 'Projection Data Set') +
+  xlim(0,40)
+```
+
+
+```{r}
+#function which
+proj_mm <- function(fvs,new_mods, rcp, trbl_plt){
+  require(tidyverse)
+  
+  sp_df <- data.frame()
+  
+  for(i in 1:length(new_mods)){
+    mod_name <- names(new_mods)[i]
+    mod_new <- new_mods[[i]]
+    #get observations
+    obs <- mod_new %>%
+      group_by(TRE_CN) %>% #for each tree
+      filter(Year == MEASYEAR) %>% #select observations
+      dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA)
+    
+    #fvs df
+    fvs <- fvs %>%
+      mutate(PLT_CN = as.numeric(PLT_CN),
+             DIA = DBH) %>%
+      dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA) %>%
+      filter(Year >= 2020 & Year <= 2060) %>%
+      bind_rows(obs) %>%
+      arrange(Year) %>%
+      group_by(TRE_CN) %>%
+      mutate(dg = DIA - lag(DIA),
+             pct = ((DIA - lag(DIA))/lag(DIA))*100,
+             model = as.factor("fvs"))
+    
+    #new model df
+    #first new df of fvs to filter every 5 years
+    fvs_red <- fvs %>%
+      dplyr::select(TRE_CN,SPCD,Year)
+    mod_new <- mod_new %>%
+      dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA) %>%
+      inner_join(fvs_red) %>% #should filter for every five years
+      arrange(Year) %>%
+      group_by(TRE_CN) %>%
+      mutate(dg = DIA - lag(DIA),
+             pct = ((DIA - lag(DIA))/lag(DIA))*100,
+             model = as.factor(mod_name))
+    
+    #both models df
+    new_fvs <- bind_rows(mod_new,fvs) %>%
+      mutate(SPCD = as.factor(SPCD)) %>%
+      filter(Year > 2020)
+    #make sure fvs is first level in order to get difference in estimate
+    new_fvs$model <- factor(new_fvs$model, levels = c("fvs", mod_name))
+    
+    #species-specific mixed model
+    require(lme4)
+    #df
+    new_fvs_df <- 
+    mod_comp_df <- lmer(pct ~ model*SPCD*Year + (1|TRE_CN),
+                     data = new_fvs)
+  }
+  
+  
+}
+```
+
+
+
+```{r}
+#average rcp26
+red_26 <- list(bcc = red_bcc26, can = red_can26, ccs = red_ccs26,
+               ces = red_ces26, csr = red_csr26, fgl = red_fgl26,
+               fio = red_fio26, gfc = red_gfc26, gfg = red_gfg26,
+               gfm = red_gfm26, gis = red_gis26, had = red_had26,
+               hada = red_hada26, ipm = red_ipm26, mir = red_mir26,
+               mpl = red_mpl26, mpm = red_mpm26, mrc = red_mrc26,
+               mre = red_mre26, mri = red_mri26, nor = red_nor26)
+#average rcp85
+red_85 <- list(acc = red_acc85, bcc = red_bcc85, bccm = red_bccm85,
+               can = red_can85, ccs = red_ccs85, ces = red_ces85, 
+               cmc = red_cmc85, cnm = red_cnm85, csr = red_csr85, 
+               fgl = red_fgl85, fio = red_fio85, gfc = red_gfc85, 
+               gfg = red_gfg85, gfm = red_gfm85, gis = red_gis85, 
+               had = red_had85, hada = red_hada85, hadc = red_hadc85,
+               inm = red_inm85, ipl = red_ipl85,  ipm = red_ipm85, 
+               mir = red_mir85, mpl = red_mpl85, mpm = red_mpm85, 
+               mrc = red_mrc85, mre = red_mre85, mri = red_mri85, nor = red_nor85)
+
+```
+
+
+```{r}
+#visualize dg by diameter
+dia_sum_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_sum_op.rds")
+#summarize by model and rcp
+dia_sum_all <- dia_sum_op %>%
+  group_by(SPCD,model,rcp,bins) %>%
+    summarise(mn_dg_all = mean(mn_dg),
+              mn_pct_all = mean(mn_pct)) %>%
+  unite("scenario", model:rcp, na.rm = TRUE, remove = FALSE) %>%
+  separate(bins, c("start", "end"), "_")
+
+#allows for lines
+dia_sum_all$start <- as.numeric(dia_sum_all$start)
+#dia_sum_all$bins <- factor(dia_sum_all$bins,levels = c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))
+
+#relative growth
+ggplot(data = dia_sum_all, aes(x = start, y = mn_pct_all, color = scenario)) +
+  geom_line() + xlab("Diameter") +
+  facet_grid(.~SPCD)
+
+```
+
+```{r}
+#get difference with fvs
+dia_fvs <- dia_sum_op %>%
+  ungroup() %>%
+  filter(model == "fvs") %>%
+  mutate(fvs_pct = mn_pct) %>%
+  dplyr::select(SPCD,bins,fvs_pct)
+dia_diff_all <- dia_sum_op %>%
+  filter(model != "fvs") %>%
+  left_join(.,dia_fvs) %>%
+  mutate(pct_diff = mn_pct - fvs_pct,
+         DIA_class = ifelse(bins == "3_8", 5,
+                        ifelse(bins == "8_13", 10,
+                           ifelse(bins == "13_18", 15,
+                              ifelse(bins == "18_23", 20,
+                                 ifelse(bins == "23_28", 25,
+                                    ifelse(bins == "28_33", 30, 35))))))) %>%
+  dplyr::select(SPCD,model,rcp,bins,pct_diff,DIA_class) %>%
+  unite("scenario", model:rcp, na.rm = TRUE, remove = FALSE)
+dia_diff_all$bins <- factor(dia_diff_all$bins,levels = c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))
+#relevel scenario so reduced annual is in the middle
+dia_diff_all$scenario <- factor(dia_diff_all$scenario, levels = c("red_26","red_85","tr_an", "n_26", "n_85","nint_26","nint_85"))
+
+#too much information, get rid of normals + interactions
+dia_diff_df <- dia_diff_all %>% filter(SPCD == 202) %>% filter(model != "nint") 
+dia_diff_pp <- dia_diff_all %>% filter(SPCD == 122) %>% filter(model != "nint")
+dia_diff_es <- dia_diff_all %>% filter(SPCD == 93) %>% filter(model != "nint")
+
+
+#plot
+proj_dia_df <- ggplot(data = dia_diff_df, aes(x = bins, y = pct_diff)) +
+  geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
+  scale_fill_manual(values=c("grey81","gray44","grey81","gray44")) +
+  stat_summary(fun="mean",color="dodgerblue3", geom="point", aes(shape = scenario), size=2,
+               position=position_dodge(width=.55)) +
+  scale_shape_manual(values=c(2,2,1,3,3)) +
+  geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
+  theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_df.png",
+       width = 10, height = 3, units = "in")
+
+proj_dia_pp <- ggplot(data = dia_diff_pp, aes(x = bins, y = pct_diff)) +
+  geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
+  scale_fill_manual(values=c("grey81","gray44","grey81","gray44")) +
+  stat_summary(fun="mean",color="dodgerblue3", geom="point", aes(shape = scenario), size=2,
+               position=position_dodge(width=.55)) +
+  scale_shape_manual(values=c(2,2,1,3,3))  +
+  geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
+  theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_pp.png",
+       width = 10, height = 3, units = "in")
+
+proj_dia_es <- ggplot(data = dia_diff_es, aes(x = bins, y = pct_diff)) +
+  geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
+  scale_fill_manual(values=c("grey81","gray44","grey81","gray44")) +
+  stat_summary(fun="mean",color="dodgerblue3", geom="point", aes(shape = scenario), size=2,
+               position=position_dodge(width=.55)) +
+  scale_shape_manual(values=c(2,2,1,3,3))  +
+  geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
+  theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_es.png",
+       width = 10, height = 3, units = "in")
+
+
+```
+
+```{r}
+#visualize ttest
+ttest_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/ttest_op.rds")
+ttest_op$model <- factor(ttest_op$model, levels = c("tr","red", "n","nint"), 
+                          labels = c("Reduced Annual","Reduced Climate", "Climate Normals", "Normals + Interactions"))
+ttest_op$rcp <- factor(ttest_op$rcp, levels = c("an","26", "85"), 
+                          labels = c("No Climate","RCP2.6", "RCP8.5")) 
+ttest_op$rcp <- factor(ttest_op$rcp, levels = c("No Climate","RCP2.6", "RCP8.5")) 
+
+#get average
+ttest_all <- ttest_op %>%
+  group_by(model,rcp,SPCD) %>%
+  summarise(mn.dg.dif = mean(dg.diff),
+            mn.pct.dif = mean(pct.diff)) #%>%
+  #unite("scenario", model:rcp, na.rm = TRUE, remove = FALSE)
+
+#plot
+proj_cum_df <- ggplot(ttest_op[ttest_op$SPCD == 202,], aes(x = rcp, y = pct.diff, color = model)) +
+  #add rcp26 rect
+  geom_rect(xmin = as.numeric(ttest_op$rcp[[3]]) - 1.5,
+            xmax = as.numeric(ttest_op$rcp[[3]]) - 0.5, 
+            ymin = -Inf, ymax = Inf,
+            fill = "grey81", alpha =.2) +
+  #add rcp285 rect
+  geom_rect(xmin = as.numeric(ttest_op$rcp[[3]]) - 0.5,
+            xmax = as.numeric(ttest_op$rcp[[3]]) + Inf, 
+            ymin = -Inf, ymax = Inf,
+            fill = "gray44", alpha =.2) +
+  geom_violin(show.legend = F) +
+  scale_color_manual(values = c("black","black","black","black")) +
+  #facet_grid(.~as.factor(SPCD)) +
+  geom_point(data = ttest_all[ttest_all$SPCD == 202,], 
+             aes(x = as.factor(rcp), y = mn.pct.dif, shape = model), 
+             size = 2, color = "dodgerblue3",
+             position=position_dodge(width = 0.9)) +
+  scale_shape_manual(values=c(1,2,3,8)) +# change shape 
+  theme_bw() + labs(x = "Climate Scenario", y = "Difference in cumulative relative growth")
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_cum_df.png",
+       width = 5, height = 3, units = "in")
+```
+
+
