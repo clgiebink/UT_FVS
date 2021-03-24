@@ -12,7 +12,7 @@ library(treeclim)
 load("./data/formatted/data_all.Rdata")
 #568 trees
 #climate data
-load("./data/formatted/clim_all.R")
+load("./data/formatted/clim_all.Rdata")
 #568 trees
 #give species info to trees to filter later
 clim_all$SPCD <- data_all$SPCD[match(clim_all$TRE_CN,data_all$TRE_CN)]
@@ -100,6 +100,7 @@ plot(dc1_DF)
 sc1_DF <- seascorr(rw_crn_DF,clim_df, 
                 primary = "prec", secondary = "temp")
 plot(sc1_DF)
+ggsave(filename = "./images/seas_df.png",sc1_DF)
 
 dc2_DF <- dcc(rw_crn_DF, clim_df, selection = 1:9, 
            dynamic = "moving", boot = "std", sb = FALSE)
@@ -108,7 +109,7 @@ plot(dc2_DF)
 
 #PP
 #create ring width dataframe (rwl) for dplR
-rw_data_PP <- incr_percov %>%
+rw_data_PP <- data_all %>%
   filter(SPCD == 122) %>%
   ungroup() %>%
   dplyr::select(TRE_CN, Year, RW)
@@ -141,7 +142,7 @@ tmax_pp <- clim_pp %>%
 tav_pp <- clim_pp %>%
   dplyr::select(Year, contains("tmin")) %>%
   pivot_longer(-Year,names_to = "var2",values_to = "tmin")%>%
-  mutate(tmax = tmax_df$tmax) %>%
+  mutate(tmax = tmax_pp$tmax) %>%
   rowwise() %>%
   mutate(temp = mean(c(tmax,tmin)))
 
@@ -152,14 +153,14 @@ ppt_pp <- clim_pp %>%
   dplyr::select(Year,month,prec)
 
 clim_pp <- ppt_pp %>%
-  mutate(temp = tav_df$temp)
+  mutate(temp = tav_pp$temp)
 
 #subset ring width data to correlate with climate
 rw_data_PP <- subset(rw_data_PP, rownames(rw_data_PP) > 1895) 
-max(rownames(rw_data_PP)) #last year will subset climate data; 1997
+max(rownames(rw_data_PP)) #last year will subset climate data; 1995
 
 #subset climate data to correlate with ring width
-clim_pp <- as.data.frame(clim_pp[clim_pp$Year <= 1997,])
+clim_pp <- as.data.frame(clim_pp[clim_pp$Year <= 1995,])
 
 
 #detrend and build chronology
@@ -217,7 +218,7 @@ tmax_es <- clim_es %>%
 tav_es <- clim_es %>%
   dplyr::select(Year, contains("tmin")) %>%
   pivot_longer(-Year,names_to = "var2",values_to = "tmin")%>%
-  mutate(tmax = tmax_df$tmax) %>%
+  mutate(tmax = tmax_es$tmax) %>%
   rowwise() %>%
   mutate(temp = mean(c(tmax,tmin)))
 
@@ -228,14 +229,14 @@ ppt_es <- clim_es %>%
   dplyr::select(Year,month,prec)
 
 clim_es <- ppt_es %>%
-  mutate(temp = tav_df$temp)
+  mutate(temp = tav_es$temp)
 
 #subset ring width data to correlate with climate
 rw_data_ES <- subset(rw_data_ES, rownames(rw_data_ES) > 1895) 
 max(rownames(rw_data_ES)) #last year will subset climate data; 1994
 
 #subset climate data to correlate with ring width
-clim_es <- as.data.frame(clim_es[clim_es$year <= 1994,])
+clim_es <- as.data.frame(clim_es[clim_es$Year <= 1994,])
 
 #detrend and build chronology
 rwi_nex_ES <- detrend(rwl = rw_data_ES, 
