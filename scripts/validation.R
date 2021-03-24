@@ -813,22 +813,26 @@ non_focal_stat <- non_focal %>%
 
 # what about plots that have a lot of die off?
 #change in BAL
-non_focal_red <- non_focal %>%
-  dplyr::select(PLT_CN,TRE_CN,DIA,fDIA,TPA_UNADJ,STATUSCD,fSTATUSCD,MEASYEAR,Year) %>%
-  filter(MEASYEAR == Year)
-non_foc_bal <- non_focal_red %>%
+den_val_red <- density_val %>%
+  dplyr::select(PLT_CN,TRE_CN,DIA,fDIA,TPA_UNADJ,STATUSCD,fSTATUSCD,MEASYEAR)
+non_foc_bal <- den_val_red %>%
   group_by(PLT_CN) %>%
   mutate(BA1 = sum(((DIA^2) * 0.005454) * TPA_UNADJ),
-         BA2 = sum(((fDIA[fSTATUSCD == 1]^2) * 0.005454) * TPA_UNADJ))
+         fDIA_c = ifelse(fSTATUSCD != 1, 0,
+                         ifelse(is.na(fDIA),DIA,fDIA)),
+         BA2 = sum(((fDIA_c^2) * 0.005454) * TPA_UNADJ),
+         n_mort = length(which(fSTATUSCD == 2)))
 
 non_foc_hist <- non_foc_bal %>%
-  dplyr::select(PLT_CN, BA1, BA2) %>%
+  dplyr::select(PLT_CN, BA1, BA2, n_mort) %>%
   distinct() %>%
   mutate(BA_diff = BA2 - BA1,
          BA_ratio = BA2/BA1)
 
 hist(non_foc_hist$BA_diff,breaks = 50, xlab = "BA2 - BA1", main = "Difference in basal area")
 hist(non_foc_hist$BA_ratio,breaks = 50, xlab = "BA2 / BA1", main = "Ratio of basal area")
+plot(x = non_foc_hist$n_mort, y = non_foc_hist$BA_diff,
+     xlab = "Number of Mortality Trees", ylab = "Difference in Basal Area")
 
 
 #interpolate dbh
@@ -2270,3 +2274,6 @@ pred_fclim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_al_df, mod_pp = cl
 pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
                             mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
                             bratio = bratio_df ,ccf_df = ccf_df, climate = clim_val)
+
+#check
+
