@@ -1810,8 +1810,8 @@ es_mods <- ggplot(data = models_es, aes(x = term, y = estimate, shape = model)) 
   scale_x_discrete(limits = rev(levels(models_pp$term))) +
   geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
   coord_flip() +
-  theme_bw() + ylab("Coefficient Estimate") + xlab("") +
-  theme(plot.title = element_text(face="bold"),
+  theme_bw() + labs(title = "a)", y = "Coefficient Estimate", x="") +
+  theme(#plot.title = element_text(face="bold"),
         legend.position = c(0.76,0.5),
         legend.background = element_rect(colour="grey80"),
         legend.title.align = 0.5)
@@ -1931,26 +1931,26 @@ ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/
 
 ```{r}
 clint <- plot_model(clim_red_es, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_pAug"),
-                    axis.title = c("Precip","dds"), legend.title = "Temp", title = "",
-                    colors = c("#FF9999", "#CC6666", "#660000")) +
+                    axis.title = c("Precip","dds"), title = "b) Temp",  show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
   theme_bw()
 nint1 <- plot_model(clim_n_es, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
-                    axis.title = c("Precip","dds"), legend.title = "Precip Normal", title = "",
-                    colors = c("#99CCFF","#3399FF","#003366")) +
+                    axis.title = c("Precip","dds"), title = "c) Precip Normal", show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
   theme_bw()
 nint2 <- plot_model(clim_n_es, type = "pred", terms = c("z.ppt_pJunSep","z.n_tmp"),
-                    axis.title = c("Precip","dds"), legend.title = "Temp Normal", title = "",
-                    colors = c("#FF9999", "#CC6666", "#660000")) +
+                    axis.title = c("Precip","dds"), title = "d) Temp Normal",  show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
   theme_bw()
 nint3 <- plot_model(clim_n_es, type = "pred", terms = c("z.tmax_pAug","z.n_tmp"),
-                    axis.title = c("Temp","dds"), legend.title = "Temp Normal", title = "",
-                    colors = c("#FF9999", "#CC6666", "#660000")) +
+                    axis.title = c("Temp","dds"), title = "e) Temp Normal",  show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
   theme_bw()
 #nint5 <- plot_model(clim_int_es, type = "pred", terms = c("z.ppt_pJunSep","z.SLOPE"),
 #                    axis.title = c("Precip","dds"), legend.title = "Slope", title = "")
 nint4 <- plot_model(clim_nint_es, type = "pred", terms = c("z.ppt_pJunSep","z.BAL"),
-                    axis.title = c("Precip","dds"), legend.title = "BAL", title = "",
-                    colors = c("#CCFFCC","#006600","#003300")) +
+                    axis.title = c("Precip","dds"), title = "f) BAL",  show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
   theme_bw()
 all_int <- grid.arrange(clint,nint1,nint2,nint3,nint4,ncol = 2)
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/eff_int_es.png", all_int, scale = .5)
