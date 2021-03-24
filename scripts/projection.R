@@ -1081,7 +1081,7 @@ proj_tst <- proj_dset %>%
   filter(is.na(ppt_Jan))
 
 
-# Density ----
+fvs# Density ----
 
 
 ##BAR method ----
@@ -1255,7 +1255,7 @@ TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_
   collect()
 #prep for merge
 fvs_proj_red <- fvs_treelist %>%
-  dplyr::select(PLT_CN, Year, TreeId, ActPt, SpeciesFIA, TPA, MortPA, DBH, DG, PctCr, PtBAL)
+  dplyr::select(PLT_CN, Year, TreeId, ActPt, SpeciesFIA, TPA, MortPA, DBH, DG)
 colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
 colnames(fvs_proj_red)[colnames(fvs_proj_red)=="SpeciesFIA"] <- "SPCD"
 colnames(fvs_proj_red)[colnames(fvs_proj_red)=="ActPt"] <- "SUBP"
@@ -1275,8 +1275,8 @@ n_tre <- fvs_proj %>%
 fvs_proj_red <- fvs_proj %>%
   mutate(TRE_CN = as.numeric(CN)) %>%
   filter(TPA > 0) %>% #remove dead (2) trees; comment out to check line below
-  filter(!(TRE_CN %in% proj_dset$TRE_CN)) %>% #remove focal trees
-  filter(Year < 2060) #keep projection short
+  filter(!(TRE_CN %in% proj_dset$TRE_CN)) #%>% #remove focal trees
+  #filter(Year < 2060) #keep projection short
 n_tre <- fvs_proj_red %>%
   dplyr::select(PLT_CN,TreeId,SUBP,SPCD) %>%
   distinct() #5678; reduced 2795 trees
@@ -1285,8 +1285,7 @@ length(unique(proj_dset$TRE_CN)) #so 176 not reduced
 #get data set with focal trees for visualization as well
 proj_foc <- fvs_proj %>%
   mutate(TRE_CN = as.numeric(CN)) %>%
-  filter(TRE_CN %in% proj_dset$TRE_CN) %>% #keep focal trees
-  filter(Year < 2060) #keep projection short
+  filter(TRE_CN %in% proj_dset$TRE_CN) #keep focal trees
 save(proj_foc, file = "./data/formatted/projection/proj_foc.Rdata")
 
 #remove plots were trees do not match
@@ -1310,31 +1309,34 @@ fvs_proj_red <- fvs_proj_red %>%
 fvs_proj_red <- fvs_proj_red %>%
   group_by(PLT_CN,TreeId,SUBP,SPCD) %>%
   arrange(desc(Year)) %>% 
-  mutate(DG_int = (lag(DBH) - DBH)/10,
-         mort_int = lag(MortPA)/10)
+  mutate(n_yr = lag(Year) - Year,
+         DG_int = (lag(DBH) - DBH)/n_yr,
+         mort_int = lag(MortPA)/n_yr)
 
 #interpolate dbh
 #mortality is applied over trees per acre so interpolate tpa
 
+
 #interpolate dbh
 int_fvs <- function(data){
-  end <- data %>% filter(Year >= 2050) %>%
+  end <- data %>% filter(Year == 2100) %>%
     mutate(Year_int = Year,
            DIA_int = DBH,
            TPA_UNADJ = TPA)
-  data_red <- data %>% filter(Year < 2050) %>%
+  data_red <- data %>% filter(Year < 2100) %>%
     arrange(Year)
   for(i in 1:nrow(data_red)){
+    n_g_yr <- data_red$n_yr[i]
     tre_yr_df <- data_red[i,] %>%
-      slice(rep(1:n(), each = 10)) %>%
-      mutate(Year_int =  Year[1]:(Year[1]+9),
+      slice(rep(1:n(), each = n_g_yr)) %>%
+      mutate(Year_int =  Year[1]:(Year[1]+(n_g_yr-1)),
              DIA_int = NA,
              TPA_UNADJ = NA)
     N <- which(tre_yr_df$Year_int == tre_yr_df$Year[1])
     tre_yr_df$DIA_int[N] <- tre_yr_df$DBH[N] #dbh when year and measure year are equal
     tre_yr_df$TPA_UNADJ[N] <- tre_yr_df$TPA[N]
     Curr_row <- N+1 #each time through subtract 1 and move down one row
-    while(Curr_row <= 10){
+    while(Curr_row <= n_g_yr){
       DIA_1 <- tre_yr_df$DIA_int[Curr_row-1]
       tre_yr_df$DIA_int[Curr_row] <- DIA_1 + tre_yr_df$DG_int[Curr_row]
       TPA_1 <- tre_yr_df$TPA_UNADJ[Curr_row-1]
@@ -1357,28 +1359,29 @@ save(proj_nonf, file = './data/formatted/proj_nonf.Rdata')
 fvs_tpa_foc <- fvs_proj %>%
   mutate(TRE_CN = as.numeric(CN)) %>%
   filter(TRE_CN %in% proj_dset$TRE_CN) %>% #keep focal trees
-  filter(Year < 2060) %>%
   group_by(PLT_CN,TRE_CN) %>%
   arrange(desc(Year)) %>% 
-  mutate(mort_int = lag(MortPA)/10)
+  mutate(n_yr = lag(Year) - Year,
+         mort_int = lag(MortPA)/n_yr)
 #function to interpolate just tpa
 int_tpa_fvs <- function(data){
-  end <- data %>% filter(Year >= 2050) %>%
+  end <- data %>% filter(Year == 2100) %>%
     mutate(Year_int = Year,
            TPA_UNADJ = TPA) %>%
     dplyr::select(PLT_CN,TRE_CN,Year_int,TPA_UNADJ)
-  data_red <- data %>% filter(Year < 2050) %>%
+  data_red <- data %>% filter(Year < 2100) %>%
     arrange(Year)
   for(i in 1:nrow(data_red)){
+    n_g_yr <- data_red$n_yr[i]
     tre_yr_df <- data_red[i,] %>%
-      slice(rep(1:n(), each = 10)) %>%
-       mutate(Year_int =  Year[1]:(Year[1]+9),
+      slice(rep(1:n(), each = n_g_yr)) %>%
+       mutate(Year_int =  Year[1]:(Year[1]+(n_g_yr-1)),
              TPA_UNADJ = NA)
     mort_c <- tre_yr_df$mort_int[1]
     N <- which(tre_yr_df$Year_int == tre_yr_df$Year[1])
     tre_yr_df$TPA_UNADJ[N] <- tre_yr_df$TPA[N] #tpa when year and measure year are equal
     Curr_row <- N+1 #each time through subtract 1 and move down one row
-    while(Curr_row <= 10){
+    while(Curr_row <= n_g_yr){
       TPA_1 <- tre_yr_df$TPA_UNADJ[Curr_row-1]
       tre_yr_df$TPA_UNADJ[Curr_row] <- TPA_1 - mort_c
       #continue loop for next row until curr_row>0
@@ -1414,16 +1417,118 @@ proj_dtst <- proj_dset %>%
          BAL = NA,
          SDI = NA)
 
+# Climate-FVS ----
+
+clim_fvs_proj <- proj_dset %>%
+  mutate(Ele = ELEV/3.28) %>%
+  dplyr::select(PLT_CN,LON,LAT,Ele) %>%
+  distinct()
+write.table(clim_fvs_proj, file = "./data/formatted/clim_fvs_proj.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = FALSE, col.names = TRUE)
+
+#climate-ready fvs data
+#http://charcoal.cnre.vt.edu/climate/customData/fvs_data.php
+
+#ensemble of 17 AR5 model predictions, rcp85
+#get output from fvs runs
+#tree list table
+fvs_treelist <- read_csv(file = "./data/raw/FVS/fvs_85.csv")
+length(unique(fvs_treelist$StandID))
+#mostly to convert 093 -> 93
+fvs_treelist$SpeciesFIA <- as.numeric(fvs_treelist$SpeciesFIA)
+fvs_red <- fvs_treelist %>%
+  dplyr::select(StandID,Year,PrdLen,TreeId,TreeIndex,SpeciesFIA,DBH,DG,PctCr,ActPt) %>%
+  filter(SpeciesFIA %in% c(93,122,202)) %>%
+  filter(DBH >= 3) #growth model threshold
+length(unique(fvs_red$StandID)) #should match above
+
+#connect to fvs ready database for validation data
+library(dbplyr)
+library(RSQLite)
+fvs_val_db <- dbConnect(RSQLite::SQLite(), "./data/raw/FVS/FVS_val.db")
+#Extract FVS_StandInit_Plot table
+#has the link between stand_cn (aka plt_cn) and stand_id
+fvsStandInitPlot<-dbReadTable(fvs_val_db, 'FVS_STANDINIT_PLOT')
+# Disconnect from the database
+dbDisconnect(fvs_val_db)
+std2plt <- fvsStandInitPlot %>%
+  dplyr::select(STAND_CN,STAND_ID)
+length(unique(std2plt$STAND_ID))
+#stand_cn = plt_cn
+fvs_red$PLT_CN <- std2plt$STAND_CN[match(fvs_red$StandID,std2plt$STAND_ID)]
+length(unique(fvs_red$PLT_CN))
+
+#separate observations from predictions
+fvs_obs <- fvs_red %>%
+  filter(DG == 0) %>%
+  select(-DG)
+dim(fvs_obs) 
+length(unique(fvs_obs$PLT_CN))
+
+fvs_pred <- fvs_red %>%
+  filter(DG != 0) %>%
+  select(-c("PrdLen"))
+dim(fvs_pred) 
+length(unique(fvs_pred$PLT_CN))
+
+#rename columns to be able to merge
+colnames(fvs_obs)[colnames(fvs_obs)=="Year"] <- "MEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="Year"] <- "fMEASYEAR"
+colnames(fvs_pred)[colnames(fvs_pred)=="DBH"] <- "eDBH"
+colnames(fvs_pred)[colnames(fvs_pred)=="PctCr"] <- "CR2"
+
+#merge 
+fvs_obs_pred <- left_join(fvs_obs,fvs_pred)
+#tree index > 2000 means trees died in projection?
+
+#validation dataset for future observations
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+TREE <- dbReadTable(UT_FIA, 'TREE')
+TREE_red <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, SPCD, SUBP, TREE, DIA, PREV_TRE_CN, STATUSCD FROM TREE")) %>%
+  collect()
+TREE_red$fDIA <- TREE$DIA[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#get status (dead or alive) of trees at remeasurement
+TREE_red$fSTATUSCD <- TREE$STATUSCD[match(TREE_red$CN,TREE$PREV_TRE_CN)]
+#prep for merge
+colnames(TREE_red)[colnames(TREE_red)=="TREE"] <- "TreeId"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="SpeciesFIA"] <- "SPCD"
+colnames(fvs_obs_pred)[colnames(fvs_obs_pred)=="ActPt"] <- "SUBP"
+# Disconnect from the database
+dbDisconnect(UT_FIA)
+
+#merge fvs runs and fia observations
+fvs_check <- left_join(fvs_obs_pred,TREE_red)
+length(unique(fvs_check$CN))
+#filter for trees that are alive at remeasurement
+fvs_check <- fvs_check %>%
+  filter(fSTATUSCD == 1)
+length(unique(fvs_check$CN))
+fvs_clim_red <- fvs_check %>%
+  mutate(TRE_CN = as.numeric(CN)) %>%
+  filter(TRE_CN %in% val_dset$TRE_CN)
+length(unique(fvs_check_red$CN))
+
+#are climate projections different from regular projections?
+fvs_clim_check <- fvs_check_red %>%
+  dplyr::select(TRE_CN,DIA,fDIA,eDBH)
+fvs_clim_check$eDBH_clim <- fvs_clim_red$eDBH[match(fvs_clim_check$TRE_CN,fvs_clim_red$TRE_CN)]
+fvs_clim_check <- fvs_clim_check %>%
+  mutate(diff_clim = eDBH - eDBH_clim) #0 no difference
+
 
 # Function ----
 
-proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df) {
+proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_fvs_df) {
   #parameters:
-  #data - trees from FIADB
-  data_rep <- data %>%
+  data <- data %>%
     ungroup() %>%
     mutate(PLT_CN = as.numeric(PLT_CN),
-           TRE_CN = as.numeric(TRE_CN)) %>%
+           TRE_CN = as.numeric(TRE_CN))
+  tpa_df <- tpa_df %>%
+    ungroup() %>%
+    mutate(PLT_CN = as.numeric(PLT_CN))
+  #tpa_df - updated tpa from fvs includes mortality
+  data_rep <- data %>%
     dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
                   DESIGNCD, CR,
                   ASPECT,SLOPE,sin,cos,LAT,LON,ELEV,
@@ -1433,7 +1538,8 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
            CCF = NA,
            PCCF = NA,
            BAL = NA,
-           SDI = NA)
+           SDI = NA,
+           CR_fvs = NA)
   ##density for new data in MEASYEAR will already be calculated
   #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
   for(i in 1:nrow(data_rep)){
@@ -1444,6 +1550,7 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
       data_rep$PCCF[i] <- data$PCCF[data$TRE_CN == TRE_CN]
       data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
       data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
+      data_rep$CR_fvs[i] <- data$CR[data$TRE_CN == TRE_CN]
     }
   }
   
@@ -1453,8 +1560,10 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
   #nonfocal - trees on the same plot as focal trees
   nonfocal <- nonfocal %>%
     ungroup() %>%
-    mutate(Year = Year_int,
-           DIA = DIA_int)
+    mutate(PLT_CN = as.numeric(PLT_CN),
+           TRE_CN = as.numeric(TRE_CN),
+           DIA = DIA_int,
+           Year = Year_int)
   #TODO expand nonfocal -> will fill in...how??
   ##will be used to compute density parameters
   #bratio - dataframe of bark ratio constants for equation
@@ -1489,7 +1598,7 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        #plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
         plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
@@ -1619,11 +1728,80 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
       
       density_cal <- density_cal %>%
         group_by(PLT_CN,Year) %>%
-        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6)) #stage
+        mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6), #stage
+               num_t = length(unique(TRE_CN)))
       
       #filter for focal trees
       plt_yr2_df <- density_cal %>%
         filter(TRE_CN %in% plt_yr_df$TRE_CN)
+      
+      #cr
+      for(i in 1:nrow(plt_yr2_df)){
+        #Function arguments:
+        #SPCD - is number code of species of tree record
+        #SDI - is SDI of stand (Stage 1968)
+        Species <- plt_yr2_df$SPCD[i]
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDIMAX_RMRS[i]),
+                         CR_fvs_df$SDIMAX[CR_fvs_df$species == Species],
+                         plt_yr2_df$SDIMAX_RMRS[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_fvs_df$d0[CR_fvs_df$species == Species]
+        d1 <- CR_fvs_df$d1[CR_fvs_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_fvs_df$a0[CR_fvs_df$species == Species]
+        b0 <- CR_fvs_df$b0[CR_fvs_df$species == Species]
+        b1 <- CR_fvs_df$b1[CR_fvs_df$species == Species]
+        c0 <- CR_fvs_df$c0[CR_fvs_df$species == Species]
+        c1 <- CR_fvs_df$c1[CR_fvs_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        CR_fvs <- X * 10
+        
+        #get CR the year before
+        TRE_CN <- plt_yr2_df$TRE_CN[i]
+        #growthyr is still previous year
+        CR_1 <- plt_df$CR_fvs[plt_df$TRE_CN == TRE_CN & 
+                                plt_df$Year == growthyr] #or CR_fvs[N] for the first round
+        #bound to 1% change per year
+        cr_bound1 <- CR_1 * .01
+        plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_fvs, 
+                                       CR_1 - cr_bound1,
+                                       CR_1 + cr_bound1)
+      }
       
       #join with plt_df
       for(i in 1:nrow(plt_df)){
@@ -1634,6 +1812,7 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
           plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
       #add density metrics in
@@ -1651,20 +1830,27 @@ proj_an <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,cc
   return(pred_df)
 }
 
-tr_an <- proj_an(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = an_df, mod_pp = an_pp, 
-                 mod_es = an_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                 ccf_df = ccf_df)
+tpa_foc_60 <- proj_tpa_foc %>%
+  ungroup() %>%
+  filter(Year <= 2060) %>%
+  mutate(PLT_CN = as.numeric(PLT_CN))
+
+tr_an <- proj_an(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = an_red_df, mod_pp = an_red_pp, 
+                 mod_es = an_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                 ccf_df = ccf_df, CR_fvs_df = CR_fvs_df)
 save(tr_an, file = "./data/formatted/projection/tr_an.Rdata")
 
 #climate
-proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,cur_clim,fut_clim) {
+proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio,ccf_df,CR_fvs_df,cur_clim,fut_clim) {
   #parameters:
   #data - trees from FIADB
   data <- data %>%
     ungroup() %>%
     mutate(PLT_CN = as.numeric(PLT_CN),
            TRE_CN = as.numeric(TRE_CN))
-  tpa_df <- tpa_df %>% ungroup()
+  tpa_df <- tpa_df %>%
+    ungroup() %>%
+    mutate(PLT_CN = as.numeric(PLT_CN))
   #tpa_df - updated tpa from fvs includes mortality
   data_rep <- data %>%
     dplyr::select(PLT_CN, TRE_CN, SPCD, SUBP, MEASYEAR, 
@@ -1677,7 +1863,8 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
            CCF = NA,
            PCCF = NA,
            BAL = NA,
-           SDI = NA)
+           SDI = NA,
+           CR_fvs = NA)
 
   ##density for new data in MEASYEAR will already be calculated
   #fill in DIA,CCF, PCCF, BAL, SDI, CR_weib, where year = measyear
@@ -1689,6 +1876,7 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
       data_rep$PCCF[i] <- data$PCCF[data$TRE_CN == TRE_CN]
       data_rep$BAL[i] <- data$BAL[data$TRE_CN == TRE_CN]
       data_rep$SDI[i] <- data$SDI_RMRS[data$TRE_CN == TRE_CN]
+      data_rep$CR_fvs[i] <- data$CR[data$TRE_CN == TRE_CN]
     }
   }
   #climate projections
@@ -1718,7 +1906,9 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
   #nonfocal - trees on the same plot as focal trees
   nonfocal <- nonfocal %>%
     ungroup() %>%
-    mutate(DIA = DIA_int,
+    mutate(PLT_CN = as.numeric(PLT_CN),
+           TRE_CN = as.numeric(TRE_CN),
+           DIA = DIA_int,
            Year = Year_int)
   #TODO expand nonfocal -> will fill in...how??
   ##will be used to compute density parameters
@@ -1754,7 +1944,7 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
         #first row is mean, second row is sd
         #the inputs of the equation are from a list so output needs to be unlisted
         plt_yr_df$z.DIA_C[i] = unlist((plt_yr_df[i,"DIA"] - para_std[1,"DIA_C"]) / para_std[2,"DIA_C"])
-        #plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
+        plt_yr_df$z.CR_fvs[i] = unlist((plt_yr_df[i,"CR_fvs"] - para_std[1,"CR_fvs"]) / para_std[2,"CR_fvs"])
         plt_yr_df$z.CR[i] = unlist((plt_yr_df[i,"CR"] - para_std[1,"CR"]) / para_std[2,"CR"])
         plt_yr_df$z.BAL[i] = unlist((plt_yr_df[i,"BAL"] - para_std[1,"BAL"]) / para_std[2,"BAL"])
         plt_yr_df$z.CCF[i] = unlist((plt_yr_df[i,"CCF"] - para_std[1,"CCF"]) / para_std[2,"CCF"])
@@ -1913,6 +2103,74 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
       plt_yr2_df <- density_cal %>%
         filter(TRE_CN %in% plt_yr_df$TRE_CN)
       
+      #cr
+      for(i in 1:nrow(plt_yr2_df)){
+        #Function arguments:
+        #SPCD - is number code of species of tree record
+        #SDI - is SDI of stand (Stage 1968)
+        Species <- plt_yr2_df$SPCD[i]
+        #SDI max values for each species were pulled from UT Variant overview
+        SDIMAX <- ifelse(is.na(plt_yr2_df$SDIMAX_RMRS[i]),
+                         CR_fvs_df$SDIMAX[CR_fvs_df$species == Species],
+                         plt_yr2_df$SDIMAX_RMRS[i])
+        #Calculate relative density
+        RD <- plt_yr2_df$SDI[i]/SDIMAX
+        
+        #Calculate average stand crown ratio (ACR) for each species in the stand
+        d0 <- CR_fvs_df$d0[CR_fvs_df$species == Species]
+        d1 <- CR_fvs_df$d1[CR_fvs_df$species == Species]
+        ACR <- d0 + d1 * RD * 100
+        
+        #Parameters of Weibull distribution: A,B,C
+        a0 <- CR_fvs_df$a0[CR_fvs_df$species == Species]
+        b0 <- CR_fvs_df$b0[CR_fvs_df$species == Species]
+        b1 <- CR_fvs_df$b1[CR_fvs_df$species == Species]
+        c0 <- CR_fvs_df$c0[CR_fvs_df$species == Species]
+        c1 <- CR_fvs_df$c1[CR_fvs_df$species == Species]
+        
+        #A parameter
+        WEIBA <-a0
+        #B parameter
+        WEIBB <- b0 + b1*ACR
+        #C parameter
+        WEIBC <- c0 + c1*ACR
+        
+        #Function arguments:
+        
+        #CCF - crown competition factor of stand
+        #rank_pltyr - tree's rank in diameter distribution by plot by year
+        #N  - number of records in the stand by year
+        
+        #Calculate scale parameter
+        SCALE = (1.0 - .00167 * (plt_yr2_df$CCF[i]-100.0))
+        if(SCALE < 0.3){SCALE = 0.3}
+        if(SCALE > 1.0){SCALE = 1.0}
+        
+        N <- plt_yr2_df$num_t[i]
+        #X is tree's rank in diameter distribution
+        #Multiply tree's rank in diameter distribution (trees position relative to tree with largest diameter in the stand) by scale parameter
+        Y <- plt_yr2_df$rank_pltyr[i]/N * SCALE
+        if(Y < 0.05){Y = 0.05}
+        if(Y > 0.95){Y = 0.95}
+        #Constrain Y between 0.05 and 0.95 - crown ratio predictions in FVS are bound between these two values
+        
+        #Calculate crown ratio (this corresponds to variable X in UTAH variant overview)
+        X <- WEIBA + WEIBB*((-1*log(1-Y))^(1/WEIBC))
+        #X = a tree’s crown ratio expressed as a percent / 10
+        CR_fvs <- X * 10
+        
+        #get CR the year before
+        TRE_CN <- plt_yr2_df$TRE_CN[i]
+        #growthyr is still previous year
+        CR_1 <- plt_df$CR_fvs[plt_df$TRE_CN == TRE_CN & 
+                                plt_df$Year == growthyr] #or CR_fvs[N] for the first round
+        #bound to 1% change per year
+        cr_bound1 <- CR_1 * .01
+        plt_yr2_df$CR_fvs[i] <- ifelse(CR_1 > CR_fvs, 
+                                       CR_1 - cr_bound1,
+                                       CR_1 + cr_bound1)
+      }
+      
       #join with plt_df
       for(i in 1:nrow(plt_df)){
         TRE_CN <- plt_df$TRE_CN[i]
@@ -1925,6 +2183,7 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
           plt_df$PCCF[i] <- plt_yr2_df$PCCF[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$BAL[i] <- plt_yr2_df$BAL[plt_yr2_df$TRE_CN == TRE_CN]
           plt_df$SDI[i] <- plt_yr2_df$SDI[plt_yr2_df$TRE_CN == TRE_CN]
+          plt_df$CR_fvs[i] <- plt_yr2_df$CR_fvs[plt_yr2_df$TRE_CN == TRE_CN]
         }
       }
       #add density metrics in
@@ -1942,145 +2201,1083 @@ proj_fclim <- function(data,tpa_df,mod_df,mod_pp,mod_es,sp_stats,nonfocal,bratio
   return(pred_df)
 }
 
-
+load('./data/formatted/proj_dset.Rdata')
 load("./data/formatted/proj_tpa_foc.Rdata")
+load('./data/formatted/proj_nonf.Rdata')
+load('./data/formatted/proj_clim.Rdata')
 
 df_stats <- varmt_df_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,CR_fvs,PCCF,CCF,
                 cos,sin,solrad_MayAug,ppt_pJunSep,tmax_FebJul,n_ppt,n_tmp) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 pp_stats <- varmt_pp_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,CR_fvs,PCCF,CCF,
                 cos,sin,solrad_MayAug,ppt_pJunSep,tmax_JunAug,n_ppt,n_tmp) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 es_stats <- varmt_es_z %>%
   ungroup() %>%
-  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,PCCF,CCF,
+  dplyr::select(DIA_C,SICOND,tASPECT,SLOPE,BAL,SDI,CR,CR_fvs,PCCF,CCF,
                 cos,sin,solrad_MayAug,ppt_pJunSep,tmax_pAug,n_ppt,n_tmp) %>%
   sapply(.,function(x) c(mean=mean(x,na.rm = T),
                          sd=sd(x,na.rm = T)))
 sp_stats <- list(sp_202 = df_stats, sp_122 = pp_stats,sp_93 = es_stats)
 
 load("./data/formatted/fut_clim/acc_rcp85.Rdata")
-red_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
-save(red_acc85, file = "./data/formatted/projection/red_acc85.Rdata")
+red_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
+save(red_acc85, file = "./data/formatted/projection/red clim/red_acc85.Rdata")
+rm(red_acc85,acc_rcp85)
 
 load("./data/formatted/fut_clim/bcc_rcp26.Rdata")
-red_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                         mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                         ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
-save(red_bcc26, file = "./data/formatted/projection/red_bcc26.Rdata")
+red_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
+save(red_bcc26, file = "./data/formatted/projection/red clim/red_bcc26.Rdata")
+rm(red_bcc26,bcc_rcp26)
 
 load("./data/formatted/fut_clim/bcc_rcp85.Rdata")
-red_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+red_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
                         ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
-save(red_bcc85, file = "./data/formatted/projection/red_bcc85.Rdata")
+save(red_bcc85, file = "./data/formatted/projection/red clim/red_bcc85.Rdata")
 
 load("./data/formatted/fut_clim/bccm_rcp85.Rdata")
-red_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
-save(red_bccm85, file = "./data/formatted/projection/red_bccm85.Rdata")
+red_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                         mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
+save(red_bccm85, file = "./data/formatted/projection/red clim/red_bccm85.Rdata")
+rm(red_bccm85,bccm_rcp85)
 
 load("./data/formatted/fut_clim/can_rcp26.Rdata")
-red_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df,cur_clim = proj_clim, fut_clim = can_rcp26)
-save(red_can26, file = "./data/formatted/projection/red_can26.Rdata")
+red_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = can_rcp26)
+save(red_can26, file = "./data/formatted/projection/red clim/red_can26.Rdata")
+rm(red_can26,can_rcp26)
 
 load("./data/formatted/fut_clim/can_rcp85.Rdata")
-red_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = can_rcp85)
-save(red_can85, file = "./data/formatted/projection/red_can85.Rdata")
+red_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = can_rcp85)
+save(red_can85, file = "./data/formatted/projection/red clim/red_can85.Rdata")
+rm(red_can85,can_rcp85)
 
 load("./data/formatted/fut_clim/ccs_rcp26.Rdata")
-red_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp26)
-save(red_ccs26, file = "./data/formatted/projection/red_ccs26.Rdata")
+red_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ccs_rcp26)
+save(red_ccs26, file = "./data/formatted/projection/red clim/red_ccs26.Rdata")
+rm(red_ccs26,ccs_rcp26)
 
 load("./data/formatted/fut_clim/ccs_rcp85.Rdata")
-red_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
-save(red_ccs85, file = "./data/formatted/projection/red_ccs85.Rdata")
+red_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ccs_rcp85)
+save(red_ccs85, file = "./data/formatted/projection/red clim/red_ccs85.Rdata")
+rm(red_ccs85,ccs_rcp85)
 
 load("./data/formatted/fut_clim/ces_rcp26.Rdata")
-red_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
-save(red_ces26, file = "./data/formatted/projection/red_ces26.Rdata")
+red_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ces_rcp26)
+save(red_ces26, file = "./data/formatted/projection/red clim/red_ces26.Rdata")
+rm(red_ces26,ces_rcp26)
 
 load("./data/formatted/fut_clim/ces_rcp85.Rdata")
-red_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_df, mod_pp = clim_pp, 
-                        mod_es = clim_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
-save(red_ces85, file = "./data/formatted/projection/red_ces85.Rdata")
+red_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
+save(red_ces85, file = "./data/formatted/projection/red clim/red_ces85.Rdata")
+rm(red_ces85,ces_rcp85)
+
+load("./data/formatted/fut_clim/cesb_rcp85.Rdata")
+red_cesb85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                         mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = cesb_rcp85)
+save(red_cesb85, file = "./data/formatted/projection/red clim/red_cesb85.Rdata")
+rm(red_cesb85,cesb_rcp85)
+
+load("./data/formatted/fut_clim/cmc_rcp85.Rdata")
+red_cmc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = cmc_rcp85)
+save(red_cmc85, file = "./data/formatted/projection/red clim/red_cmcb85.Rdata")
+rm(red_cmc85,cmc_rcp85)
+
+load("./data/formatted/fut_clim/cnm_rcp85.Rdata")
+red_cnm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = cnm_rcp85)
+save(red_cnm85, file = "./data/formatted/projection/red clim/red_cnm85.Rdata")
+rm(red_cnm85,cnm_rcp85)
+
+load("./data/formatted/fut_clim/csr_rcp26.Rdata")
+red_csr26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = csr_rcp26)
+save(red_csr26, file = "./data/formatted/projection/red clim/red_csr26.Rdata")
+rm(red_csr26,csr_rcp26)
+
+load("./data/formatted/fut_clim/csr_rcp85.Rdata")
+red_csr85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = csr_rcp85)
+save(red_csr85, file = "./data/formatted/projection/red clim/red_csr85.Rdata")
+rm(red_csr85,csr_rcp85)
+
+load("./data/formatted/fut_clim/fgl_rcp26.Rdata")
+red_fgl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp26)
+save(red_fgl26, file = "./data/formatted/projection/red clim/red_fgl26.Rdata")
+rm(red_fgl26,fgl_rcp26)
+
+load("./data/formatted/fut_clim/fgl_rcp85.Rdata")
+red_fgl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp85)
+save(red_fgl85, file = "./data/formatted/projection/red clim/red_fgl85.Rdata")
+rm(red_fgl85,fgl_rcp85)
+
+load("./data/formatted/fut_clim/fio_rcp26.Rdata")
+red_fio26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp26)
+save(red_fio26, file = "./data/formatted/projection/red clim/red_fio26.Rdata")
+rm(fio_rcp26,red_fio26)
+
+load("./data/formatted/fut_clim/fio_rcp85.Rdata")
+red_fio85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp85)
+save(red_fio85, file = "./data/formatted/projection/red clim/red_fio85.Rdata")
+rm(red_fio85,fio_rcp85)
+
+load("./data/formatted/fut_clim/gfc_rcp26.Rdata")
+red_gfc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfc_rcp26)
+save(red_gfc26, file = "./data/formatted/projection/red clim/red_gfc26.Rdata")
+rm(red_gfc26,gfc_rcp26)
+
+load("./data/formatted/fut_clim/gfc_rcp85.Rdata")
+red_gfc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfc_rcp85)
+save(red_gfc85, file = "./data/formatted/projection/red clim/red_gfc85.Rdata")
+rm(red_gfc85,gfc_rcp85)
+
+load("./data/formatted/fut_clim/gfg_rcp26.Rdata")
+red_gfg26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfg_rcp26)
+save(red_gfg26, file = "./data/formatted/projection/red clim/red_gfg26.Rdata")
+rm(red_gfg26,gfg_rcp26)
+
+load("./data/formatted/fut_clim/gfg_rcp85.Rdata")
+red_gfg85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfg_rcp85)
+save(red_gfg85, file = "./data/formatted/projection/red clim/red_gfg85.Rdata")
+rm(red_gfg85,gfg_rcp85)
+
+load("./data/formatted/fut_clim/gfm_rcp26.Rdata")
+red_gfm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfm_rcp26)
+save(red_gfm26, file = "./data/formatted/projection/red clim/red_gfm26.Rdata")
+rm(red_gfm26,gfm_rcp26)
+
+load("./data/formatted/fut_clim/gfm_rcp85.Rdata")
+red_gfm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfm_rcp85)
+save(red_gfm85, file = "./data/formatted/projection/red clim/red_gfm85.Rdata")
+rm(red_gfm85,gfm_rcp85)
+
+load("./data/formatted/fut_clim/gis_rcp26.Rdata")
+red_gis26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gis_rcp26)
+save(red_gis26, file = "./data/formatted/projection/red clim/red_gis26.Rdata")
+rm(red_gis26,gis_rcp26)
+
+load("./data/formatted/fut_clim/gis_rcp85.Rdata")
+red_gis85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gis_rcp85)
+save(red_gis85, file = "./data/formatted/projection/red clim/red_gis85.Rdata")
+rm(red_gis85,gis_rcp85)
+
+load("./data/formatted/fut_clim/had_rcp26.Rdata")
+red_had26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = had_rcp26)
+save(red_had26, file = "./data/formatted/projection/red clim/red_had26.Rdata")
+rm(red_had26,had_rcp26)
+
+load("./data/formatted/fut_clim/had_rcp85.Rdata")
+red_had85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = had_rcp85)
+save(red_had85, file = "./data/formatted/projection/red clim/red_had85.Rdata")
+rm(red_had85,had_rcp85)
+
+load("./data/formatted/fut_clim/hada_rcp26.Rdata")
+red_hada26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = hada_rcp26)
+save(red_hada26, file = "./data/formatted/projection/red clim/red_hada26.Rdata")
+rm(red_hada26,hada_rcp26)
+
+load("./data/formatted/fut_clim/hada_rcp85.Rdata")
+red_hada85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hada_rcp85)
+save(red_hada85, file = "./data/formatted/projection/red clim/red_hada85.Rdata")
+rm(red_hada85,hada_rcp85)
+
+load("./data/formatted/fut_clim/hadc_rcp85.Rdata")
+red_hadc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hadc_rcp85)
+save(red_hadc85, file = "./data/formatted/projection/red clim/red_hadc85.Rdata")
+rm(red_hadc85,hadc_rcp85)
+
+load("./data/formatted/fut_clim/inm_rcp85.Rdata")
+red_inm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                         mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = inm_rcp85)
+save(red_inm85, file = "./data/formatted/projection/red clim/red_inm85.Rdata")
+rm(red_inm85,inm_rcp85)
+
+load("./data/formatted/fut_clim/ipl_rcp85.Rdata")
+red_ipl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipl_rcp85)
+save(red_ipl85, file = "./data/formatted/projection/red clim/red_ipl85.Rdata")
+rm(red_ipl85,ipl_rcp85)
+
+load("./data/formatted/fut_clim/ipm_rcp26.Rdata")
+red_ipm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ipm_rcp26)
+save(red_ipm26, file = "./data/formatted/projection/red clim/red_ipm26.Rdata")
+rm(red_ipm26,ipm_rcp26)
+
+load("./data/formatted/fut_clim/ipm_rcp85.Rdata")
+red_ipm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipm_rcp85)
+save(red_ipm85, file = "./data/formatted/projection/red clim/red_ipm85.Rdata")
+rm(red_ipm85,ipm_rcp85)
+
+load("./data/formatted/fut_clim/mir_rcp26.Rdata")
+red_mir26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mir_rcp26)
+save(red_mir26, file = "./data/formatted/projection/red clim/red_mir26.Rdata")
+rm(red_mir26,mir_rcp26)
+
+load("./data/formatted/fut_clim/mir_rcp85.Rdata")
+red_mir85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mir_rcp85)
+save(red_mir85, file = "./data/formatted/projection/red clim/red_mir85.Rdata")
+rm(red_mir85,mir_rcp85)
+
+load("./data/formatted/fut_clim/mpl_rcp26.Rdata")
+red_mpl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpl_rcp26)
+save(red_mpl26, file = "./data/formatted/projection/red clim/red_mpl26.Rdata")
+rm(red_mpl26,mpl_rcp26)
+
+load("./data/formatted/fut_clim/mpl_rcp85.Rdata")
+red_mpl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpl_rcp85)
+save(red_mpl85, file = "./data/formatted/projection/red clim/red_mpl85.Rdata")
+rm(red_mpl85,mpl_rcp85)
+
+load("./data/formatted/fut_clim/mpm_rcp26.Rdata")
+red_mpm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpm_rcp26)
+save(red_mpm26, file = "./data/formatted/projection/red clim/red_mpm26.Rdata")
+rm(red_mpm26,mpm_rcp26)
+
+load("./data/formatted/fut_clim/mpm_rcp85.Rdata")
+red_mpm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpm_rcp85)
+save(red_mpm85, file = "./data/formatted/projection/red clim/red_mpm85.Rdata")
+rm(red_mpm85,mpm_rcp85)
+
+load("./data/formatted/fut_clim/mrc_rcp26.Rdata")
+red_mrc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mrc_rcp26)
+save(red_mrc26, file = "./data/formatted/projection/red clim/red_mrc26.Rdata")
+rm(red_mrc26,mrc_rcp26)
+
+load("./data/formatted/fut_clim/mrc_rcp85.Rdata")
+red_mrc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mrc_rcp85)
+save(red_mrc85, file = "./data/formatted/projection/red clim/red_mrc85.Rdata")
+rm(red_mrc85,mrc_rcp85)
+
+load("./data/formatted/fut_clim/mre_rcp26.Rdata")
+red_mre26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mre_rcp26)
+save(red_mre26, file = "./data/formatted/projection/red clim/red_mre26.Rdata")
+rm(red_mre26,mre_rcp26)
+
+load("./data/formatted/fut_clim/mre_rcp85.Rdata")
+red_mre85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mre_rcp85)
+save(red_mre85, file = "./data/formatted/projection/red clim/red_mre85.Rdata")
+rm(red_mre85,mre_rcp85)
+
+load("./data/formatted/fut_clim/mri_rcp26.Rdata")
+red_mri26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mri_rcp26)
+save(red_mri26, file = "./data/formatted/projection/red clim/red_mri26.Rdata")
+rm(red_mri26,mri_rcp26)
+
+load("./data/formatted/fut_clim/mri_rcp85.Rdata")
+red_mri85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mri_rcp85)
+save(red_mri85, file = "./data/formatted/projection/red clim/red_mri85.Rdata")
+rm(red_mri85,mri_rcp85)
+
+load("./data/formatted/fut_clim/nor_rcp26.Rdata")
+red_nor26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = nor_rcp26)
+save(red_nor26, file = "./data/formatted/projection/red clim/red_nor26.Rdata")
+rm(red_nor26,mrc_nor26)
+
+load("./data/formatted/fut_clim/nor_rcp85.Rdata")
+red_nor85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = nor_rcp85)
+save(red_nor85, file = "./data/formatted/projection/red clim/red_nor85.Rdata")
+rm(red_nor85,nor_rcp85)
+
 
 #normals
-n_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                      mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                      ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
+load("./data/formatted/fut_clim/acc_rcp85.Rdata")
+n_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
 save(n_acc85, file = "./data/formatted/projection/normals/n_acc85.Rdata")
+rm(acc_rcp85,n_acc85)
 
 load("./data/formatted/fut_clim/bcc_rcp26.Rdata")
-n_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
+n_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
 save(n_bcc26, file = "./data/formatted/projection/normals/n_bcc26.Rdata")
+rm(bcc_rcp26,n_bcc26)
 
 load("./data/formatted/fut_clim/bcc_rcp85.Rdata")
-n_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
+n_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
 save(n_bcc85, file = "./data/formatted/projection/normals/n_bcc85.Rdata")
+rm(bcc_rcp85,n_bcc85)
 
 load("./data/formatted/fut_clim/bccm_rcp85.Rdata")
-n_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                         mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                         ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
+n_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                       mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
 save(n_bccm85, file = "./data/formatted/projection/normals/n_bccm85.Rdata")
+rm(bccm_rcp85,n_bccm85)
 
 load("./data/formatted/fut_clim/can_rcp26.Rdata")
-n_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df,cur_clim = proj_clim, fut_clim = can_rcp26)
-save(n_can26, file = "./data/formatted/projection/n_can26.Rdata")
+n_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = can_rcp26)
+save(n_can26, file = "./data/formatted/projection/normals/n_can26.Rdata")
+rm(can_rcp26,n_can26)
 
 load("./data/formatted/fut_clim/can_rcp85.Rdata")
-n_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                      mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                      ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = can_rcp85)
-save(n_can85, file = "./data/formatted/projection/n_can85.Rdata")
+n_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = can_rcp85)
+save(n_can85, file = "./data/formatted/projection/normals/n_can85.Rdata")
+rm(can_rcp85,n_can85)
 
 load("./data/formatted/fut_clim/ccs_rcp26.Rdata")
-n_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp26)
-save(n_ccs26, file = "./data/formatted/projection/n_ccs26.Rdata")
+n_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ccs_rcp26)
+save(n_ccs26, file = "./data/formatted/projection/normals/n_ccs26.Rdata")
+rm(ccs_rcp26,n_ccs26)
 
 load("./data/formatted/fut_clim/ccs_rcp85.Rdata")
-n_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
-save(n_ccs85, file = "./data/formatted/projection/n_ccs85.Rdata")
+n_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
+save(n_ccs85, file = "./data/formatted/projection/normals/n_ccs85.Rdata")
+rm(n_ccs85,ccs_rcp85)
 
 load("./data/formatted/fut_clim/ces_rcp26.Rdata")
-n_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
-save(n_ces26, file = "./data/formatted/projection/n_ces26.Rdata")
+n_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
+save(n_ces26, file = "./data/formatted/projection/normals/n_ces26.Rdata")
+rm(n_ces26,ces_rcp26)
 
 load("./data/formatted/fut_clim/ces_rcp85.Rdata")
-n_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = n_df, mod_pp = n_pp, 
-                        mod_es = n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
-                        ccf_df = ccf_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
-save(n_ces85, file = "./data/formatted/projection/n_ces85.Rdata")
+n_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
+save(n_ces85, file = "./data/formatted/projection/normals/n_ces85.Rdata")
+rm(n_ces85,ces_rcp85)
+
+load("./data/formatted/fut_clim/cesb_rcp85.Rdata")
+n_cesb85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                       mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cesb_rcp85)
+save(n_cesb85, file = "./data/formatted/projection/normals/n_cesb85.Rdata")
+rm(n_cesb85,cesb_rcp85)
+
+load("./data/formatted/fut_clim/cmc_rcp85.Rdata")
+n_cmc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cmc_rcp85)
+save(n_cmc85, file = "./data/formatted/projection/normals/n_cmc85.Rdata")
+rm(n_cmc85,cmc_rcp85)
+
+load("./data/formatted/fut_clim/cnm_rcp85.Rdata")
+n_cnm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cnm_rcp85)
+save(n_cnm85, file = "./data/formatted/projection/normals/n_cnm85.Rdata")
+rm(n_cnm85,cnm_rcp85)
+
+load("./data/formatted/fut_clim/csr_rcp26.Rdata")
+n_csr26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = csr_rcp26)
+save(n_csr26, file = "./data/formatted/projection/normals/n_csr26.Rdata")
+rm(n_csr26,csr_rcp26)
+
+load("./data/formatted/fut_clim/csr_rcp85.Rdata")
+n_csr85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                      mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = csr_rcp85)
+save(n_csr85, file = "./data/formatted/projection/normals/n_csr85.Rdata")
+rm(n_csr85,csr_rcp85)
+
+load("./data/formatted/fut_clim/fgl_rcp26.Rdata")
+n_fgl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp26)
+save(n_fgl26, file = "./data/formatted/projection/normals/n_fgl26.Rdata")
+rm(n_fgl26,fgl_rcp26)
+
+load("./data/formatted/fut_clim/fgl_rcp85.Rdata")
+n_fgl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp85)
+save(n_fgl85, file = "./data/formatted/projection/normals/n_fgl85.Rdata")
+rm(n_fgl85,fgl_rcp85)
+
+load("./data/formatted/fut_clim/fio_rcp26.Rdata")
+n_fio26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp26)
+save(n_fio26, file = "./data/formatted/projection/normals/n_fio26.Rdata")
+rm(fio_rcp26,n_fio26)
+
+load("./data/formatted/fut_clim/fio_rcp85.Rdata")
+n_fio85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp85)
+save(n_fio85, file = "./data/formatted/projection/normals/n_fio85.Rdata")
+rm(n_fio85,fio_rcp85)
+
+load("./data/formatted/fut_clim/gfc_rcp26.Rdata")
+n_gfc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es,sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfc_rcp26)
+save(n_gfc26, file = "./data/formatted/projection/normals/n_gfc26.Rdata")
+rm(n_gfc26,gfc_rcp26)
+
+load("./data/formatted/fut_clim/gfc_rcp85.Rdata")
+n_gfc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfc_rcp85)
+save(n_gfc85, file = "./data/formatted/projection/normals/n_gfc85.Rdata")
+rm(n_gfc85,gfc_rcp85)
+
+load("./data/formatted/fut_clim/gfg_rcp26.Rdata")
+n_gfg26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfg_rcp26)
+save(n_gfg26, file = "./data/formatted/projection/normals/n_gfg26.Rdata")
+rm(n_gfg26,gfg_rcp26)
+
+load("./data/formatted/fut_clim/gfg_rcp85.Rdata")
+n_gfg85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfg_rcp85)
+save(n_gfg85, file = "./data/formatted/projection/normals/n_gfg85.Rdata")
+rm(n_gfg85,gfg_rcp85)
+
+load("./data/formatted/fut_clim/gfm_rcp26.Rdata")
+n_gfm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfm_rcp26)
+save(n_gfm26, file = "./data/formatted/projection/normals/n_gfm26.Rdata")
+rm(n_gfm26,gfm_rcp26)
+
+load("./data/formatted/fut_clim/gfm_rcp85.Rdata")
+n_gfm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfm_rcp85)
+save(n_gfm85, file = "./data/formatted/projection/normals/n_gfm85.Rdata")
+rm(n_gfm85,gfm_rcp85)
+
+load("./data/formatted/fut_clim/gis_rcp26.Rdata")
+n_gis26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gis_rcp26)
+save(n_gis26, file = "./data/formatted/projection/normals/n_gis26.Rdata")
+rm(n_gis26,gis_rcp26)
+
+load("./data/formatted/fut_clim/gis_rcp85.Rdata")
+n_gis85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gis_rcp85)
+save(n_gis85, file = "./data/formatted/projection/normals/n_gis85.Rdata")
+rm(n_gis85,gis_rcp85)
+
+load("./data/formatted/fut_clim/had_rcp26.Rdata")
+n_had26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = had_rcp26)
+save(n_had26, file = "./data/formatted/projection/normals/n_had26.Rdata")
+rm(n_had26,had_rcp26)
+
+load("./data/formatted/fut_clim/had_rcp85.Rdata")
+n_had85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = had_rcp85)
+save(n_had85, file = "./data/formatted/projection/normals/n_had85.Rdata")
+rm(n_had85,had_rcp85)
+
+load("./data/formatted/fut_clim/hada_rcp26.Rdata")
+n_hada26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                         mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = hada_rcp26)
+save(n_hada26, file = "./data/formatted/projection/normals/n_hada26.Rdata")
+rm(n_hada26,hada_rcp26)
+
+load("./data/formatted/fut_clim/hada_rcp85.Rdata")
+n_hada85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                         mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hada_rcp85)
+save(n_hada85, file = "./data/formatted/projection/normals/n_hada85.Rdata")
+rm(n_hada85,hada_rcp85)
+
+load("./data/formatted/fut_clim/hadc_rcp85.Rdata")
+n_hadc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                         mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                         ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hadc_rcp85)
+save(n_hadc85, file = "./data/formatted/projection/normals/n_hadc85.Rdata")
+rm(n_hadc85,hadc_rcp85)
+
+load("./data/formatted/fut_clim/inm_rcp85.Rdata")
+n_inm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = inm_rcp85)
+save(n_inm85, file = "./data/formatted/projection/normals/n_inm85.Rdata")
+rm(n_inm85,inm_rcp85)
+
+load("./data/formatted/fut_clim/ipl_rcp85.Rdata")
+n_ipl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_red_df, mod_pp = clim_red_pp, 
+                        mod_es = clim_cred_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipl_rcp85)
+save(n_ipl85, file = "./data/formatted/projection/normals/n_ipl85.Rdata")
+rm(n_ipl85,ipl_rcp85)
+
+load("./data/formatted/fut_clim/ipm_rcp26.Rdata")
+n_ipm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ipm_rcp26)
+save(n_ipm26, file = "./data/formatted/projection/normals/n_ipm26.Rdata")
+rm(n_ipm26,ipm_rcp26)
+
+load("./data/formatted/fut_clim/ipm_rcp85.Rdata")
+n_ipm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipm_rcp85)
+save(n_ipm85, file = "./data/formatted/projection/normals/n_ipm85.Rdata")
+rm(n_ipm85,ipm_rcp85)
+
+load("./data/formatted/fut_clim/mir_rcp26.Rdata")
+n_mir26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mir_rcp26)
+save(n_mir26, file = "./data/formatted/projection/normals/n_mir26.Rdata")
+rm(n_mir26,mir_rcp26)
+
+load("./data/formatted/fut_clim/mir_rcp85.Rdata")
+n_mir85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mir_rcp85)
+save(n_mir85, file = "./data/formatted/projection/normals/n_mir85.Rdata")
+rm(n_mir85,mir_rcp85)
+
+load("./data/formatted/fut_clim/mpl_rcp26.Rdata")
+n_mpl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpl_rcp26)
+save(n_mpl26, file = "./data/formatted/projection/normals/n_mpl26.Rdata")
+rm(n_mpl26,mpl_rcp26)
+
+load("./data/formatted/fut_clim/mpl_rcp85.Rdata")
+n_mpl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpl_rcp85)
+save(n_mpl85, file = "./data/formatted/projection/normals/n_mpl85.Rdata")
+rm(n_mpl85,mpl_rcp85)
+
+load("./data/formatted/fut_clim/mpm_rcp26.Rdata")
+n_mpm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpm_rcp26)
+save(n_mpm26, file = "./data/formatted/projection/normals/n_mpm26.Rdata")
+rm(n_mpm26,mpm_rcp26)
+
+load("./data/formatted/fut_clim/mpm_rcp85.Rdata")
+n_mpm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpm_rcp85)
+save(n_mpm85, file = "./data/formatted/projection/normals/n_mpm85.Rdata")
+rm(n_mpm85,mpm_rcp85)
+
+load("./data/formatted/fut_clim/mrc_rcp26.Rdata")
+n_mrc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mrc_rcp26)
+save(n_mrc26, file = "./data/formatted/projection/normals/n_mrc26.Rdata")
+rm(n_mrc26,mrc_rcp26)
+
+load("./data/formatted/fut_clim/mrc_rcp85.Rdata")
+n_mrc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mrc_rcp85)
+save(n_mrc85, file = "./data/formatted/projection/normals/n_mrc85.Rdata")
+rm(n_mrc85,mrc_rcp85)
+
+load("./data/formatted/fut_clim/mre_rcp26.Rdata")
+n_mre26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mre_rcp26)
+save(n_mre26, file = "./data/formatted/projection/normals/n_mre26.Rdata")
+rm(n_mre26,mre_rcp26)
+
+load("./data/formatted/fut_clim/mre_rcp85.Rdata")
+n_mre85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mre_rcp85)
+save(n_mre85, file = "./data/formatted/projection/normals/n_mre85.Rdata")
+rm(n_mre85,mre_rcp85)
+
+load("./data/formatted/fut_clim/mri_rcp26.Rdata")
+n_mri26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mri_rcp26)
+save(n_mri26, file = "./data/formatted/projection/normals/n_mri26.Rdata")
+rm(n_mri26,mri_rcp26)
+
+load("./data/formatted/fut_clim/mri_rcp85.Rdata")
+n_mri85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mri_rcp85)
+save(n_mri85, file = "./data/formatted/projection/normals/n_mri85.Rdata")
+rm(n_mri85,mri_rcp85)
+
+load("./data/formatted/fut_clim/nor_rcp26.Rdata")
+n_nor26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = nor_rcp26)
+save(n_nor26, file = "./data/formatted/projection/normals/n_nor26.Rdata")
+rm(n_nor26,mrc_nor26)
+
+load("./data/formatted/fut_clim/nor_rcp85.Rdata")
+n_nor85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_n_df, mod_pp = clim_n_pp, 
+                        mod_es = clim_n_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = nor_rcp85)
+save(n_nor85, file = "./data/formatted/projection/normals/n_nor85.Rdata")
+rm(n_nor85,nor_rcp85)
+
+
+
+#normals + interaction
+proj_tpa_foc <- proj_tpa_foc %>% filter(Year <= 2060)
+
+load("./data/formatted/fut_clim/acc_rcp85.Rdata")
+nint_acc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                        mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = acc_rcp85)
+save(nint_acc85, file = "./data/formatted/projection/nint_acc85.Rdata")
+rm(nint_acc85,acc_rcp85)
+
+load("./data/formatted/fut_clim/bcc_rcp26.Rdata")
+nint_bcc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                         mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bcc_rcp26)
+save(nint_bcc26, file = "./data/formatted/projection/nint_bcc26.Rdata")
+rm(nint_bcc26,bcc_rcp26)
+
+load("./data/formatted/fut_clim/bcc_rcp85.Rdata")
+nint_bcc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                         mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                        ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bcc_rcp85)
+save(nint_bcc85, file = "./data/formatted/projection/nint_bcc85.Rdata")
+rm(nint_bcc85,bcc_rcp85)
+
+load("./data/formatted/fut_clim/bccm_rcp85.Rdata")
+nint_bccm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                       mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = bccm_rcp85)
+save(nint_bccm85, file = "./data/formatted/projection/normals/nint_bccm85.Rdata")
+rm(bccm_rcp85,nint_bccm85)
+
+load("./data/formatted/fut_clim/can_rcp26.Rdata")
+nint_can26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = can_rcp26)
+save(nint_can26, file = "./data/formatted/projection/normals/nint_can26.Rdata")
+rm(can_rcp26,nint_can26)
+
+load("./data/formatted/fut_clim/can_rcp85.Rdata")
+nint_can85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = can_rcp85)
+save(nint_can85, file = "./data/formatted/projection/normals/nint_can85.Rdata")
+rm(can_rcp85,nint_can85)
+
+load("./data/formatted/fut_clim/ccs_rcp26.Rdata")
+nint_ccs26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ccs_rcp26)
+save(nint_ccs26, file = "./data/formatted/projection/normals/nint_ccs26.Rdata")
+rm(ccs_rcp26,nint_ccs26)
+
+load("./data/formatted/fut_clim/ccs_rcp85.Rdata")
+nint_ccs85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ccs_rcp85)
+save(nint_ccs85, file = "./data/formatted/projection/normals/nint_ccs85.Rdata")
+rm(nint_ccs85,ccs_rcp85)
+
+load("./data/formatted/fut_clim/ces_rcp26.Rdata")
+nint_ces26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ces_rcp26)
+save(nint_ces26, file = "./data/formatted/projection/normals/nint_ces26.Rdata")
+rm(nint_ces26,ces_rcp26)
+
+load("./data/formatted/fut_clim/ces_rcp85.Rdata")
+nint_ces85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ces_rcp85)
+save(nint_ces85, file = "./data/formatted/projection/normals/nint_ces85.Rdata")
+rm(nint_ces85,ces_rcp85)
+
+load("./data/formatted/fut_clim/cesb_rcp85.Rdata")
+nint_cesb85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                       mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cesb_rcp85)
+save(nint_cesb85, file = "./data/formatted/projection/normals/nint_cesb85.Rdata")
+rm(nint_cesb85,cesb_rcp85)
+
+load("./data/formatted/fut_clim/cmc_rcp85.Rdata")
+nint_cmc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cmc_rcp85)
+save(nint_cmc85, file = "./data/formatted/projection/normals/nint_cmcb85.Rdata")
+rm(nint_cmc85,cmc_rcp85)
+
+load("./data/formatted/fut_clim/cnm_rcp85.Rdata")
+nint_cnm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = cnm_rcp85)
+save(nint_cnm85, file = "./data/formatted/projection/normals/nint_cnm85.Rdata")
+rm(nint_cnm85,cnm_rcp85)
+
+load("./data/formatted/fut_clim/csr_rcp26.Rdata")
+nint_csr26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = csr_rcp26)
+save(nint_csr26, file = "./data/formatted/projection/normals/nint_csr26.Rdata")
+rm(nint_csr26,csr_rcp26)
+
+load("./data/formatted/fut_clim/csr_rcp85.Rdata")
+nint_csr85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = csr_rcp85)
+save(nint_csr85, file = "./data/formatted/projection/normals/nint_csr85.Rdata")
+rm(nint_csr85,csr_rcp85)
+
+load("./data/formatted/fut_clim/fgl_rcp26.Rdata")
+nint_fgl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp26)
+save(nint_fgl26, file = "./data/formatted/projection/normals/nint_fgl26.Rdata")
+rm(nint_fgl26,fgl_rcp26)
+
+load("./data/formatted/fut_clim/fgl_rcp85.Rdata")
+nint_fgl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fgl_rcp85)
+save(nint_fgl85, file = "./data/formatted/projection/normals/nint_fgl85.Rdata")
+rm(nint_fgl85,fgl_rcp85)
+
+load("./data/formatted/fut_clim/fio_rcp26.Rdata")
+nint_fio26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp26)
+save(nint_fio26, file = "./data/formatted/projection/normals/nint_fio26.Rdata")
+rm(fio_rcp26,nint_fio26)
+
+load("./data/formatted/fut_clim/fio_rcp85.Rdata")
+nint_fio85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = fio_rcp85)
+save(nint_fio85, file = "./data/formatted/projection/normals/nint_fio85.Rdata")
+rm(nint_fio85,fio_rcp85)
+
+load("./data/formatted/fut_clim/gfc_rcp26.Rdata")
+nint_gfc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfc_rcp26)
+save(nint_gfc26, file = "./data/formatted/projection/normals/nint_gfc26.Rdata")
+rm(nint_gfc26,gfc_rcp26)
+
+load("./data/formatted/fut_clim/gfc_rcp85.Rdata")
+nint_gfc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfc_rcp85)
+save(nint_gfc85, file = "./data/formatted/projection/normals/nint_gfc85.Rdata")
+rm(nint_gfc85,gfc_rcp85)
+
+load("./data/formatted/fut_clim/gfg_rcp26.Rdata")
+nint_gfg26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfg_rcp26)
+save(nint_gfg26, file = "./data/formatted/projection/normals/nint_gfg26.Rdata")
+rm(nint_gfg26,gfg_rcp26)
+
+load("./data/formatted/fut_clim/gfg_rcp85.Rdata")
+nint_gfg85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfg_rcp85)
+save(nint_gfg85, file = "./data/formatted/projection/normals/nint_gfg85.Rdata")
+rm(nint_gfg85,gfg_rcp85)
+
+load("./data/formatted/fut_clim/gfm_rcp26.Rdata")
+nint_gfm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gfm_rcp26)
+save(nint_gfm26, file = "./data/formatted/projection/normals/nint_gfm26.Rdata")
+rm(nint_gfm26,gfm_rcp26)
+
+load("./data/formatted/fut_clim/gfm_rcp85.Rdata")
+nint_gfm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gfm_rcp85)
+save(nint_gfm85, file = "./data/formatted/projection/normals/nint_gfm85.Rdata")
+rm(nint_gfm85,gfm_rcp85)
+
+load("./data/formatted/fut_clim/gis_rcp26.Rdata")
+nint_gis26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = gis_rcp26)
+save(nint_gis26, file = "./data/formatted/projection/normals/nint_gis26.Rdata")
+rm(nint_gis26,gis_rcp26)
+
+load("./data/formatted/fut_clim/gis_rcp85.Rdata")
+nint_gis85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = gis_rcp85)
+save(nint_gis85, file = "./data/formatted/projection/normals/nint_gis85.Rdata")
+rm(nint_gis85,gis_rcp85)
+
+load("./data/formatted/fut_clim/had_rcp26.Rdata")
+nint_had26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = had_rcp26)
+save(nint_had26, file = "./data/formatted/projection/normals/nint_had26.Rdata")
+rm(nint_had26,had_rcp26)
+
+load("./data/formatted/fut_clim/had_rcp85.Rdata")
+nint_had85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = had_rcp85)
+save(nint_had85, file = "./data/formatted/projection/normals/nint_had85.Rdata")
+rm(nint_had85,had_rcp85)
+
+load("./data/formatted/fut_clim/hada_rcp26.Rdata")
+nint_hada26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                       mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = hada_rcp26)
+save(nint_hada26, file = "./data/formatted/projection/normals/nint_hada26.Rdata")
+rm(nint_hada26,hada_rcp26)
+
+load("./data/formatted/fut_clim/hada_rcp85.Rdata")
+nint_hada85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                       mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hada_rcp85)
+save(nint_hada85, file = "./data/formatted/projection/normals/nint_hada85.Rdata")
+rm(nint_hada85,hada_rcp85)
+
+load("./data/formatted/fut_clim/hadc_rcp85.Rdata")
+nint_hadc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                       mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                       ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = hadc_rcp85)
+save(nint_hadc85, file = "./data/formatted/projection/normals/nint_hadc85.Rdata")
+rm(nint_hadc85,hadc_rcp85)
+
+load("./data/formatted/fut_clim/inm_rcp85.Rdata")
+nint_inm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = inm_rcp85)
+save(nint_inm85, file = "./data/formatted/projection/normals/nint_inm85.Rdata")
+rm(nint_inm85,inm_rcp85)
+
+load("./data/formatted/fut_clim/ipm_rcp26.Rdata")
+nint_ipm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = ipm_rcp26)
+save(nint_ipm26, file = "./data/formatted/projection/normals/nint_ipm26.Rdata")
+rm(nint_ipm26,ipm_rcp26)
+
+load("./data/formatted/fut_clim/ipm_rcp85.Rdata")
+nint_ipm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipm_rcp85)
+save(nint_ipm85, file = "./data/formatted/projection/normals/nint_ipm85.Rdata")
+rm(nint_ipm85,ipm_rcp85)
+
+load("./data/formatted/fut_clim/ipl_rcp85.Rdata")
+nint_ipl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                         mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = ipl_rcp85)
+save(nint_ipl85, file = "./data/formatted/projection/normals/nint_ipl85.Rdata")
+rm(nint_ipl85,ipl_rcp85)
+
+load("./data/formatted/fut_clim/mir_rcp26.Rdata")
+nint_mir26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mir_rcp26)
+save(nint_mir26, file = "./data/formatted/projection/normals/nint_mir26.Rdata")
+rm(nint_mir26,mir_rcp26)
+
+load("./data/formatted/fut_clim/mir_rcp85.Rdata")
+nint_mir85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mir_rcp85)
+save(nint_mir85, file = "./data/formatted/projection/normals/nint_mir85.Rdata")
+rm(nint_mir85,mir_rcp85)
+
+load("./data/formatted/fut_clim/mpl_rcp26.Rdata")
+nint_mpl26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpl_rcp26)
+save(nint_mpl26, file = "./data/formatted/projection/normals/nint_mpl26.Rdata")
+rm(nint_mpl26,mpl_rcp26)
+
+load("./data/formatted/fut_clim/mpl_rcp85.Rdata")
+nint_mpl85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpl_rcp85)
+save(nint_mpl85, file = "./data/formatted/projection/normals/nint_mpl85.Rdata")
+rm(nint_mpl85,mpl_rcp85)
+
+load("./data/formatted/fut_clim/mpm_rcp26.Rdata")
+nint_mpm26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mpm_rcp26)
+save(nint_mpm26, file = "./data/formatted/projection/normals/nint_mpm26.Rdata")
+rm(nint_mpm26,mpm_rcp26)
+
+load("./data/formatted/fut_clim/mpm_rcp85.Rdata")
+nint_mpm85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mpm_rcp85)
+save(nint_mpm85, file = "./data/formatted/projection/normals/nint_mpm85.Rdata")
+rm(nint_mpm85,mpm_rcp85)
+
+load("./data/formatted/fut_clim/mrc_rcp26.Rdata")
+nint_mrc26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc,mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mrc_rcp26)
+save(nint_mrc26, file = "./data/formatted/projection/normals/nint_mrc26.Rdata")
+rm(nint_mrc26,mrc_rcp26)
+
+load("./data/formatted/fut_clim/mrc_rcp85.Rdata")
+nint_mrc85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mrc_rcp85)
+save(nint_mrc85, file = "./data/formatted/projection/normals/nint_mrc85.Rdata")
+rm(nint_mrc85,mrc_rcp85)
+
+load("./data/formatted/fut_clim/mre_rcp26.Rdata")
+nint_mre26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mre_rcp26)
+save(nint_mre26, file = "./data/formatted/projection/normals/nint_mre26.Rdata")
+rm(nint_mre26,mre_rcp26)
+
+load("./data/formatted/fut_clim/mre_rcp85.Rdata")
+nint_mre85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mre_rcp85)
+save(nint_mre85, file = "./data/formatted/projection/normals/nint_mre85.Rdata")
+rm(nint_mre85,mre_rcp85)
+
+load("./data/formatted/fut_clim/mri_rcp26.Rdata")
+nint_mri26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = mri_rcp26)
+save(nint_mri26, file = "./data/formatted/projection/normals/nint_mri26.Rdata")
+rm(nint_mri26,mri_rcp26)
+
+load("./data/formatted/fut_clim/mri_rcp85.Rdata")
+nint_mri85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = mri_rcp85)
+save(nint_mri85, file = "./data/formatted/projection/normals/nint_mri85.Rdata")
+rm(nint_mri85,mri_rcp85)
+
+load("./data/formatted/fut_clim/nor_rcp26.Rdata")
+nint_nor26 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df, CR_fvs_df = CR_fvs_df,cur_clim = proj_clim, fut_clim = nor_rcp26)
+save(nint_nor26, file = "./data/formatted/projection/normals/nint_nor26.Rdata")
+rm(nint_nor26,mrc_nor26)
+
+load("./data/formatted/fut_clim/nor_rcp85.Rdata")
+nint_nor85 <- proj_fclim(data = proj_dset, tpa_df=proj_tpa_foc, mod_df = clim_nint_df, mod_pp = clim_nint_pp, 
+                      mod_es = clim_nint_es, sp_stats = sp_stats, nonfocal = proj_nonf, bratio = bratio_df,
+                      ccf_df = ccf_df,CR_fvs_df = CR_fvs_df, cur_clim = proj_clim, fut_clim = nor_rcp85)
+save(nint_nor85, file = "./data/formatted/projection/normals/nint_nor85.Rdata")
+rm(nint_nor85,nor_rcp85)
