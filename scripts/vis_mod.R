@@ -16,8 +16,8 @@ full_clim_df <-  tidy(clim_16) %>%
   mutate(model = "Douglas fir")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_FebJul = "Temperature",
                        "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
@@ -36,8 +36,8 @@ full_clim_pp <-  tidy(clim_16_pp) %>%
   mutate(model = "Ponderosa pine")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_JunAug = "Temperature",
                        "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
@@ -56,8 +56,8 @@ full_clim_es <-  tidy(clim_16_es) %>%
   mutate(model = "Engelmann spruce")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_pAug = "Temperature",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
@@ -86,7 +86,7 @@ dwplot(full_clim_mod,
 clim_red_df <- lmer(log(dds)~
                       #tree variables
                       z.DIA_C+I(z.DIA_C^2)+#remove log due to standardization
-                      #z.CR_weib+
+                      #z.CR_fvs+
                       #climate
                       z.ppt_pJunSep*z.tmax_FebJul+
                       #competition/density
@@ -103,8 +103,8 @@ red_clim_df <-  tidy(clim_red_df) %>%
   mutate(model = "Douglas fir")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_FebJul = "Temperature",
                        "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
@@ -136,8 +136,8 @@ red_clim_pp <-  tidy(clim_red_pp) %>%
   mutate(model = "Ponderosa pine")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_JunAug = "Temperature",
                        "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
@@ -153,7 +153,7 @@ red_clim_pp <-  tidy(clim_red_pp) %>%
 clim_red_es <- lmer(log(dds)~
                       #tree variables
                       z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                      #z.CR_weib+
+                      #z.CR_fvs+
                       #climate
                       z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
                       #competition/density
@@ -170,8 +170,8 @@ red_clim_es <-  tidy(clim_red_es) %>%
   mutate(model = "Engelmann spruce")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_weib = "Crown Ratio",
-                       "I(z.CR_weib^2)" = "CR^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_pAug = "Temperature",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
@@ -193,7 +193,9 @@ dwplot(red_clim_mod,
   theme(plot.title = element_text(face="bold"),
         legend.position = "right",
         legend.background = element_rect(colour="grey80"),
-        legend.title.align = 0.5)
+        legend.title.align = 0.5) +
+  scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1"))
 
 #changing color
 #colorblind friendly
@@ -228,3 +230,88 @@ mod_pres <- dwplot(red_clim_mod,
   scale_fill_viridis(discrete = TRUE) 
 mod_pres
 ggsave(filename = "trday20.jpeg", path = "./images/",width = 6, height = 5, units = "in")
+
+#constant cr
+red_clim_df <-  tidy(clim_mod_df) %>% 
+  filter(effect == "fixed") %>%
+  dplyr::select(term,estimate,std.error) %>%
+  mutate(model = "Douglas fir")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "Competition",
+                       z.CCF = "Competition", 
+                       z.SDI = "Competition",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "Solar Radiation"))
+red_clim_pp <-  tidy(clim_mod_pp) %>% 
+  filter(effect == "fixed") %>%
+  dplyr::select(term,estimate,std.error) %>%
+  mutate(model = "Ponderosa pine")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "Competition",
+                       z.CCF = "Competition", 
+                       z.SDI = "Competition",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "Solar Radiation"))
+red_clim_es <-  tidy(clim_mod2_es) %>% 
+  filter(effect == "fixed") %>%
+  dplyr::select(term,estimate,std.error) %>%
+  mutate(model = "Engelmann spruce")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR = "Crown Ratio",
+                       "I(z.CR^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "Competition",
+                       z.CCF = "Competition", 
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope"))
+red_clim_mod <- full_join(red_clim_df,red_clim_pp) %>%
+  full_join(.,red_clim_es)
+dwplot(red_clim_mod, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Reduced: Tree-Rings + Climate") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5) +
+  scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1"))
+
+#vis comp
+df_stats <- df_stats %>%
+  mutate(Species = "Douglas fir") %>%
+  dplyr:: select(Species, CR, CCF, BAL, SDI)
+pp_stats <- pp_stats %>%
+  mutate(Species = "Ponderosa pine") %>%
+  dplyr:: select(Species, CR, CCF, BAL, SDI)
+es_stats <- es_stats %>%
+  mutate(Species = "Englemann spruce") %>%
+  dplyr:: select(Species, CR, CCF, BAL, SDI)
+
+sp_stats <- bind_rows(df_stats,)
