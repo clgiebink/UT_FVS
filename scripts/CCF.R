@@ -135,4 +135,57 @@ dens_data_con <- dens_data_con %>%
 #mutate(CCF = ifelse(CCF == 0, NA, CCF))
 
 
-save(dens_data_con,file = "./data/formatted/density_data.Rdata")
+save(dens_data_con,file = "./data/formatted/dens_data_con.Rdata")
+
+#check projection
+for(i in 1:nrow(had26_check)){
+  Species <- had26_check$SPCD[i]
+  r1 <- ccf_df$r1[ccf_df$species == Species]
+  r2 <- ccf_df$r2[ccf_df$species == Species]
+  r3 <- ccf_df$r3[ccf_df$species == Species]
+  r4 <- ccf_df$r4[ccf_df$species == Species]
+  r5 <- ccf_df$r5[ccf_df$species == Species]
+  dbrk <- ccf_df$dbrk[ccf_df$species == Species]
+  if(Species == 475){
+    ifelse(had26_check$DIA[i] < dbrk,
+           CCF_t <- had26_check$DIA[i]*(r1+r2+r3),
+           CCF_t <- r1 + (r2 * had26_check$DIA[i]) + (r3 * had26_check$DIA[i]^2))
+  }
+  if(Species != 475){
+    ifelse(is.na(had26_check$DIA[i]), 
+           CCF_t <- NA,
+           ifelse(had26_check$DIA[i] <= 0.1, 
+                  CCF_t <- 0.0001,
+                  ifelse(had26_check$DIA[i] < dbrk, 
+                         CCF_t <- r4 * (had26_check$DIA[i]^r5),
+                         CCF_t <- r1 + (r2 * had26_check$DIA[i]) + (r3 * had26_check$DIA[i]^2))))
+  }
+  had26_check$CCF_t[i] <- CCF_t
+}
+
+#PCCF is the crown competition factor on the inventory point where the tree is established
+#pCCF = the sum of CCF_t on a subplot on a per acre basis
+#subplot given by SUBP
+#TPA is measured on a stand level, convert to subplot by multiplying by number of subplots
+#4 subplots; 4 microplots
+
+had26_check <- had26_check %>%
+  group_by(PLT_CN,SUBP,Year) %>%
+  mutate(PCCF = sum(CCF_t * (TPA_UNADJ * 4), na.rm = TRUE))
+
+#stand CCF = sum(CCFt on a plot) on a per acre basis
+#plot given by PLT_CN
+#TPA measured on a plot/stand level
+had26_check <- had26_check %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(CCF = sum(CCF_t * TPA_UNADJ,na.rm = TRUE)) #%>%
+#mutate(CCF = ifelse(CCF == 0, NA, CCF))
+
+had26_check <- had26_check %>%
+  mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ)  %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(BAL = map_dbl(DIA,~sum(BA_pa[DIA>.x],na.rm = TRUE)))
+
+had26_check <- had26_check %>%
+  group_by(PLT_CN,Year) %>%
+  mutate(SDI = sum(TPA_UNADJ*(DIA/10)^1.6)) 
