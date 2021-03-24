@@ -1220,10 +1220,10 @@ pred_clim_al <- val_clim(newdata = val_dset,mod_df = clim_al_df, mod_pp = clim_a
                               mod_es = clim_al_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
                               bratio = bratio_df ,ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, climate = clim_val)
 save(pred_clim_al,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_al.Rdata")
-val_clim <- val_clim(newdata = val_dset,mod_df = clim_red_df, mod_pp = clim_red_pp, 
+val_clim2 <- val_clim(newdata = val_dset,mod_df = clim_red_df, mod_pp = clim_red_pp, 
                               mod_es = clim_cred_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
                               bratio = bratio_df ,ccf_df = ccf_df, CR_fvs_df = CR_fvs_df, climate = clim_val)
-save(val_clim,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim.Rdata")
+save(val_clim2,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_clim2.Rdata")
 val_n <- val_clim(newdata = val_dset,mod_df = clim_n_df,mod_pp = clim_n_pp, 
                               mod_es = clim_n_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
                               bratio = bratio_df ,ccf_df = ccf_df, CR_fvs_df= CR_fvs_df, climate = clim_val)
@@ -1665,18 +1665,10 @@ qqline(pred_fan_fmy$diff)
 plot(pred_fan_fmy$DIA,pred_fan_fmy$diff, xlab = "predicted", ylab= "residuals")
 ```
 
-
-```{r}
-#merge with climate normals
-n_ppt <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_ppt_extr.csv")
-n_tmp <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmp_extr.csv")
-n_tmx <- read.csv("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/n_tmx_extr.csv")
-```
-
 ```{r}
 #calculate anomalies
 #get total/average climate variable during projection cycle for each tree
-val_clim_red <- val_clim %>%
+val_clim_red <- clim_val %>%
   mutate(ppt_an = ppt_Jan+ppt_Feb+ppt_Mar+ppt_Apr+ppt_May+ppt_Jun
          +ppt_Jul+ppt_Aug+ppt_Sep+ppt_Oct+ppt_Nov+ppt_Dec,
          tmx_an = (tmax_Jan+tmax_Feb+tmax_Mar+tmax_Apr+tmax_May+tmax_Jun
