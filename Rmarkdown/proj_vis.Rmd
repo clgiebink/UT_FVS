@@ -870,27 +870,56 @@ lapply(full_paths, function(x) {
 ```
 
 ```{r}
-#should check out validation dataset
+#dbh distribution for each stage - calibration, validation, projection
+
+#calibration
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata')
+#filter for DIA in measurement year
+cal_dia_df <- varmt_df_z %>%
+  ungroup() %>%
+  group_by(TRE_CN) %>%
+  mutate(DIA = max(DIA_C),
+         data = "calibration",
+         SPCD = 202) %>%
+  dplyr::select(TRE_CN,SPCD,DIA,data) %>%
+  distinct()
+cal_dia_pp <- varmt_pp_z %>%
+  ungroup() %>%
+  group_by(TRE_CN) %>%
+  mutate(DIA = max(DIA_C),
+         data = "calibration",
+         SPCD = 122) %>%
+  dplyr::select(TRE_CN,SPCD,DIA,data) %>%
+  distinct()
+cal_dia_es <- varmt_es_z %>%
+  ungroup() %>%
+  group_by(TRE_CN) %>%
+  mutate(DIA = max(DIA_C),
+         data = "calibration",
+         SPCD = 93) %>%
+  dplyr::select(TRE_CN,SPCD,DIA,data) %>%
+  distinct()
+
+cal_dia <- bind_rows(cal_dia_df,cal_dia_pp) %>% bind_rows(.,cal_dia_es)
+
+#validation
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/val_dset.Rdata')
 ggplot(val_dset, aes(x = DIA, color = as.factor(SPCD))) +
   geom_histogram(fill="white", position="dodge") +
   theme_bw() + labs(main = 'Validation Data Set')
+#filter to plot with other data sets
+val_dia <- val_dset %>%
+  ungroup() %>%
+  mutate(TRE_CN = as.numeric(TRE_CN),
+         data = "validation") %>%
+  dplyr::select(TRE_CN,SPCD,DIA,data)
+
 #projection
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/proj_dset.Rdata')
 ggplot(proj_dset, aes(x = DIA, color = as.factor(SPCD))) +
   geom_histogram(fill="white", position="dodge") +
-  theme_bw() + labs(main = 'Projection Data Set')
-
-ggplot(proj_dset[proj_dset$SPCD == 202,],aes(x = DIA)) +
-  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
-  theme_bw() + labs(main = 'Projection Data Set')
-
-ggplot(proj_dset[proj_dset$SPCD == 122,],aes(x = DIA)) +
-  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
-  theme_bw() + labs(main = 'Projection Data Set')
-
-ggplot(proj_dset[proj_dset$SPCD == 93,],aes(x = DIA)) +
-  geom_histogram(breaks = c(3,8,13,18,23,28,33,38)) +
   theme_bw() + labs(main = 'Projection Data Set')
 
 #rug
@@ -910,6 +939,29 @@ ggplot(proj_dset[proj_dset$SPCD == 93,],aes(x = DIA, y = DIA)) +
   geom_rug(alpha = 0.3, sides = "b") +
   theme_bw() + labs(main = 'Projection Data Set') +
   xlim(0,40)
+
+#filter to plot with others
+proj_dia <- proj_dset %>%
+  ungroup() %>%
+  mutate(TRE_CN = as.numeric(TRE_CN),
+         data = "projection") %>%
+  dplyr::select(TRE_CN,SPCD,DIA,data)
+
+#together by species
+dia_all <- bind_rows(cal_dia,val_dia) %>% bind_rows(.,proj_dia)
+dia_all$data <- factor(dia_all$data, levels = c("calibration","validation","projection"))
+dia_mu <- dia_all %>%
+  group_by(data) %>%
+  mutate(mn.dia = mean(DIA))
+ggplot(dia_all, aes(x = DIA, color = data)) +
+  geom_density() +
+  geom_vline(data=dia_mu, aes(xintercept=mn.dia, color=data),
+             linetype="dashed")+
+  scale_color_brewer(palette="Paired") +
+  facet_grid(SPCD~.) +
+  theme_bw()
+
+  
 ```
 
 
@@ -1019,6 +1071,10 @@ ggplot(data = dia_sum_all, aes(x = start, y = mn_pct_all, color = scenario)) +
   geom_line() + xlab("Diameter") +
   facet_grid(.~SPCD)
 
+#absolute growth
+ggplot(data = dia_sum_all, aes(x = start, y = mn_dg_all, color = scenario)) +
+  geom_line() + xlab("Diameter") +
+  facet_grid(.~SPCD)
 ```
 
 ```{r}
@@ -1128,4 +1184,18 @@ ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/
        width = 5, height = 3, units = "in")
 ```
 
+## Explore
+
+What does the dbh distribution of calibration, validation, projection look like?
+
+```{r}
+#load data
+#calibration
+
+#validation
+
+
+#projection
+
+```
 
