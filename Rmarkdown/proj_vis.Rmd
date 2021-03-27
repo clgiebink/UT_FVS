@@ -961,7 +961,6 @@ ggplot(dia_all, aes(x = DIA, color = data)) +
   facet_grid(SPCD~.) +
   theme_bw()
 
-  
 ```
 
 
@@ -1182,20 +1181,5 @@ proj_cum_df <- ggplot(ttest_op[ttest_op$SPCD == 202,], aes(x = rcp, y = pct.diff
   theme_bw() + labs(x = "Climate Scenario", y = "Difference in cumulative relative growth")
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_cum_df.png",
        width = 5, height = 3, units = "in")
-```
-
-## Explore
-
-What does the dbh distribution of calibration, validation, projection look like?
-
-```{r}
-#load data
-#calibration
-
-#validation
-
-
-#projection
-
 ```
 
