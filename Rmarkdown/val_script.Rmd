@@ -1257,8 +1257,8 @@ load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/valid
 fvs_check_red <- fvs_check_red %>%
   dplyr::select(-DIA) %>%
   mutate(DIA = eDBH) %>%
-  mutate(DG_obs = fDIA - DIA,
-         DG_pred = eDBH - DIA)
+  mutate(DG_obs = fDIA - DBH,
+         DG_pred = eDBH - DBH)
 #full annual
 pred_an_al <- pred_an_al %>%
   group_by(TRE_CN) %>%
@@ -1466,12 +1466,13 @@ mod_dg <- assess_dg_sp(mods_fmy = mods_fmy)
 mod_dg$mod_name <- factor(mod_dg$mod_name, levels = c("Current FVS","Full Annual", "Reduced Annual", "Full Climate",
                                                       "Reduced Climate", "Climate Normals","Normals + Interactions"))
 mod_dg$SPCD <- factor(mod_dg$SPCD, levels = c(93, 122, 202),
-                  labels = c("Engelmann spruce", "Ponerosa pine", "Douglas fir"))
+                  labels = c("Engelmann spruce", "Ponderosa pine", "Douglas-fir"))
 val_dg_all <- ggplot(data = mod_dg, aes(x = RMSE, y = slope, shape = mod_name)) +
   geom_point(aes(color = r2)) +  #guides(color = guide_legend(reverse = TRUE)) +
   scale_shape_manual(values=c(10,16,1,17,2,3,8)) +# change shape
   facet_wrap(~SPCD, nrow =2) +
-  theme_bw() + theme(legend.box = "horizontal",legend.position = c(0.8, 0.2))
+  theme_bw() + theme(legend.box = "horizontal",legend.position = c(0.8, 0.2)) +
+  labs(shape = "Model", y = "Slope of Observed vs Predicted Growth")
 ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/val_dg_all.png", val_dg_all,
        width = 7, height = 5, units = "in")
 ```
@@ -1594,28 +1595,19 @@ pred_fan_es <- pred_fan_fmy %>%
 #reduced annual
 pred_an_es <- pred_an_fmy %>%
   filter(SPCD == 93)
-pred_acr_es <- pred_acr_fmy %>%
-  filter(SPCD == 93)
 #full climate
 pred_fclim_es <- pred_fclim_fmy %>%
   filter(SPCD == 93)
 #reduced climate
 pred_rclim_es <- pred_rclim_fmy %>%
   filter(SPCD == 93)
-#constant CR
-pred_crclim_es <- pred_crclim_fmy %>%
-  filter(SPCD == 93)
 #normal
 pred_n_es <- pred_n_fmy %>%
   filter(SPCD == 93)
 #normal + interactions
-pred_int_es <- pred_int_fmy %>%
-  filter(SPCD == 93)
+#pred_int_es <- pred_int_fmy %>%
+#  filter(SPCD == 93)
 pred_nint_es <- pred_nint_fmy %>%
-  filter(SPCD == 93)
-pred_n2_es <- pred_nint3_fmy %>%
-  filter(SPCD == 93)
-pred_int2_es <- pred_nint4_fmy %>%
   filter(SPCD == 93)
 ```
 
@@ -1623,13 +1615,9 @@ pred_int2_es <- pred_nint4_fmy %>%
 mods_es <- list(cur_fvs = fvs_es,
                  an_full = pred_fan_es,
                  an_red = pred_an_es,
-                 #an_cr = pred_acr_es,
                  clim_full = pred_fclim_es,
-                 clim_red = pred_crclim_es,
+                 clim_red = pred_rclim_es,
                  clim_n = pred_n_es,
-                 #clim_n2 = pred_n2_es,
-                 clim_int = pred_int_es,
-                 #clim_int2 = pred_int2_es,
                  clim_nint = pred_nint_es)
 ```
 
@@ -2075,6 +2063,10 @@ ggplot(data = pred_rclim_fmy, aes(x = DSTRBCD1,y = diff)) +
 
 ```{r}
 #plot fvs predicted vs observed
+fvs_check_red <- fvs_check_red%>%
+  mutate(Species = ifelse(SPCD==93,"Engelmann spruce",
+                          ifelse(SPCD==122,"Ponderosa pine",
+                                 "Douglas-fir")))
 par(mfrow=c(1,2))
 ggplot(fvs_check_red) +
   geom_point(aes(x = eDBH, y = fDIA, color = factor(SPCD))) +
@@ -2082,10 +2074,16 @@ ggplot(fvs_check_red) +
   labs(title = "DBH - FVS", x = "Predicted", y = "Observed", color = "Species") +
   theme_bw()
 ggplot(fvs_check_red) +
-  geom_point(aes(x = DG_pred, y = DG_obs, color = factor(SPCD))) +
+  geom_point(aes(x = DG_pred, y = DG_obs, color = Species, alpha = 0.5)) + 
+  scale_colour_manual(values = c("Douglas-fir" = "purple4", "Ponderosa pine" = "turquoise4",
+                                 "Engelmann spruce" = "gold1")) +
   geom_abline(slope = 1, intercept = 0) +
-  labs(title = "DG - FVS", x = "Predicted", y = "Observed", color = "Species") +
-  theme_bw()
+  labs(title = "DG - FVS", x = "Predicted Diameter Growth", y = "Observed Diameter Growth", color = "Species") +
+  theme_bw() + ylim(NA,6) + xlim(NA,5) +
+  theme(legend.position = c(0.88,0.95),
+        legend.background = element_rect(colour = 'black', fill = 'white', linetype='solid'))
+ggsave("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/obs_pred.png",
+       dpi = 300, height = 5, width = 7, units = "in")
 fit_fvs <- lm(fDIA~eDBH,data = fvs_check_red)
 summary(fit_fvs)
 sqrt(mean(fit_fvs$residuals^2))
