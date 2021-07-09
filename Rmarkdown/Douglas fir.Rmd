@@ -1550,6 +1550,7 @@ clim_nint_df <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = varmt_df_z)
+AIC(an_red_df,clim_red_df,clim_n_df,clim_nint_df)
 ```
 
 
@@ -1809,7 +1810,7 @@ df_mods <- dwplot(models_df, dodge_size = 1,
                           legend.background = element_rect(colour="grey80"),
                           legend.title.align = 0.5)
 #change shapes
-models_df <- models_df %>% filter(term != "(Intercept)")
+models_df <- models_df %>% filter(term != "(Intercept)") %>% droplevels()
 models_df$model <- factor(models_df$model, levels = c("Full Annual", "Reduced Annual", "Full Climate",
                                                       "Reduced Climate", "Climate Normals","Normals + Interactions"))
 df_mods <- ggplot(data = models_df, aes(x = term, y = estimate, shape = model)) + 
@@ -1817,7 +1818,7 @@ df_mods <- ggplot(data = models_df, aes(x = term, y = estimate, shape = model)) 
                 position = position_dodge(width = 1), color = "grey58") +
   geom_point(position = position_dodge(width = 1), size = 2) +
   scale_shape_manual(values=c(16,1,17,2,3,8)) +# change shape
-  scale_x_discrete(limits = rev(levels(models_pp$term))) +
+  scale_x_discrete(limits = rev(levels(models_df$term))) +
   geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
   coord_flip() +
   theme_bw() + labs(title = "a)", y = "Coefficient Estimate", x="") +
@@ -1953,6 +1954,21 @@ nint4 <- plot_model(clim_nint_df, type = "pred", terms = c("z.SDI","z.n_ppt"),
   theme_bw()
 all_int <- grid.arrange(clint,nint1,nint2,nint3,nint4,ncol = 2)
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/eff_int_df.png", all_int, scale = .5)
+
+#presentation
+prec_sdi <- plot_model(clim_nint_df, type = "pred", terms = c("z.ppt_pJunSep","z.SDI"),
+                    axis.title = c("Interannual Precipitation","dds"),
+                    colors = c("#3366FF", "#660099", "#CC0000")) +
+  theme_bw()
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/prec_sdi.png", prec_sdi, 
+       width = 5, height = 4, units = "in")
+n_sdi <- plot_model(clim_nint_df, type = "pred", terms = c("z.SDI","z.n_ppt"),
+                    axis.title = c("Competition","dds"),
+                    colors = c("#CC0000", "#660099", "#3366FF")) +
+  theme_bw()
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/n_sdi.png", n_sdi,
+       width = 5, height = 4, units = "in")
+
 ```
 
 ```{r}
