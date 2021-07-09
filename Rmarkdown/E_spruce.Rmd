@@ -1561,6 +1561,7 @@ clim_nint_es <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = varmt_es_z)
+AIC(an_red_es,clim_red_es,clim_n_es,clim_nint_es)
 ```
 
 ### Test of Normality
@@ -1799,7 +1800,7 @@ ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/
        height = 5, width = 8, units = "in")
 
 #change shapes
-models_es <- models_es %>% filter(term != "(Intercept)")
+models_es <- models_es %>% filter(term != "(Intercept)") %>% droplevels()
 models_es$model <- factor(models_es$model, levels = c("Full Annual", "Reduced Annual", "Full Climate",
                                                       "Reduced Climate", "Climate Normals","Normals + Interactions"))
 es_mods <- ggplot(data = models_es, aes(x = term, y = estimate, shape = model)) + 
@@ -1807,7 +1808,7 @@ es_mods <- ggplot(data = models_es, aes(x = term, y = estimate, shape = model)) 
                 position = position_dodge(width = 1), color = "grey58") +
   geom_point(position = position_dodge(width = 1), size = 2) +
   scale_shape_manual(values=c(16,1,17,2,3,8)) +# change shape
-  scale_x_discrete(limits = rev(levels(models_pp$term))) +
+  scale_x_discrete(limits = rev(levels(models_es$term))) +
   geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
   coord_flip() +
   theme_bw() + labs(title = "a)", y = "Coefficient Estimate", x="") +
@@ -1954,6 +1955,20 @@ nint4 <- plot_model(clim_nint_es, type = "pred", terms = c("z.ppt_pJunSep","z.BA
   theme_bw()
 all_int <- grid.arrange(clint,nint1,nint2,nint3,nint4,ncol = 2)
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/eff_int_es.png", all_int, scale = .5)
+
+#presentation
+temp_int <- plot_model(clim_n_es, type = "pred", terms = c("z.tmax_pAug","z.n_tmp"),
+                    axis.title = c("Temperature","growth"),
+                    colors = c("#3366FF", "#660099", "#CC0000")) +
+  theme_bw()
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/temp_int.png", temp_int,
+       width = 5, height = 4, units = "in")
+prec_bal <- plot_model(clim_nint_es, type = "pred", terms = c("z.ppt_pJunSep","z.BAL"),
+                    axis.title = c("Interannual Precipitation","dds"),,
+                    colors = c("#3366FF", "#660099", "#CC0000")) +
+  theme_bw()
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/prec_bal.png", prec_bal, 
+       width = 5, height = 4, units = "in")
 ```
 
 ```{r}
