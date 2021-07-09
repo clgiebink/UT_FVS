@@ -83,23 +83,9 @@ dwplot(full_clim_mod,
         legend.title.align = 0.5)
 
 #reduced
-clim_red_df <- lmer(log(dds)~
-                      #tree variables
-                      z.DIA_C+I(z.DIA_C^2)+#remove log due to standardization
-                      #z.CR_fvs+
-                      #climate
-                      z.ppt_pJunSep*z.tmax_FebJul+
-                      #competition/density
-                      z.SDI+ 
-                      #site variables
-                      z.SICOND+z.SLOPE+
-                      #random effects
-                      (1+z.DIA_C|TRE_CN)+(1|Year),
-                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                    data = glmm_df_z)
 red_clim_df <-  tidy(clim_red_df) %>% 
   filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
+  dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Douglas fir")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
@@ -107,7 +93,7 @@ red_clim_df <-  tidy(clim_red_df) %>%
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_FebJul = "Temperature",
-                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Precip:Temp",
                        z.BAL = "Competition",
                        z.CCF = "Competition", 
                        z.SDI = "Competition",
@@ -117,22 +103,9 @@ red_clim_df <-  tidy(clim_red_df) %>%
                        z.sin = "sin(Aspect-0.7854)*Slope",
                        z.cos = "cos(Aspect-0.7854)*Slope",
                        z.solrad_MayAug = "Solar Radiation"))
-clim_red_pp <- lmer(log(dds)~
-                      #tree variables
-                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                      #climate
-                      z.ppt_pJunSep+z.tmax_JunAug+
-                      #competition/density
-                      z.CCF+ #remove /100 due to standardization
-                      #site variables
-                      z.SICOND+z.SLOPE+
-                      #random effects
-                      (1+z.DIA_C|TRE_CN)+(1|Year),
-                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                    data = glmm_pp_z)
 red_clim_pp <-  tidy(clim_red_pp) %>% 
   filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
+  dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Ponderosa pine")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
@@ -140,7 +113,7 @@ red_clim_pp <-  tidy(clim_red_pp) %>%
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_JunAug = "Temperature",
-                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Precip:Temp",
                        z.BAL = "Competition",
                        z.CCF = "Competition", 
                        z.SDI = "Competition",
@@ -150,31 +123,18 @@ red_clim_pp <-  tidy(clim_red_pp) %>%
                        z.sin = "sin(Aspect-0.7854)*Slope",
                        z.cos = "cos(Aspect-0.7854)*Slope",
                        z.solrad_MayAug = "Solar Radiation"))
-clim_red_es <- lmer(log(dds)~
-                      #tree variables
-                      z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
-                      #z.CR_fvs+
-                      #climate
-                      z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
-                      #competition/density
-                      z.BAL+ 
-                      #site variables
-                      z.SICOND+z.SLOPE+
-                      #random effects
-                      (1+z.DIA_C|TRE_CN)+(1|Year),
-                    control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
-                    data = glmm_es_z)
 red_clim_es <-  tidy(clim_red_es) %>% 
   filter(effect == "fixed") %>%
-  select(term,estimate,std.error) %>%
+  dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Engelmann spruce")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
                        z.CR_fvs = "Crown Ratio",
+                       z.CR = "Crown Ratio",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precipitation",
                        z.tmax_pAug = "Temperature",
-                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Precip:Temp",
                        z.BAL = "Competition",
                        z.CCF = "Competition", 
                        z.SICOND = "Site Index",
@@ -184,18 +144,20 @@ red_clim_es <-  tidy(clim_red_es) %>%
                        z.cos = "cos(Aspect-0.7854)*Slope"))
 red_clim_mod <- full_join(red_clim_df,red_clim_pp) %>%
   full_join(.,red_clim_es)
-dwplot(red_clim_mod, 
+red_clim <- dwplot(red_clim_mod, 
        vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), # plot line at zero _behind_ coefs
        dot_args = list(aes(shape = model)),
        whisker_args = list(aes(linetype = model))) +
-  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
-  ggtitle("Reduced: Tree-Rings + Climate") +
+  theme_bw() + xlab("Standardized Coefficient Estimate") + ylab("") +
+  #ggtitle("Reduced: Tree-Rings + Climate") +
   theme(plot.title = element_text(face="bold"),
-        legend.position = "right",
+        legend.position = c(0.75,0.45),
         legend.background = element_rect(colour="grey80"),
         legend.title.align = 0.5) +
   scale_colour_manual(values = c("Douglas fir" = "purple4", "Ponderosa pine" = "turquoise4",
                                  "Engelmann spruce" = "gold1"))
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/red_clim_mods.png",red_clim,
+       height = 4, width = 5, units = "in")
 
 #changing color
 #colorblind friendly
