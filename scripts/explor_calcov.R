@@ -289,6 +289,8 @@ plt_sdi_cal <- plt_sdi_cal %>%
   group_by(PLT_CN,SPCD) %>%
   mutate(age = (STDAGE-n+1):STDAGE)
 
+
+
 #validation
 #number of years for each plot
 plt_sdi_val <- plt_sdi_val %>%
@@ -443,3 +445,306 @@ ggplot(si_df, aes(x=SICOND, fill=Species)) +
 ggplot(si_df, aes(x=SICOND, fill=Species)) +
   geom_density(alpha=.5) +
   theme_bw()
+
+#with variable radius plots
+#df
+var_df_cal <- var_df_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+var_df_cal <- left_join(var_df_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+var_df_cal <- var_df_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 202)
+ggplot(var_df_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN)) +
+  geom_hline(yintercept=570, linetype="dashed") +
+  ggtitle("Douglas fir") +
+  theme_bw()
+
+#pp
+var_pp_cal <- var_pp_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+var_pp_cal <- left_join(var_pp_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+var_pp_cal <- var_pp_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 122)
+
+#es
+var_es_cal <- test_es_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+var_es_cal <- left_join(var_es_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+var_es_cal <- var_es_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 93)
+
+var_cal <- bind_rows(var_df_cal,var_pp_cal) %>%
+  bind_rows(.,var_es_cal)
+ggplot(var_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+ggplot(var_cal) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+#df
+varmt_df_cal <- varmt_df_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+varmt_df_cal <- left_join(varmt_df_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+varmt_df_cal <- varmt_df_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 202)
+
+#pp
+varmt_pp_cal <- varmt_pp_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+varmt_pp_cal <- left_join(varmt_pp_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+varmt_pp_cal <- varmt_pp_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 122)
+
+#es
+varmt_es_cal <- varmt_es_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+varmt_es_cal <- left_join(varmt_es_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+varmt_es_cal <- varmt_es_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 93)
+
+varmt_cal <- bind_rows(varmt_df_cal,varmt_pp_cal) %>%
+  bind_rows(.,varmt_es_cal)
+ggplot(varmt_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+ggplot(varmt_cal) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+
+
+#df
+con_df_cal <- con_df_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+con_df_cal <- left_join(con_df_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+con_df_cal <- con_df_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 202)
+
+#pp
+con_pp_cal <- con_pp_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+con_pp_cal <- left_join(con_pp_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+con_pp_cal <- con_pp_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 122)
+
+#es
+con_es_cal <- con_es_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+con_es_cal <- left_join(con_es_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+con_es_cal <- con_es_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 93)
+
+con_cal <- bind_rows(con_df_cal,con_pp_cal) %>%
+  bind_rows(.,con_es_cal)
+ggplot(con_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+ggplot(con_cal) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+#df
+conmt_df_cal <- conmt_df_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+conmt_df_cal <- left_join(conmt_df_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+conmt_df_cal <- conmt_df_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 202)
+
+#pp
+conmt_pp_cal <- conmt_pp_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+conmt_pp_cal <- left_join(conmt_pp_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+conmt_pp_cal <- conmt_pp_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 122)
+
+#es
+conmt_es_cal <- conmt_es_z %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,Year,CCF,SDI) %>%
+  distinct()
+conmt_es_cal <- left_join(conmt_es_cal, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+conmt_es_cal <- conmt_es_cal %>%
+  arrange(Year) %>%
+  group_by(PLT_CN) %>%
+  mutate(age = (STDAGE-length(Year)+1):STDAGE,
+         SPCD = 93)
+
+conmt_cal <- bind_rows(conmt_df_cal,conmt_pp_cal) %>%
+  bind_rows(.,conmt_es_cal)
+ggplot(conmt_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+ggplot(conmt_cal) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+#explore the correlation between the different methods
+load('./data/formatted/con_cal.Rdata')
+load('./data/formatted/conmt_cal.Rdata')
+load('./data/formatted/var_cal.Rdata')
+load('./data/formatted/varmt_cal.Rdata')
+
+colnames(var_cal)[colnames(var_cal)=="CCF"] <- "CCF_var"
+colnames(var_cal)[colnames(var_cal)=="SDI"] <- "SDI_var"
+
+colnames(varmt_cal)[colnames(varmt_cal)=="CCF"] <- "CCF_varmt"
+colnames(varmt_cal)[colnames(varmt_cal)=="SDI"] <- "SDI_varmt"
+
+colnames(conmt_cal)[colnames(conmt_cal)=="CCF"] <- "CCF_conmt"
+colnames(conmt_cal)[colnames(conmt_cal)=="SDI"] <- "SDI_conmt"
+
+colnames(con_cal)[colnames(con_cal)=="CCF"] <- "CCF_con"
+colnames(con_cal)[colnames(con_cal)=="SDI"] <- "SDI_con"
+
+comp_cor <- left_join(var_cal, varmt_cal) %>% left_join(., con_cal) %>% left_join(., conmt_cal)
+
+#vis correlation
+library(PerformanceAnalytics)
+
+ccf_cor <- comp_cor %>% ungroup() %>% dplyr::select(starts_with("CCF"))
+chart.Correlation(ccf_cor, histogram=TRUE, pch=19)
+
+sdi_cor <- comp_cor %>% ungroup() %>% dplyr::select(starts_with("SDI"))
+chart.Correlation(sdi_cor, histogram=TRUE, pch=19)
+
+#check projection outputs
+load('./data/formatted/projection/red_bcc85.Rdata')
+
+bcc85_red_ex <- red_bcc85 %>%
+  ungroup() %>%
+  dplyr::select(PLT_CN,SPCD,Year,CCF,SDI) %>%
+  distinct()
+bcc85_red_ex <- left_join(bcc85_red_ex, cond_red, by = "PLT_CN") #PLT is numeric
+#stand age back in time
+bcc85_red_ex <- bcc85_red_ex %>%
+  arrange(Year) %>%
+  group_by(PLT_CN,SPCD) %>%
+  mutate(age = STDAGE:(STDAGE+length(Year)-1))
+
+ggplot(bcc85_red_ex) +
+  geom_line(aes(age,CCF, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+ggplot(bcc85_red_ex) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+
+
