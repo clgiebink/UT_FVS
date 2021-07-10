@@ -16,7 +16,6 @@ library(lme4)
 library(lmerTest)
 library(tidyverse)
 library(r2glmm)
-library(stringr)
 ```
 
 
@@ -83,7 +82,7 @@ r2_es <- as.data.frame(r2beta(an_es))
 r2_es$model <- "Engelmann spruce"
 r2_an <- bind_rows(r2_df,r2_pp) %>%
   bind_rows(.,r2_es)
-#write.csv(r2_an,file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/r2_an.csv")
+#write.csv(r2_an,file = "./data/formatted/r2_an.csv")
 #edit effect names and reload
 ```
 
@@ -371,7 +370,6 @@ obs <-  red_acc85 %>%
 plt_no_fclim <- red_acc85 %>% filter(Year < 2060) %>% filter(is.na(DIA)) #error - some climate data didn't match
 plt_no_fclim <- unique(plt_no_fclim$PLT_CN) #remove these plots
 rm(red_acc85)
-
 colnames(proj_foc)[colnames(proj_foc)=="DIA"] <- "DIA_0" #more intuitive column names
 colnames(proj_foc)[colnames(proj_foc)=="DBH"] <- "DIA"
 fvs <- proj_foc %>%
@@ -388,7 +386,6 @@ fvs <- proj_foc %>%
          pct_cum = ((max(DIA) - min(DIA))/min(DIA))*100,
          model = as.factor("fvs"))
 rm(proj_foc)
-
 #dbh summary output
 dia_sum_op <- fvs %>%
     dplyr::select(PLT_CN,TRE_CN,SPCD,model,Year,DIA,dg_5,pct_5) %>%
@@ -400,7 +397,6 @@ dia_sum_op <- fvs %>%
     summarise(mn_dg = mean(dg_5),
               mn_pct = mean(pct_5))
 saveRDS(dia_sum_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_sum_op.rds")
-
 #mixed model output
 mm_op <- data.frame(model = character(), SPCD = double(),
                       dg.diff = double(),
@@ -409,7 +405,6 @@ mm_op <- data.frame(model = character(), SPCD = double(),
                       pct.se = double(),
                       rcp = factor())
 saveRDS(mm_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/mm_op.rds")
-
 #t test output
 ttest_op <- data.frame(model = character(), SPCD = double(),
                      dg.diff = double(),
@@ -426,7 +421,6 @@ saveRDS(ttest_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/
 #get file names
 full_paths <- paste0('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/', 
                      dir('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/'))
-
 #run function over each file, or model output
 lapply(full_paths, function(x) {
   
@@ -533,12 +527,10 @@ lapply(full_paths, function(x) {
   saveRDS(ttest_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/ttest_op.rds")
   rm(new_mod,ttest_op)
 })
-
 ```
 
 ```{r}
 #dbh distribution for each stage - calibration, validation, projection
-
 #calibration
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata')
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata')
@@ -568,9 +560,7 @@ cal_dia_es <- varmt_es_z %>%
          SPCD = 93) %>%
   dplyr::select(TRE_CN,SPCD,DIA,data) %>%
   distinct()
-
 cal_dia <- bind_rows(cal_dia_df,cal_dia_pp) %>% bind_rows(.,cal_dia_es)
-
 #validation
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/val_dset.Rdata')
 ggplot(val_dset, aes(x = DIA, color = as.factor(SPCD))) +
@@ -582,13 +572,11 @@ val_dia <- val_dset %>%
   mutate(TRE_CN = as.numeric(TRE_CN),
          data = "validation") %>%
   dplyr::select(TRE_CN,SPCD,DIA,data)
-
 #projection
 load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/proj_dset.Rdata')
 ggplot(proj_dset, aes(x = DIA, color = as.factor(SPCD))) +
   geom_histogram(fill="white", position="dodge") +
   theme_bw() + labs(main = 'Projection Data Set')
-
 #rug
 rug_dg <- ggplot(proj_dset[proj_dset$SPCD == 202,],aes(x = DIA, y = DIA)) +
   geom_rug(alpha = 0.5, sides = "b") +
@@ -596,24 +584,20 @@ rug_dg <- ggplot(proj_dset[proj_dset$SPCD == 202,],aes(x = DIA, y = DIA)) +
   xlim(0,40)
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/rug_df.png",
        width = 10, height = 3, units = "in")
-
 ggplot(proj_dset[proj_dset$SPCD == 122,],aes(x = DIA, y = DIA)) +
   geom_rug(alpha = 0.5, sides = "b") +
   theme_bw() + labs(main = 'Projection Data Set') +
   xlim(0,40)
-
 ggplot(proj_dset[proj_dset$SPCD == 93,],aes(x = DIA, y = DIA)) +
   geom_rug(alpha = 0.3, sides = "b") +
   theme_bw() + labs(main = 'Projection Data Set') +
   xlim(0,40)
-
 #filter to plot with others
 proj_dia <- proj_dset %>%
   ungroup() %>%
   mutate(TRE_CN = as.numeric(TRE_CN),
          data = "projection") %>%
   dplyr::select(TRE_CN,SPCD,DIA,data)
-
 #together by species
 dia_all <- bind_rows(cal_dia,val_dia) %>% bind_rows(.,proj_dia)
 dia_all$data <- factor(dia_all$data, levels = c("calibration","validation","projection"))
@@ -627,7 +611,6 @@ ggplot(dia_all, aes(x = DIA, color = data)) +
   scale_color_brewer(palette="Paired") +
   facet_grid(SPCD~.) +
   theme_bw()
-
 ```
 
 
@@ -713,7 +696,6 @@ red_85 <- list(acc = red_acc85, bcc = red_bcc85, bccm = red_bccm85,
                inm = red_inm85, ipl = red_ipl85,  ipm = red_ipm85, 
                mir = red_mir85, mpl = red_mpl85, mpm = red_mpm85, 
                mrc = red_mrc85, mre = red_mre85, mri = red_mri85, nor = red_nor85)
-
 ```
 
 
@@ -727,16 +709,13 @@ dia_sum_all <- dia_sum_op %>%
               mn_pct_all = mean(mn_pct)) %>%
   unite("scenario", model:rcp, na.rm = TRUE, remove = FALSE) %>%
   separate(bins, c("start", "end"), "_")
-
 #allows for lines
 dia_sum_all$start <- as.numeric(dia_sum_all$start)
 #dia_sum_all$bins <- factor(dia_sum_all$bins,levels = c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))
-
 #relative growth
 ggplot(data = dia_sum_all, aes(x = start, y = mn_pct_all, color = scenario)) +
   geom_line() + xlab("Diameter") +
   facet_grid(.~SPCD)
-
 #absolute growth
 ggplot(data = dia_sum_all, aes(x = start, y = mn_dg_all, color = scenario)) +
   geom_line() + xlab("Diameter") +
@@ -765,13 +744,10 @@ dia_diff_all <- dia_sum_op %>%
 dia_diff_all$bins <- factor(dia_diff_all$bins,levels = c("3_8","8_13","13_18","18_23","23_28","28_33","33_38"))
 #relevel scenario so reduced annual is in the middle
 dia_diff_all$scenario <- factor(dia_diff_all$scenario, levels = c("red_26","red_85","tr_an", "n_26", "n_85","nint_26","nint_85"))
-
 #too much information, get rid of normals + interactions
 dia_diff_df <- dia_diff_all %>% filter(SPCD == 202) %>% filter(model != "nint") 
 dia_diff_pp <- dia_diff_all %>% filter(SPCD == 122) %>% filter(model != "nint")
 dia_diff_es <- dia_diff_all %>% filter(SPCD == 93) %>% filter(model != "nint")
-
-
 #plot
 proj_dia_df <- ggplot(data = dia_diff_df, aes(x = bins, y = pct_diff)) +
   geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
@@ -783,7 +759,6 @@ proj_dia_df <- ggplot(data = dia_diff_df, aes(x = bins, y = pct_diff)) +
   theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_df.png",
        width = 10, height = 3, units = "in")
-
 proj_dia_pp <- ggplot(data = dia_diff_pp, aes(x = bins, y = pct_diff)) +
   geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
   scale_fill_manual(values=c("grey81","gray44","grey81","gray44")) +
@@ -794,7 +769,6 @@ proj_dia_pp <- ggplot(data = dia_diff_pp, aes(x = bins, y = pct_diff)) +
   theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_pp.png",
        width = 10, height = 3, units = "in")
-
 proj_dia_es <- ggplot(data = dia_diff_es, aes(x = bins, y = pct_diff)) +
   geom_violin(aes(fill = scenario), width=6, position=position_dodge(width=0.6)) + 
   scale_fill_manual(values=c("grey81","gray44","grey81","gray44")) +
@@ -805,8 +779,6 @@ proj_dia_es <- ggplot(data = dia_diff_es, aes(x = bins, y = pct_diff)) +
   theme_bw() + labs(x = "Diameter Class", y = "Difference in relative growth", shape = "Model", fill = "Climate Scenario" )
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/proj_dia_es.png",
        width = 10, height = 3, units = "in")
-
-
 ```
 
 ```{r}
@@ -817,14 +789,12 @@ ttest_op$model <- factor(ttest_op$model, levels = c("tr","red", "n","nint"),
 ttest_op$rcp <- factor(ttest_op$rcp, levels = c("an","26", "85"), 
                           labels = c("No Climate","RCP2.6", "RCP8.5")) 
 ttest_op$rcp <- factor(ttest_op$rcp, levels = c("No Climate","RCP2.6", "RCP8.5")) 
-
 #get average
 ttest_all <- ttest_op %>%
   group_by(model,rcp,SPCD) %>%
   summarise(mn.dg.dif = mean(dg.diff),
             mn.pct.dif = mean(pct.diff)) #%>%
   #unite("scenario", model:rcp, na.rm = TRUE, remove = FALSE)
-
 #plot
 proj_cum_df <- ggplot(ttest_op[ttest_op$SPCD == 202,], aes(x = rcp, y = pct.diff, color = model)) +
   #add rcp26 rect
