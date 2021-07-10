@@ -1,0 +1,2134 @@
+---
+title: "Competition Comparison"
+author: "Courtney Giebink"
+date: "11/20/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Competition Issue
+
+```{r include=FALSE}
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(broom.mixed)
+library(dotwhisker)
+library(gridExtra)
+library(grid)
+library(sjPlot)
+library(sjmisc)
+```
+
+```{r include=FALSE}
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/con_df_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/conmt_df_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/var_df_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/con_cal.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/conmt_cal.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/var_cal.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_cal.Rdata')
+```
+
+## Constant Plot
+
+```{r}
+ggplot(con_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+```
+
+
+
+## Constant Plot + Mort
+
+```{r echo=FALSE}
+ggplot(conmt_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+```
+
+## Variable Plot
+
+```{r echo = FALSE}
+ggplot(var_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+```
+
+
+## Variable Plot + Mort
+
+```{r echo=FALSE}
+ggplot(varmt_cal) +
+  geom_line(aes(age,SDI, group = PLT_CN, color = factor(SPCD))) +
+  geom_hline(yintercept=620, linetype="dashed", color = "red") +
+  geom_hline(yintercept=446, linetype="dashed", color = "green") +
+  geom_hline(yintercept=570, linetype="dashed", color = "blue") +
+  #ggtitle("Density of calibration plots") +
+  labs(color = "Species") +
+  theme_bw()
+```
+
+
+## Douglas fir
+
+
+```{r}
+#constant tpa
+clim_con_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_df_z)
+#summary(clim_con_df)$coef
+##w/ mortality
+clim_conmt_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = conmt_df_z)
+#summary(clim_conmt_df)$coef
+#variable plot
+clim_mod_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_df_z)
+#summary(clim_mod_df)$coef
+## w/ mortality
+clim_red_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+#summary(clim_red_df)$coef
+AIC(clim_con_df,clim_conmt_df,clim_mod_df,clim_red_df)
+```
+
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+con_df <-  tidy(clim_con_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF",
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+conmt_df <-  tidy(clim_conmt_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+var_df <-  tidy(clim_mod_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+varmt_df <-  tidy(clim_red_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+models_df <- full_join(con_df,conmt_df) %>%
+  full_join(.,var_df) %>%
+  full_join(.,varmt_df)
+dwplot(models_df, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Growth for Douglas fir") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+
+## Ponderosa pine
+
+```{r include=FALSE}
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/con_pp_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/conmt_pp_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/var_pp_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata')
+```
+
+```{r}
+#constant
+clim_con_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.PCCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+#z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = con_pp_z)
+#summary(clim_con_pp)$coef
+## w/ mortality
+clim_conmt_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = conmt_pp_z)
+#summary(clim_conmt_pp)$coef
+#variable
+clim_red_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+#z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+#summary(clim_red_pp)$coef
+## with mortality
+clim_red2_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+#z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+#summary(clim_red2_pp)$coef
+AIC(clim_con_pp,clim_conmt_pp,clim_red_pp,clim_red2_pp)
+```
+
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+con_pp <-  tidy(clim_con_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF",
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+conmt_pp <-  tidy(clim_conmt_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+var_pp <-  tidy(clim_red_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+varmt_pp <-  tidy(clim_red2_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+models_pp <- full_join(con_pp,conmt_pp) %>%
+  full_join(.,var_pp) %>%
+  full_join(.,varmt_pp)
+dwplot(models_pp, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Growth for Ponderosa pine") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+
+## Engelmann spruce
+
+```{r include=FALSE}
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/con_es_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/conmt_es_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/var_es_z.Rdata')
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata')
+```
+
+
+```{r}
+#constant
+clim_con_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_es_z)
+#summary(clim_con_es)$coef
+##with mort 
+clim_conmt_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = conmt_es_z)
+#summary(clim_conmt_es)$coef
+#variable
+clim_red_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_es_z)
+#summary(clim_red_es)$coef
+## wiht mort
+clim_red2_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+#summary(clim_red2_es)$coef
+AIC(clim_con_es,clim_conmt_es,clim_red_es,clim_red2_es)
+```
+
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+con_es <-  tidy(clim_con_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF",
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+conmt_es <-  tidy(clim_conmt_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Constant + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+var_es <-  tidy(clim_red_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+varmt_es <-  tidy(clim_red2_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Variable + Mort")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+models_es <- full_join(con_es,conmt_es) %>%
+  full_join(.,var_es) %>%
+  full_join(.,varmt_es)
+dwplot(models_es, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("Growth for Englemann spruce") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+## Validation
+
+```{r}
+library(equivalence)
+library(plot3D)
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_check_red.Rdata")
+fvs_check_red <- fvs_check_red %>%
+  mutate(DG_obs = fDIA - DIA,
+         DG_pred = eDBH - DIA)
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_con3.Rdata")
+pred_clim_con3 <- pred_clim_con3 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_con3_fmy <- pred_clim_con3 %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_con3')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_conmt.Rdata")
+pred_clim_conmt <- pred_clim_conmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_conmt_fmy <- pred_clim_conmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_conmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_conmt3.Rdata")
+pred_clim_conmt3 <- pred_clim_conmt3 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_conmt3_fmy <- pred_clim_conmt3 %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_conmt3')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_var3.Rdata")
+pred_clim_var3 <- pred_clim_var3 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_var3_fmy <- pred_clim_var3 %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_var3')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_varmt4.Rdata")
+pred_clim_varmt4 <- pred_clim_varmt4 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_varmt4_fmy <- pred_clim_varmt4 %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_varmt4')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_clim_cr2.Rdata")
+pred_clim_cr2 <- pred_clim_cr2 %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_cr2_fmy <- pred_clim_cr2 %>%
+  filter(Year == fMEASYEAR)
+rm('pred_clim_cr2')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int_con.Rdata")
+pred_int_con <- pred_int_con %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_int_fmy <- pred_int_con %>%
+  filter(Year == fMEASYEAR)
+rm('pred_int_con')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int_varmt.Rdata")
+pred_int_varmt <- pred_int_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vmint_fmy <- pred_int_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_int_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int_var.Rdata")
+pred_int_var <- pred_int_var %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vint_fmy <- pred_int_var %>%
+  filter(Year == fMEASYEAR)
+rm('pred_int_var')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_int2_varmt.Rdata")
+pred_int2_varmt <- pred_int2_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vmint2_fmy <- pred_int2_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_int2_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n_con.Rdata")
+pred_n_con <- pred_n_con %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_cn_fmy <- pred_n_con %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n_con')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n_var.Rdata")
+pred_n_var <- pred_n_var %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vn_fmy <- pred_n_var %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n_var')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n2_var.Rdata")
+pred_n2_var <- pred_n2_var %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vn2_fmy <- pred_n2_var %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n2_var')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n_varmt.Rdata")
+pred_n_varmt <- pred_n_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vmn_fmy <- pred_n_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n2_varmt.Rdata")
+pred_n2_varmt <- pred_n2_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vmn2_fmy <- pred_n2_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n2_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_n3_varmt.Rdata")
+pred_n3_varmt <- pred_n3_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vmn3_fmy <- pred_n3_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_n3_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint_var.Rdata")
+pred_nint_var <- pred_nint_var %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vnint_fmy <- pred_nint_var %>%
+  filter(Year == fMEASYEAR)
+rm('pred_nint_var')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint1_var.Rdata")
+pred_nint1_var <- pred_nint1_var %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_vnint1_fmy <- pred_nint1_var %>%
+  filter(Year == fMEASYEAR)
+rm('pred_nint1_var')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint_varmt.Rdata")
+pred_nint_varmt <- pred_nint_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_nint_fmy <- pred_nint_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_nint_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint2_varmt.Rdata")
+pred_nint2_varmt <- pred_nint2_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_nint2_fmy <- pred_nint2_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_nint2_varmt')
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pred_nint1_varmt.Rdata")
+pred_nint1_varmt <- pred_nint1_varmt %>%
+  group_by(TRE_CN) %>%
+  mutate(DG_pred = max(DIA) - min(DIA),
+         DG_obs = fDIA - min(DIA))
+pred_nint1_fmy <- pred_nint1_varmt %>%
+  filter(Year == fMEASYEAR)
+rm('pred_nint1_varmt')
+```
+
+```{r}
+assess_dg <- function(mods_fmy){
+  require(equivalence)
+  require(tidyverse)
+  mod_comp_lst <- list()
+  for(i in 1:length(mods_fmy)){
+    mod_run <- mods_fmy[[i]]
+    fit_lm <- lm(DG_obs~DG_pred, data = mod_run)
+    r2 <- summary(fit_lm)$adj.r.squared
+    RMSE <- sqrt(mean(fit_lm$residuals^2))
+    slope <- summary(fit_lm)$coef[2,1]
+    eq <- equivalence::equiv.boot(x = mod_run$DG_pred, y = mod_run$DG_obs)
+    mod_name <- names(mods_fmy)[i]
+    ntrees <- eq$n
+    #ci.b0.low <- eq$ci.b0[[1]]
+    #ci.b0.high <- eq$ci.b0[[2]]
+    #rs.b0.low <- eq$rs.b0[1]
+    #rs.b0.high <- eq$rs.b0[2]
+    #test.b0 <- eq$Test.b0[[1]]
+    ci.b1.low <- eq$ci.b1[[1]]
+    ci.b1.high <- eq$ci.b1[[2]]
+    #rs.b1.low <- eq$rs.b1[1]
+    #rs.b1.high <- eq$rs.b1[2]
+    test.b1 <- eq$Test.b1[[1]]
+    mod_df <- data.frame(mod_name, ntrees, r2, RMSE, slope,
+                           ci.b1.low, ci.b1.high, test.b1)
+    mod_comp_lst[[i]] <- mod_df
+  }
+  mod_comp_df <- do.call(rbind.data.frame, mod_comp_lst)
+  return(mod_comp_df)
+}
+```
+
+```{r}
+mods_comp <- list(fvs = fvs_check_red,
+                  #con = pred_con3_fmy,
+                  #con_int = pred_int_fmy,
+                  #conmt = pred_conmt3_fmy,
+                  var = pred_var3_fmy,
+                  varmt = pred_varmt4_fmy,
+                  #varmt_int = pred_vmint_fmy,
+                  var_int = pred_vint_fmy,
+                  varmt_int = pred_vmint2_fmy,
+                  #con_n = pred_cn_fmy,
+                  #var_n = pred_vn_fmy,
+                  var_n = pred_vn2_fmy,
+                  #varmt_n = pred_vmn_fmy,
+                  varmt_n = pred_vmn2_fmy,
+                  #varmt_n3 = pred_vmn3_fmy,
+                  #var_nint1 = pred_vnint1_fmy,
+                  var_nint = pred_vnint_fmy,
+                  #varmt_nint1 = pred_nint1_fmy,
+                  #varmt_nint = pred_nint_fmy,
+                  varmt_nint = pred_nint2_fmy,
+                  OG = pred_cr2_fmy)
+```
+
+```{r}
+mod_comp_dg <- assess_dg(mods_fmy = mods_comp)
+ggplot(data = mod_comp_dg, aes(x = RMSE, y = slope, label = mod_name)) +
+  geom_point(aes(color = r2)) + geom_text(hjust = 0, nudge_x = 0.0002) +
+  #xlim(0.53,0.541)+
+  theme_bw()
+```
+
+### Residuals
+
+```{r}
+
+```
+
+
+
+## Other interactions
+
+### Douglas fir
+
+#### Con
+
+```{r}
+clim_int_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 z.CCF:z.tmax_FebJul+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 z.SICOND:z.tmax_FebJul+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_df_z)
+AIC(clim_int_df)
+summary(clim_int_df)$coef
+clim_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_df_z)
+AIC(clim_n_df)
+summary(clim_n_df)$coef
+clim_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 z.CCF:z.n_ppt+
+                 #z.CCF:z.tmax_FebJul+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SICOND:z.tmax_FebJul+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_df_z)
+AIC(clim_nint_df)
+summary(clim_nint_df)$coef
+```
+
+
+#### Con + mort
+
+```{r}
+clim_int_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 z.SICOND:z.tmax_FebJul+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = conmt_df_z)
+AIC(clim_int_df)
+summary(clim_int_df)$coef
+clim_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = conmt_df_z)
+AIC(clim_n_df)
+summary(clim_n_df)$coef
+clim_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.DIA_C:z.tmax_FebJul+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 z.CCF:z.n_ppt+
+                 #site variables
+                 z.SICOND+#z.SLOPE+
+                 #z.SICOND:z.tmax_FebJul+
+                 z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = conmt_df_z)
+AIC(clim_nint_df)
+summary(clim_nint_df)$coef
+```
+
+
+#### Var
+
+```{r}
+var_int_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 z.SICOND:z.tmax_FebJul+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_df_z)
+AIC(var_int_df)
+summary(var_int_df)$coef
+var_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                   z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_df_z)
+AIC(var_n_df)
+summary(var_n_df)$coef
+var_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 #z.DIA_C:z.tmax_FebJul+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 z.CCF:z.n_ppt+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SICOND:z.tmax_FebJul+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_df_z)
+AIC(var_nint_df)
+summary(var_nint_df)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(var_n_df, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"),
+           title = "Douglas fir")
+plot_model(var_n_df, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"),
+           title = "Douglas fir")
+plot_model(var_n_df, type = "pred", terms = c("z.tmax_FebJul", "z.n_ppt"),
+           title = "Douglas fir")
+plot_model(var_n_df, type = "pred", terms = c("z.tmax_FebJul", "z.n_tmp"),
+           title = "Douglas fir")
+plot_model(var_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_FebJul"),
+           title = "Douglas fir")
+```
+
+```{r}
+#what makes sense
+var_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 z.ppt_pJunSep:z.tmax_FebJul+z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 #z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.CCF+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_df_z)
+AIC(var_n_df)
+summary(var_n_df)$coef
+```
+
+
+#### Var + mort
+
+```{r}
+varmt_int_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 #z.DIA_C:z.tmax_FebJul+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 z.SICOND:z.tmax_FebJul+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+AIC(varmt_int_df)
+summary(varmt_int_df)$coef
+varmt_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+AIC(varmt_n_df)
+summary(varmt_n_df)$coef
+varmt_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.DIA_C:z.tmax_FebJul+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 #z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 #z.n_tmp:z.ppt_pJunSep+
+                 #z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 z.SDI:z.n_ppt+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+AIC(varmt_nint_df)
+summary(varmt_nint_df)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(varmt_n_df, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"),
+           title = "Douglas fir")
+plot_model(varmt_n_df, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"),
+           title = "Douglas fir")
+plot_model(varmt_n_df, type = "pred", terms = c("z.tmax_FebJul", "z.n_ppt"),
+           title = "Douglas fir")
+plot_model(varmt_n_df, type = "pred", terms = c("z.tmax_FebJul", "z.n_tmp"),
+           title = "Douglas fir")
+plot_model(varmt_nint_df, type = "pred", terms = c("z.ppt_pJunSep", "z.SDI"),
+           title = "Douglas fir")
+#plot_model(var_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_FebJul"),
+#           title = "Douglas fir")
+```
+
+```{r}
+varmt_n_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 #z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 #z.n_tmp:z.ppt_pJunSep+
+                 #z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+AIC(varmt_n_df)
+summary(varmt_n_df)$coef
+varmt_nint_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_FebJul+
+                 #z.ppt_pJunSep:z.tmax_FebJul+
+                 #z.n_ppt+
+                 z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 #z.n_tmp:z.ppt_pJunSep+
+                 #z.n_tmp:z.tmax_FebJul+
+                 z.n_ppt:z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+AIC(varmt_nint_df)
+summary(varmt_nint_df)$coef
+```
+
+
+### Ponderosa pine
+
+#### Con
+
+```{r}
+clim_int_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.PCCF+ #remove /100 due to standardization
+                     z.PCCF:z.tmax_JunAug+
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = con_pp_z)
+AIC(clim_int_pp)
+summary(clim_int_pp)$coef
+clim_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #z.n_tmp:z.tmax_JunAug+
+                     #competition/density
+                     z.PCCF+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = con_pp_z)
+AIC(clim_n_pp)
+summary(clim_n_pp)$coef
+clim_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #z.n_tmp:z.tmax_JunAug+
+                     #competition/density
+                     z.PCCF+ #remove /100 due to standardization
+                     z.PCCF:z.tmax_JunAug+
+                     z.PCCF:z.n_ppt+
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = con_pp_z)
+AIC(clim_nint_pp)
+summary(clim_nint_pp)$coef
+```
+
+
+#### Con + mort
+
+```{r}
+clim_int_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = conmt_pp_z)
+AIC(clim_int_pp)
+summary(clim_int_pp)$coef
+clim_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #z.n_tmp:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = conmt_pp_z)
+AIC(clim_n_pp)
+summary(clim_n_pp)$coef
+clim_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #z.n_tmp:z.tmax_JunAug+
+                     #competition/density
+                     z.PCCF+ #remove /100 due to standardization
+                     z.PCCF:z.ppt_pJunSep+
+                     z.PCCF:z.n_ppt+
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = conmt_pp_z)
+AIC(clim_nint_pp)
+summary(clim_nint_pp)$coef
+```
+
+
+#### Var
+
+```{r}
+var_int_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+AIC(var_int_pp)
+summary(var_int_pp)$coef
+var_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+AIC(var_n_pp)
+summary(var_n_pp)$coef
+var_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+AIC(var_nint_pp)
+summary(var_nint_pp)$coef
+var_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     z.BAL:z.n_ppt+
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+AIC(var_nint_pp)
+summary(var_nint_pp)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(var_n_pp, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"))
+plot_model(var_n_pp, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"))
+#plot_model(var_n_pp, type = "pred", terms = c("z.tmax_JunAug", "z.n_ppt"))
+#plot_model(var_n_pp, type = "pred", terms = c("z.tmax_JunAug", "z.n_tmp"))
+#plot_model(var_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_FebJul"))
+plot_model(var_nint_pp, type = "pred", terms = c("z.BAL", "z.DIA_C"))
+plot_model(var_nint_pp, type = "pred", terms = c("z.BAL", "z.n_ppt"))
+```
+
+```{r}
+var_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     #z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = var_pp_z)
+AIC(var_n_pp)
+summary(var_n_pp)$coef
+```
+
+
+#### Var + mort
+
+```{r}
+varmt_int_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_int_pp)
+summary(varmt_int_pp)$coef
+varmt_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_n_pp)
+summary(varmt_n_pp)$coef
+varmt_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_nint_pp)
+summary(varmt_nint_pp)$coef
+varmt_nint_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     z.DIA_C:z.BAL+
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     z.BAL:z.n_ppt+
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_nint_pp)
+summary(varmt_nint_pp)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(varmt_n_pp, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"))
+plot_model(varmt_n_pp, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"))
+plot_model(varmt_n_pp, type = "pred", terms = c("z.tmax_JunAug", "z.n_ppt"))
+#plot_model(var_n_pp, type = "pred", terms = c("z.tmax_JunAug", "z.n_tmp"))
+plot_model(varmt_n_pp, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_JunAug"))
+#plot_model(var_nint_pp, type = "pred", terms = c("z.BAL", "z.DIA_C"))
+plot_model(varmt_nint_pp, type = "pred", terms = c("z.BAL", "z.n_ppt"))
+```
+
+```{r}
+varmt_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     #z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     #z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_n_pp)
+summary(varmt_n_pp)$coef
+varmt_n_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep+z.tmax_JunAug+#interaction significant
+                     z.ppt_pJunSep:z.tmax_JunAug+
+                     #z.n_ppt+z.n_tmp+
+                     z.n_ppt:z.ppt_pJunSep+
+                     z.n_tmp:z.ppt_pJunSep+
+                     #z.n_ppt:z.tmax_JunAug+
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+AIC(varmt_n_pp)
+summary(varmt_n_pp)$coef
+```
+
+
+### Englemann spruce
+
+#### Con
+
+```{r}
+clim_int_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.SDI:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 z.SLOPE:z.ppt_pJunSep+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_es_z)
+AIC(clim_int_es)
+summary(clim_int_es)$coef
+clim_n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 #z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.SDI+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = con_es_z)
+AIC(clim_n_es)
+summary(clim_n_es)$coef
+```
+
+#### Con + mort
+
+```{r}
+
+```
+
+#### Var
+
+```{r}
+var_int_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.DIA_C:z.ppt_pJunSep+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SLOPE:z.ppt_pJunSep+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+AIC(var_int_es)
+summary(var_int_es)$coef
+var_n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_es_z)
+AIC(var_n_es)
+summary(var_n_es)$coef
+var_nint_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 #z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = var_es_z)
+AIC(var_nint_es)
+summary(var_nint_es)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(var_n_es, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"))
+plot_model(var_n_es, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"))
+plot_model(var_n_es, type = "pred", terms = c("z.tmax_pAug", "z.n_tmp"))
+#plot_model(var_n_es, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_JunAug"))
+#plot_model(var_nint_pp, type = "pred", terms = c("z.BAL", "z.DIA_C"))
+plot_model(var_nint_es, type = "pred", terms = c("z.ppt_pJunSep", "z.BAL"))
+```
+
+
+#### Var + mort
+
+```{r}
+varmt_int_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.DIA_C:z.ppt_pJunSep+
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.SLOPE:z.ppt_pJunSep+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+AIC(varmt_int_es)
+summary(varmt_int_es)$coef
+varmt_n_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+AIC(varmt_n_es)
+summary(varmt_n_es)$coef
+varmt_nint_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep+z.tmax_pAug+ #significant interaction
+                 #z.ppt_pJunSep:z.tmax_pAug+
+                 #z.n_ppt+z.n_tmp+
+                 z.n_ppt:z.ppt_pJunSep+
+                 z.n_tmp:z.ppt_pJunSep+
+                 z.n_tmp:z.tmax_pAug+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 z.BAL:z.ppt_pJunSep+
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+AIC(varmt_nint_es)
+summary(varmt_nint_es)$coef
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE,fig.show="hold", out.width="50%"}
+par(mfrow=c(2,2))
+plot_model(varmt_n_es, type = "pred", terms = c("z.ppt_pJunSep", "z.n_ppt"))
+plot_model(varmt_n_es, type = "pred", terms = c("z.ppt_pJunSep", "z.n_tmp"))
+plot_model(varmt_n_es, type = "pred", terms = c("z.tmax_pAug", "z.n_tmp"))
+#plot_model(var_n_es, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_JunAug"))
+#plot_model(var_nint_pp, type = "pred", terms = c("z.BAL", "z.DIA_C"))
+plot_model(varmt_nint_es, type = "pred", terms = c("z.ppt_pJunSep", "z.BAL"))
+```
+# Variable + Mort
+
+```{r}
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_df_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_pp_z.Rdata")
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/varmt_es_z.Rdata")
+```
+
+## Annual
+
+### Full
+
+
+
+### Reduced
+
+```{r}
+an_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+an_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+an_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_es_z)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+an_df_ef <-  tidy(an_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual DF")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF",
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+an_pp_ef <-  tidy(an_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual PP")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+an_es_ef <-  tidy(an_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual ES")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+models_an <- full_join(an_df_ef,an_pp_ef) %>%
+  full_join(.,an_es_ef) 
+dwplot(models_an, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("TR Growth Models") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+
+## Climate
+
+```{r}
+clim_df <- lmer(log(dds)~
+                  #tree variables
+                 z.DIA_C+ I(z.DIA_C^2)+#remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_FebJul+
+                 #competition/density
+                 z.SDI+#remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #z.solrad_MayAug+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+               data = varmt_df_z)
+clim_pp <- lmer(log(dds)~
+                     #tree variables
+                     z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                     #climate
+                     z.ppt_pJunSep*z.tmax_JunAug+#interaction significant
+                     #competition/density
+                     z.BAL+ #remove /100 due to standardization
+                     #site variables
+                     z.SICOND+z.SLOPE+
+                     #random effects
+                     (1+z.DIA_C|TRE_CN)+(1|Year),
+                   control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                   data = varmt_pp_z)
+clim_es <- lmer(log(dds)~
+                 #tree variables
+                 z.DIA_C+I(z.DIA_C^2)+ #remove log due to standardization
+                 z.CR+
+                 #climate
+                 z.ppt_pJunSep*z.tmax_pAug+ #significant interaction
+                 #competition/density
+                 z.BAL+#z.PCCF+z.CCF+ #remove /100 due to standardization
+                 #site variables
+                 z.SICOND+z.SLOPE+
+                 #random effects
+                 (1+z.DIA_C|TRE_CN)+(1|Year),
+                 control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
+                data = varmt_es_z)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+an_df_ef <-  tidy(an_df) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual DF")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_FebJul = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_FebJul" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF",
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+an_pp_ef <-  tidy(an_pp) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual PP")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_JunAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_JunAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+an_es_ef <-  tidy(an_es) %>% 
+  filter(effect == "fixed") %>%
+  select(term,estimate,std.error) %>%
+  mutate(model = "Annual ES")%>%
+  relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
+                       "I(z.DIA_C^2)" = "DBH^2",
+                       z.CR_fvs = "Crown Ratio",
+                       "I(z.CR_fvs^2)" = "CR^2",
+                       z.CR = "Crown Ratio",
+                       z.ppt_pJunSep = "Precipitation",
+                       z.tmax_pAug = "Temperature",
+                       "z.ppt_pJunSep:z.tmax_pAug" = "Climate Interaction",
+                       z.BAL = "BAL",
+                       z.CCF = "CCF", 
+                       z.SDI = "SDI",
+                       z.SICOND = "Site Index",
+                       z.SLOPE = "Slope",
+                       "I(z.SLOPE^2)" = "Slope^2",
+                       z.sin = "sin(Aspect-0.7854)*Slope",
+                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.solrad_MayAug = "radiation"))
+models_an <- full_join(an_df_ef,an_pp_ef) %>%
+  full_join(.,an_es_ef) 
+dwplot(models_an, 
+       vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2), 
+       # plot line at zero _behind_ coefs
+       dot_args = list(aes(shape = model)),
+       whisker_args = list(aes(linetype = model))) +
+  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+  ggtitle("TR Growth Models") +
+  theme(plot.title = element_text(face="bold"),
+        legend.position = "right",
+        legend.background = element_rect(colour="grey80"),
+        legend.title.align = 0.5)
+```
+
+
+## Climate Normals
+
+
+## Douglas fir
+
+
+## Ponderosa pine
+
+
+## Engelmann spruce
+
+
+
