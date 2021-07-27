@@ -1,0 +1,438 @@
+---
+title: "NCS_fig"
+author: "Courtney Giebink"
+date: "7/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Projection
+
+```{r echo=FALSE}
+library(tidyverse)
+```
+
+```{r}
+#fvs projection data
+load(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_proj.Rdata")
+#get observations
+#don't want second projection before 2020
+load('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/red clim/red_acc85.Rdata')
+obs <-  red_acc85 %>%
+  group_by(TRE_CN) %>%
+  filter(Year == MEASYEAR) %>%
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA)
+plt_no_fclim <- red_acc85 %>% filter(Year < 2060) %>% filter(is.na(DIA)) #error - some climate data didn't match
+plt_no_fclim <- unique(plt_no_fclim$PLT_CN) #remove these plots
+rm(red_acc85)
+colnames(fvs_proj)[colnames(fvs_proj)=="DIA"] <- "DIA_0" #more intuitive column names
+colnames(fvs_proj)[colnames(fvs_proj)=="DBH"] <- "DIA"
+fvs_proj <- fvs_proj %>%
+  mutate(PLT_CN = as.numeric(PLT_CN),
+         TRE_CN = as.numeric(CN)) %>%
+  filter(!(PLT_CN %in% plt_no_fclim)) %>% #remove
+  dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA_0,DIA,TPA) %>%
+  mutate(TPA = replace_na(TPA,6))
+```
+
+```{r}
+#FIA
+#get previous inventory data from those plots (most often two measurements?)
+#connect to database
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FIADB.db")
+tree <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, PLOT, COUNTYCD, SUBP, TREE, SPCD, STATUSCD, PREV_TRE_CN, DIA, CR, TPA_UNADJ, INVYR FROM TREE")) %>%
+  collect()
+colnames(tree)[colnames(tree)=="CN"] <- "TRE_CN"
+plot <- tbl(UT_FIA, sql("SELECT CN, MEASYEAR, LAT, LON, ELEV, DESIGNCD, SUBP_EXAMINE_CD, PREV_PLT_CN FROM PLOT")) %>%
+  collect()
+colnames(plot)[colnames(plot)=="CN"] <- "PLT_CN"
+cond <- tbl(UT_FIA, sql("SELECT PLT_CN, CONDID, COND_STATUS_CD, SLOPE, ASPECT,SDI_RMRS, SDIMAX_RMRS, SICOND, BALIVE, DSTRBCD1, SIBASE, SISP FROM COND")) %>%
+  collect()
+#t-1 inventory
+```
+
+```{r}
+#filter for plots with single species PP or ES
+sum_proj <- fvs_proj %>%
+  group_by(PLT_CN) %>%
+  summarise(n_sp = length(unique(SPCD)),
+            SPCD = max(SPCD),
+            n_tr = length(unique(TRE_CN))) %>%
+  filter(n_sp == 1) %>%
+  filter(SPCD %in% c(93,122))
+#previous plot
+sum_proj$MEASYEAR <- plot$MEASYEAR[match(sum_proj$PLT_CN,plot$PLT_CN)]
+sum_proj$PREV_PLT <- plot$PREV_PLT_CN[match(sum_proj$PLT_CN, plot$PLT_CN)]
+sum_proj$PREV_YR <- plot$MEASYEAR[match(sum_proj$PREV_PLT,plot$PLT_CN)]
+#do they have disturbance?
+sum_proj$DST2 <- cond$DSTRBCD1[match(sum_proj$PLT_CN,plot$PLT_CN)]
+sum_proj$DST1 <- cond$DSTRBCD1[match(sum_proj$PREV_PLT,plot$PLT_CN)]
+#or filter by change in basal area over time?
+```
+
+```{r}
+#get FVS db of plots
+#original code Mark castle
+#df containing validation plots and years
+ncsPlots <- sum_proj
+
+#Remove row names column
+ncsPlots$X<-NULL;head(ncsPlots)
+
+#Open DB connection
+con <- dbConnect(SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FIADB.db")
+
+#Extract FVS_GroupAddFilesAndKeywords table
+fvsAddKey<-dbReadTable(con, 'FVS_GROUPADDFILESANDKEYWORDS')
+
+#Extract FVS_PlotInit_Plot table
+fvsPlotInitPlot<-dbReadTable(con, 'FVS_PLOTINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitCond<-dbReadTable(con, 'FVS_STANDINIT_COND')
+
+#Extract FVS_StandInit_Cond table
+fvsStandInitPlot<-dbReadTable(con, 'FVS_STANDINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitPlot<-dbReadTable(con, 'FVS_TREEINIT_PLOT')
+
+#Extract FVS_StandInit_Cond table
+fvsTreeInitCond<-dbReadTable(con, 'FVS_TREEINIT_COND')
+
+#Disconnect from input database
+dbDisconnect(con)
+
+#Rename  PLT_CN header in valPlots
+names(ncsPlots)[names(ncsPlots)=="PLT_CN"]<-"STAND_CN"
+
+#Subset FIA utah data based on the plots in valPlots
+fvsPlotInitPlot<-fvsPlotInitPlot[fvsPlotInitPlot$STAND_CN %in% ncsPlots$STAND_CN,]
+fvsStandInitPlot<-fvsStandInitPlot[fvsStandInitPlot$STAND_CN %in% ncsPlots$STAND_CN,]
+fvsTreeInitPlot<-fvsTreeInitPlot[fvsTreeInitPlot$STAND_CN %in% ncsPlots$STAND_CN,]
+
+#Merge inventory years to FVSPlotInitPlot and FVSStandInitPlot
+fvsPlotInitPlot<-merge(fvsPlotInitPlot, ncsPlots, by="STAND_CN", all.x = T)
+fvsStandInitPlot<-merge(fvsStandInitPlot, ncsPlots, by="STAND_CN", all.x = T)
+
+#Create group label based on inventory years
+fvsPlotInitPlot$NewGroup<-paste(fvsPlotInitPlot$MEASYEAR);head(fvsPlotInitPlot)
+fvsStandInitPlot$NewGroup<-paste(fvsStandInitPlot$MEASYEAR);head(fvsStandInitPlot)
+
+#Add NewGroup to GROUPS column
+fvsPlotInitPlot$GROUPS<-paste(fvsPlotInitPlot$GROUPS, fvsPlotInitPlot$NewGroup, sep = " ");head(fvsPlotInitPlot$GROUPS)
+fvsStandInitPlot$GROUPS<-paste(fvsStandInitPlot$GROUPS, fvsStandInitPlot$NewGroup, sep = " ");head(fvsStandInitPlot$GROUPS)
+
+#Create new UT DB
+conn <- dbConnect(RSQLite::SQLite(), "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/FVS_ncs.db")
+
+#Write each of the neccesary FVS tables to DB
+dbWriteTable(conn, "FVS_GROUPADDFILESANDKEYWORDS", fvsAddKey)
+dbWriteTable(conn, "FVS_PLOTINIT_PLOT", fvsPlotInitPlot)
+dbWriteTable(conn, "FVS_STANDINIT_COND", fvsStandInitCond)
+dbWriteTable(conn, "FVS_STANDINIT_PLOT", fvsStandInitPlot)
+dbWriteTable(conn, "FVS_TREEINIT_COND", fvsTreeInitCond)
+dbWriteTable(conn, "FVS_TREEINIT_PLOT", fvsTreeInitPlot)
+```
+
+Consider rerunning FVS with modifiers
+```{r}
+#want to figure out the percent of average cumulative growth
+#basically get modification
+#dbh summary output
+pct_cum_op <- data.frame(PLT_CN = double(),
+                         TRE_CN = double(),
+                         SPCD = double(),
+                         DIA_0 = double(),
+                         tdg_cum = double(), 
+                         model = character(), 
+                         rcp = factor(),
+                         dg_cum = double(),
+                         pct_cum = double())
+saveRDS(pct_cum_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pct_cum_op.rds")
+
+#get file names
+full_paths <- paste0('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/', 
+                     dir('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/'))
+#run function over each file, or model output
+lapply(full_paths, function(x) {
+  
+  filename <- word(x, -1, sep = '/')
+  file_string <- str_remove(filename, '.rds')
+  model_name <- word(file_string, 1, sep = "_")
+  rcp <- str_sub(file_string, start = -2)
+  
+  fvs_red <- fvs %>%
+    dplyr::select(PLT_CN,TRE_CN,dg_cum) %>%
+    filter(PLT_CN %in% unique(sum_proj$PLT_CN)) %>% #remove
+    distinct()
+  
+  if(model_name %in% c("nint","red")){
+    new_mod <- readRDS(file = x)
+    new_mod <- new_mod %>%
+      filter(PLT_CN %in% unique(sum_proj$PLT_CN)) %>% #remove
+      dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA) %>%
+      arrange(Year) %>%
+      group_by(TRE_CN) %>%
+      mutate(tdg_cum = max(DIA) - min(DIA),
+             DIA_0 = min(DIA),
+             model = model_name,
+             rcp = rcp) %>%
+      dplyr::select(PLT_CN,TRE_CN,SPCD,DIA_0,tdg_cum,model,rcp) %>%
+      distinct() %>%
+      inner_join(.,fvs_red) %>%
+      mutate(pct_cum = (tdg_cum/dg_cum)*100)
+    
+    #bind to all model summary
+    pct_cum_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pct_cum_op.rds")
+    pct_cum_op <- bind_rows(pct_cum_op,new_mod)
+    saveRDS(pct_cum_op, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pct_cum_op.rds")
+    rm(pct_cum_op)
+  }
+})
+
+pct_cum_op <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/pct_cum_op.rds")
+
+pct_cum <- pct_cum_op %>%
+  filter(SPCD %in% c(93,122) & rcp == 85) %>%
+  group_by(SPCD) %>%
+  summarise(mn_pct = mean(pct_cum, na.rm = T))
+```
+
+
+```{r}
+#filter for plots
+#first add previous
+prev_plts <- sum_proj$PREV_PLT #17
+#df of first inventory (2000-2010)
+prev_df <- plot %>%
+  filter(PLT_CN %in% prev_plts) %>%
+  inner_join(., tree, by = "PLT_CN") %>%
+  inner_join(., cond, by = "PLT_CN") %>%
+  mutate(PREV_PLT = PLT_CN) %>%
+  dplyr::select(-c(PLT_CN))
+#add plot number from next inventory
+sum_proj_red <- sum_proj %>%
+  dplyr::select(PLT_CN,PREV_PLT)
+prev_df <- prev_df %>%
+  left_join(., sum_proj_red, by = "PREV_PLT")
+
+#calculate basal area per plot
+#first remove dead trees
+prev_df_red <- prev_df %>%
+  filter(STATUSCD == 1)
+prev_ba <- prev_df_red %>%
+  mutate(Year = MEASYEAR,
+         BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ) %>%
+  group_by(PLT_CN, Year, BALIVE) %>%
+  summarise(BA = sum(BA_pa)) %>%
+  mutate(dat = "obs")
+#same as BALIVE, so just use that then? yes
+```
+
+```{r}
+#dataframe of second inventory
+#get second inventory, or projection start year
+proj_ba <- fvs_proj %>%
+  filter(PLT_CN %in% sum_proj$PLT_CN) %>% #mono PP & ES stands
+  group_by(PLT_CN) %>%
+  slice_min(Year) %>%
+  mutate(BA_pa = ((DIA^2) * 0.005454) * TPA) %>%
+  group_by(PLT_CN, Year) %>%
+  summarise(BA = sum(BA_pa)) %>%
+  mutate(dat = "obs")
+proj_ba$BALIVE <- cond$BALIVE[match(proj_ba$PLT_CN,cond$PLT_CN)]
+```
+
+```{r}
+#fvs ba
+fvs_ba <- fvs_proj %>%
+  filter(PLT_CN %in% sum_proj$PLT_CN) %>% #mono PP & ES stands
+  anti_join(., proj_ba, by = c("PLT_CN","Year")) %>% #take out inventory/observations
+  mutate(BA_pa = ((DIA^2) * 0.005454) * TPA) %>%
+  group_by(PLT_CN, Year) %>%
+  summarise(BA = sum(BA_pa)) %>%
+  mutate(dat = "fvs")
+```
+
+```{r}
+#make empty df
+dia_proj <- data.frame(PLT_CN = NA, TRE_CN = NA, SPCD = NA,
+                       Year = NA, DIA = NA, TPA_UNADJ =NA,
+                       model = NA, rcp = NA)
+saveRDS(dia_proj, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_proj.rds")
+#get file names
+full_paths <- paste0('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/', 
+                     dir('/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/projection/outputs/'))
+#run function over each file, or model output
+lapply(full_paths, function(x) {
+  
+  filename <- word(x, -1, sep = '/')
+  file_string <- str_remove(filename, '.rds')
+  model_name <- word(file_string, 1, sep = "_")
+  rcp <- str_sub(file_string, start = -2)
+  
+  if(model_name %in% c("nint","red")){
+    new_mod <- readRDS(file = x)
+    new_mod <- new_mod %>%
+      filter(PLT_CN %in% sum_proj$PLT_CN) %>% #filter plots for mono PP and ES
+      anti_join(., proj_ba, by = c("PLT_CN","Year")) %>% #take out inventory/observations
+      filter(Year <= 2060) %>%
+      dplyr::select(PLT_CN,TRE_CN,SPCD,Year,DIA,TPA_UNADJ) %>%
+      mutate(model = model_name,
+             rcp = rcp)
+    #bind to all model df
+    dia_proj <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_proj.rds")
+    dia_proj <- bind_rows(dia_proj,new_mod)
+    saveRDS(dia_proj, file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_proj.rds")
+    rm(dia_proj)
+  }
+})
+```
+
+```{r}
+#load all projections
+dia_proj <- readRDS(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/dia_proj.rds")
+#check
+length(unique(dia_proj$PLT_CN))
+#average diameter for same tree across climate models
+dia_sum_proj <- dia_proj %>%
+  mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ) %>%
+  group_by(PLT_CN,TRE_CN,SPCD,Year,model) %>%
+  summarise(BA_mn = mean(BA_pa, na.rm = T),
+            BA_var = (sd(BA_pa, na.rm = T))^2) #square sd to get variance; can't add sd but can add variance
+#stand level basal area for each year
+tr_ba <- dia_sum_proj %>%
+  group_by(PLT_CN, SPCD, Year, model) %>%
+  summarise(BA = sum(BA_mn),
+            var_sum = sum(BA_var)) %>%
+  mutate(sd_tot = sqrt(var_sum),
+         dat = "tr")
+tr_es_ba <- tr_ba %>%
+  filter(SPCD == 93,
+         model == "nint")
+tr_pp_ba <- tr_ba %>%
+  filter(SPCD == 122,
+         model == "red")
+tr_ba <- bind_rows(tr_es_ba,tr_pp_ba)
+```
+
+
+```{r}
+#plot fvs only
+#combine dfs
+all_ba <- bind_rows(prev_ba,proj_ba) %>%
+  bind_rows(.,fvs_ba)
+ggplot(data = all_ba, aes(x = Year, y = BA, group = PLT_CN)) +
+  geom_line()
+```
+
+```{r}
+library(sjPlot)
+library(sjmisc)
+library(grid)
+library(gridExtra)
+```
+
+
+```{r}
+#plot a couple plots
+obs_ba <- bind_rows(prev_ba,proj_ba)
+all_ba <- tr_ba %>%
+  dplyr::select(PLT_CN,Year,BA,dat,sd_tot) %>%
+  bind_rows(.,fvs_ba) %>%
+  bind_rows(.,obs_ba) %>%
+  mutate(sd_tot = ifelse(is.na(sd_tot), 0, sd_tot))
+#fvs_ba and tr_ba
+for(i in 1:length(unique(sum_proj$PLT_CN))){
+  tst_plt <- unique(sum_proj$PLT_CN)[i]
+  species <- ifelse(sum_proj$SPCD[sum_proj$PLT_CN == tst_plt] == 93, 
+                    "Engelmann spruce stand", "Ponderosa pine stand")
+  all_ba$dat <- factor(all_ba$dat, levels=c("obs", "fvs", "tr"))
+                       #labels=c("Observation: FIA", "Projection: FVS", "Projection: Climate-Sensitive"))
+  p <- ggplot(data = all_ba[all_ba$PLT_CN == tst_plt,], 
+              aes(x = Year, y = BA, color = dat)) + 
+    xlim(2000,2060) + ylim (0,300) +
+    geom_line() +
+    geom_ribbon(aes(ymin = BA-sd_tot, ymax = BA+sd_tot), alpha = 0.2) +
+    labs(title = species, y = "Total basal area of live trees") +
+    scale_color_manual(name = "Data", 
+                       values = c("black","dark green","light green")) + 
+    theme_bw() + theme(legend.position = "none")
+  
+  #maximum basal area
+  #calculated from MaxSDI
+  #see UT variant eq 3.5.1
+  #SDIMAXi =BAMAX / (0.5454154 * SDIU); default SDIU is 0.85
+  #PP = 446 * (0.5454154*0.85) = 206.767
+  #ES = 620 * (0.5454154*0.85) = 287.4339
+  if(species == "Engelmann spruce stand"){
+    p <- p + geom_hline(yintercept= 287.4339, linetype="dashed",
+                        color = "red")
+  }
+  if(species == "Ponderosa pine stand"){
+    p <- p + geom_hline(yintercept= 206.767, linetype="dashed",
+                        color = "red")
+  }
+  file.name <- paste0("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/ncs/",
+                      tst_plt, ".png")
+  ggsave(plot = p, filename = file.name,
+         width = 4, height = 3, units = "in")
+  
+  fvs_fire <- fvs_fire %>% mutate(PLT_CN = as.numeric(PLT_CN))
+  p2 <- ggplot(data = fvs_fire[fvs_fire$PLT_CN == tst_plt,]) +
+    geom_line(aes(x = Year, y = Mortality_BA_Sev, color = StandID)) +
+    labs(y = "Percent of BA killed") +
+    xlim(2000,2060) + ylim(0,100)+
+    theme_bw() + theme(legend.position = "none")
+  
+  lay = rbind(c(1,1,1),
+              c(1,1,1),
+              c(2,2,2))
+  pp_plot <- grid.arrange(grobs = list(p,p2), layout_matrix = lay)
+  file.name2 <- paste0("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/ncs/",
+                       tst_plt,"x2.png")
+  ggsave(filename =  file.name2, pp_plot, 
+         height = 5, width = 7, units = "in")
+}
+
+```
+
+
+```{r}
+#aggregate basal area over plots?
+#possibly shows how in aggregation you lose heterogeneity
+```
+
+
+
+## FVS
+
+```{r}
+fvs_carb <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/ncs/carbon.csv")
+fvs_carb$PLT_CN <- fvsStandInitPlot$STAND_CN[match(fvs_carb$StandID,fvsStandInitPlot$STAND_ID)]
+fvs_fire <- read_csv(file = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/raw/FVS/ncs/fire.csv")
+fvs_fire$PLT_CN <- fvsStandInitPlot$STAND_CN[match(fvs_fire$StandID,fvsStandInitPlot$STAND_ID)]
+```
+
+```{r}
+ggplot(data = fvs_fire) +
+    geom_line(aes(x = Year, y = Mortality_BA_Sev, color = StandID))
+ggplot(data = fvs_fire) +
+    geom_line(aes(x = Year, y = PTorch_Sev, color = StandID))
+ggplot(data = fvs_fire) +
+    geom_line(aes(x = Year, y = Crown_Index, color = StandID))
+```
+
+```{r}
+ggplot(data = fvs_carb) +
+    geom_line(aes(x = Year, y = Total_Stand_Carbon, color = StandID))
+```
