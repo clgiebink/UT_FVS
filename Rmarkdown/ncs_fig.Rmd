@@ -306,6 +306,7 @@ length(unique(dia_proj$PLT_CN))
 #average diameter for same tree across climate models
 dia_sum_proj <- dia_proj %>%
   mutate(BA_pa = ((DIA^2) * 0.005454) * TPA_UNADJ) %>%
+  filter(rcp == 85) %>%
   group_by(PLT_CN,TRE_CN,SPCD,Year,model) %>%
   summarise(BA_mn = mean(BA_pa, na.rm = T),
             BA_var = (sd(BA_pa, na.rm = T))^2) #square sd to get variance; can't add sd but can add variance
@@ -357,16 +358,18 @@ for(i in 1:length(unique(sum_proj$PLT_CN))){
   species <- ifelse(sum_proj$SPCD[sum_proj$PLT_CN == tst_plt] == 93, 
                     "Engelmann spruce stand", "Ponderosa pine stand")
   all_ba$dat <- factor(all_ba$dat, levels=c("obs", "fvs", "tr"))
-                       #labels=c("Observation: FIA", "Projection: FVS", "Projection: Climate-Sensitive"))
+  all_ba$label <- ifelse(all_ba$dat == "obs", "Observation: FIA",
+                         ifelse(all_ba$dat == "fvs", "Projection: FVS",
+                                "Projection: Tree-Ring, Climate-Sensitive"))
   p <- ggplot(data = all_ba[all_ba$PLT_CN == tst_plt,], 
-              aes(x = Year, y = BA, color = dat)) + 
+              aes(x = Year, y = BA, color = label)) + 
     xlim(2000,2060) + ylim (0,300) +
     geom_line() +
     geom_ribbon(aes(ymin = BA-sd_tot, ymax = BA+sd_tot), alpha = 0.2) +
     labs(title = species, y = "Total basal area of live trees") +
     scale_color_manual(name = "Data", 
                        values = c("black","dark green","light green")) + 
-    theme_bw() + theme(legend.position = "none")
+    theme_bw() #+ theme(legend.position = "none")
   
   #maximum basal area
   #calculated from MaxSDI
@@ -385,23 +388,23 @@ for(i in 1:length(unique(sum_proj$PLT_CN))){
   file.name <- paste0("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/ncs/",
                       tst_plt, ".png")
   ggsave(plot = p, filename = file.name,
-         width = 4, height = 3, units = "in")
+         width = 7, height = 4, units = "in")
   
-  fvs_fire <- fvs_fire %>% mutate(PLT_CN = as.numeric(PLT_CN))
-  p2 <- ggplot(data = fvs_fire[fvs_fire$PLT_CN == tst_plt,]) +
-    geom_line(aes(x = Year, y = Mortality_BA_Sev, color = StandID)) +
-    labs(y = "Percent of BA killed") +
-    xlim(2000,2060) + ylim(0,100)+
-    theme_bw() + theme(legend.position = "none")
-  
-  lay = rbind(c(1,1,1),
-              c(1,1,1),
-              c(2,2,2))
-  pp_plot <- grid.arrange(grobs = list(p,p2), layout_matrix = lay)
-  file.name2 <- paste0("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/ncs/",
-                       tst_plt,"x2.png")
-  ggsave(filename =  file.name2, pp_plot, 
-         height = 5, width = 7, units = "in")
+  # fvs_fire <- fvs_fire %>% mutate(PLT_CN = as.numeric(PLT_CN))
+  # p2 <- ggplot(data = fvs_fire[fvs_fire$PLT_CN == tst_plt,]) +
+  #   geom_line(aes(x = Year, y = Mortality_BA_Sev, color = StandID)) +
+  #   labs(y = "Percent of BA killed") +
+  #   xlim(2000,2060) + ylim(0,100)+
+  #   theme_bw() + theme(legend.position = "none")
+  # 
+  # lay = rbind(c(1,1,1),
+  #             c(1,1,1),
+  #             c(2,2,2))
+  # pp_plot <- grid.arrange(grobs = list(p,p2), layout_matrix = lay)
+  # file.name2 <- paste0("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/ncs/",
+  #                      tst_plt,"x2.png")
+  # ggsave(filename =  file.name2, pp_plot, 
+  #        height = 5, width = 7, units = "in")
 }
 
 ```
