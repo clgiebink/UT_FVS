@@ -1561,7 +1561,7 @@ clim_nint_es <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = varmt_es_z)
-AIC(an_red_es,clim_red_es,clim_n_es,clim_nint_es)
+AIC(an_al_es,an_red_es,clim_al_es,clim_red_es,clim_n_es,clim_nint_es)
 ```
 
 ### Test of Normality
@@ -1669,30 +1669,30 @@ full_an_es <-  tidy(an_al_es) %>%
   mutate(model = "Full Annual")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope"))
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL"))
 red_an_es <-  tidy(an_red_es) %>% 
   filter(effect == "fixed") %>%
   dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Reduced Annual")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
-                       z.CR = "Crown Ratio",
+                       z.CR_fvs = "CR",
+                       z.CR = "CR",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.solrad_MayAug = "solrad"))
 full_clim_es <-  tidy(clim_al_es) %>% 
   filter(effect == "fixed") %>%
@@ -1700,18 +1700,18 @@ full_clim_es <-  tidy(clim_al_es) %>%
   mutate(model = "Full Climate")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_pAug = "Temp",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Precip:Temp",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope"))
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL"))
 
 red_clim_es <-  tidy(clim_red_es) %>% 
   filter(effect == "fixed") %>%
@@ -1719,38 +1719,38 @@ red_clim_es <-  tidy(clim_red_es) %>%
   mutate(model = "Reduced Climate")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
-                       z.CR = "Crown Ratio",
+                       z.CR = "CR",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_pAug = "Temp",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Precip:Temp",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope"))
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL"))
 red_n_es <-  tidy(clim_n_es) %>% 
   filter(effect == "fixed") %>%
   dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Climate Normals")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
-                       z.CR = "Crown Ratio",
+                       z.CR = "CR",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_pAug = "Temp",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Precip:Temp",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.n_ppt = "Precip Normal",
                        z.n_tmp = "Temp Normal",
                        "z.ppt_pJunSep:z.n_ppt" = "Precip:Precip Normal",
@@ -1762,19 +1762,19 @@ red_nint_es <-  tidy(clim_nint_es) %>%
   mutate(model = "Normals + Interactions")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
-                       z.CR = "Crown Ratio",
+                       z.CR = "CR",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_pAug = "Temp",
                        "z.ppt_pJunSep:z.tmax_pAug" = "Precip:Temp",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.n_ppt = "Precip Normal",
                        z.n_tmp = "Temp Normal",
                        "z.ppt_pJunSep:z.n_ppt" = "Precip:Precip Normal",
@@ -1811,7 +1811,7 @@ es_mods <- ggplot(data = models_es, aes(x = term, y = estimate, shape = model)) 
   scale_x_discrete(limits = rev(levels(models_es$term))) +
   geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
   coord_flip() +
-  theme_bw() + labs(title = "a)", y = "Coefficient Estimate", x="") +
+  theme_bw() + labs(title = "a)", y = "Standardized Coefficient Estimate", x="Predictor") +
   theme(#plot.title = element_text(face="bold"),
         legend.position = c(0.76,0.5),
         legend.background = element_rect(colour="grey80"),

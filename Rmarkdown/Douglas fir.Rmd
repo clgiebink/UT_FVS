@@ -1550,7 +1550,7 @@ clim_nint_df <- lmer(log(dds)~
                  (1+z.DIA_C|TRE_CN)+(1|Year),
                  control = lmerControl(optimizer = "Nelder_Mead",optCtrl = list(maxfun = 100000)),
                data = varmt_df_z)
-AIC(an_red_df,clim_red_df,clim_n_df,clim_nint_df)
+AIC(an_al_df,an_red_df,clim_al_df,clim_red_df,clim_n_df,clim_nint_df)
 ```
 
 
@@ -1676,32 +1676,32 @@ full_an_df <-  tidy(an_al_df) %>%
   mutate(model = "Full Annual")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.BAL = "BAL",
                        z.CCF = "CCF",
                        z.PCCF = "PCCF",
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope"))
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL"))
 red_an_df <-  tidy(an_red_df) %>% 
   filter(effect == "fixed") %>%
   dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Reduced Annual")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
-                       z.CR = "Crown Ratio",
+                       z.CR_fvs = "CR",
+                       z.CR = "CR",
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.solrad_MayAug = "solrad"))
 full_clim_df <-  tidy(clim_al_df) %>% 
   filter(effect == "fixed") %>%
@@ -1709,7 +1709,7 @@ full_clim_df <-  tidy(clim_al_df) %>%
   mutate(model = "Full Climate")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_FebJul = "Temp",
@@ -1718,18 +1718,18 @@ full_clim_df <-  tidy(clim_al_df) %>%
                        z.CCF = "CCF", 
                        z.PCCF = "PCCF",
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope"))
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL"))
 red_clim_df <-  tidy(clim_red_df) %>% 
   filter(effect == "fixed") %>%
   dplyr::select(term,estimate,std.error) %>%
   mutate(model = "Reduced Climate")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_FebJul = "Temp",
@@ -1737,11 +1737,11 @@ red_clim_df <-  tidy(clim_red_df) %>%
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.solrad_MayAug = "solrad"))
 red_n_df <-  tidy(clim_n_df) %>% 
   filter(effect == "fixed") %>%
@@ -1749,7 +1749,7 @@ red_n_df <-  tidy(clim_n_df) %>%
   mutate(model = "Climate Normals")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_FebJul = "Temp",
@@ -1757,11 +1757,11 @@ red_n_df <-  tidy(clim_n_df) %>%
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.solrad_MayAug = "solrad",
                        z.n_ppt = "Precip Normal",
                        z.n_tmp = "Temp Normal",
@@ -1774,7 +1774,7 @@ red_nint_df <-  tidy(clim_nint_df) %>%
   mutate(model = "Normals + Interactions")%>%
   relabel_predictors(c(z.DIA_C = "DBH",                       # relabel predictors
                        "I(z.DIA_C^2)" = "DBH^2",
-                       z.CR_fvs = "Crown Ratio",
+                       z.CR_fvs = "CR",
                        "I(z.CR_fvs^2)" = "CR^2",
                        z.ppt_pJunSep = "Precip",
                        z.tmax_FebJul = "Temp",
@@ -1782,11 +1782,11 @@ red_nint_df <-  tidy(clim_nint_df) %>%
                        z.BAL = "BAL",
                        z.CCF = "CCF", 
                        z.SDI = "SDI",
-                       z.SICOND = "Site Index",
-                       z.SLOPE = "Slope",
-                       "I(z.SLOPE^2)" = "Slope^2",
-                       z.sin = "sin(Aspect-0.7854)*Slope",
-                       z.cos = "cos(Aspect-0.7854)*Slope",
+                       z.SICOND = "SICOND",
+                       z.SLOPE = "SL",
+                       "I(z.SLOPE^2)" = "SL^2",
+                       z.sin = "sin(ASP-0.7854)*SL",
+                       z.cos = "cos(ASP-0.7854)*SL",
                        z.solrad_MayAug = "solrad",
                        z.n_ppt = "Precip Normal",
                        z.n_tmp = "Temp Normal",
@@ -1804,7 +1804,7 @@ df_mods <- dwplot(models_df, dodge_size = 1,
                   # plot line at zero _behind_ coefs
                   dot_args = list(aes(shape = model)))+
                   #whisker_args = list(aes(linetype = model))) +
-                  theme_bw() + xlab("Coefficient Estimate") + ylab("") +
+                  theme_bw() + xlab("Standardized Coefficient Estimate") + ylab("") +
                     theme(plot.title = element_text(face="bold"),
                           legend.position = "right",
                           legend.background = element_rect(colour="grey80"),
@@ -1821,7 +1821,7 @@ df_mods <- ggplot(data = models_df, aes(x = term, y = estimate, shape = model)) 
   scale_x_discrete(limits = rev(levels(models_df$term))) +
   geom_hline(yintercept = 0, colour = "grey60", linetype = 2) +
   coord_flip() +
-  theme_bw() + labs(title = "a)", y = "Coefficient Estimate", x="") +
+  theme_bw() + labs(title = "a)", y = "Standardized Coefficient Estimate", x="Predictor") +
   theme(#plot.title = element_text(face="bold"),
         legend.position = c(0.76,0.5),
         legend.background = element_rect(colour="grey80"),
