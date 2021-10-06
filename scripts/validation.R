@@ -2274,6 +2274,44 @@ pred_fclim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_al_df, mod_pp = cl
 pred_clim_cr <- val_clim_cr(newdata = val_dset,mod_df = clim_mod_df, mod_pp = clim_mod_pp, 
                             mod_es = clim_mod_es,sp_stats = sp_stats,nonfocal = non_focal_exp,
                             bratio = bratio_df ,ccf_df = ccf_df, climate = clim_val)
+ 
 
-#check
+# Crown Ratio Check -------
+
+#just use reduced annual model
+#could probably choose any output though
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/validation/val_an.Rdata")
+
+#connect to SQLite database to get future CR
+library(dbplyr)
+library(RSQLite)
+UT_FIA <- DBI::dbConnect(RSQLite::SQLite(), "./data/raw/FIADB.db")
+tree <- tbl(UT_FIA, sql("SELECT CN, PLT_CN, CR, PREV_TRE_CN FROM TREE")) %>%
+  collect()
+
+#match across remeasurement
+val_an$fCR <- tree$CR[match(val_an$TRE_CN,tree$PREV_TRE_CN)]
+
+#filter data set
+red_an <- val_an %>%
+  dplyr::select(TRE_CN,MEASYEAR,CR,Year,CR_fvs,fMEASYEAR,fCR) %>%
+  filter(fMEASYEAR == Year)
+#plot
+CR_tr_plt <- ggplot(data = red_an, aes(x = CR_fvs, y = fCR)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  stat_regline_equation(label.y = 90, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 80, aes(label = ..rr.label..)) +
+  theme_bw() +
+  labs(x = "Predicted CR", y = "Observed CR")
+
+#also look at FVS prediction
+load("/home/courtney/Documents/Masters/Research/Utah/UT_FVS/data/formatted/fvs_check_red.Rdata")
+fvs_check_red$fCR <- tree$CR[match(fvs_check_red$CN,tree$PREV_TRE_CN)]
+#plot
+CR_fvs_plt <- ggplot(data = fvs_check_red, aes(x = CR2, y = fCR)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Predicted CR", y = "Observed CR")
+
 
