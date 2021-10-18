@@ -1661,6 +1661,14 @@ plotLowess(resid_clmred~z.SLOPE,data = varmt_df_z,ylab="Residuals",main="Climate
 
 ```
 
+```{r}
+ggplot(data = varmt_df_z, aes(x = z.SDI, y = z.n_ppt)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "SDI", y = "MAP")
+```
+
+
 
 ## Visualization
 
@@ -1932,26 +1940,37 @@ ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/
 ### Interaction
 
 ```{r}
+#plot interaction across whole range
 clint <- plot_model(clim_red_df, type = "pred", terms = c("z.ppt_pJunSep","z.tmax_FebJul"),
                     axis.title = c("Precip","dds"), title = "b) Temp", show.legend = F,
                     colors = c("grey72", "gray47", "gray0")) +
-  theme_bw()
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  geom_rug(data = varmt_df_z, aes(x = z.ppt_pJunSep), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
 nint1 <- plot_model(clim_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
                     axis.title = c("Precip","dds"), title = "c) Precip Normal", show.legend = F,
                     colors = c("grey72", "gray47", "gray0")) +
-  theme_bw()
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  geom_rug(data = varmt_df_z, aes(x = z.ppt_pJunSep), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
 nint2 <- plot_model(clim_n_df, type = "pred", terms = c("z.tmax_FebJul","z.n_ppt"),
                     axis.title = c("Temp","dds"), title = "d) Precip Normal", show.legend = F,
                     colors = c("grey72", "gray47", "gray0")) +
-  theme_bw()
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  geom_rug(data = varmt_df_z, aes(x = z.tmax_FebJul), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
 nint3 <- plot_model(clim_nint_df, type = "pred", terms = c("z.ppt_pJunSep","z.SDI"),
                     axis.title = c("Precip","dds"), title = "e) SDI", show.legend = F,
                     colors = c("grey72", "gray47", "gray0")) +
-  theme_bw()
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  geom_rug(data = varmt_df_z, aes(x = z.ppt_pJunSep), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
 nint4 <- plot_model(clim_nint_df, type = "pred", terms = c("z.SDI","z.n_ppt"),
                     axis.title = c("SDI","dds"), title = "f) Precip Normal", show.legend = F,
                     colors = c("grey72", "gray47", "gray0")) +
-  theme_bw()
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  geom_rug(data = varmt_df_z, aes(x = z.SDI), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
 all_int <- grid.arrange(clint,nint1,nint2,nint3,nint4,ncol = 2)
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/eff_int_df.png", all_int, scale = .5)
 
@@ -1969,9 +1988,7 @@ n_sdi <- plot_model(clim_nint_df, type = "pred", terms = c("z.SDI","z.n_ppt"),
 ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/n_sdi.png", n_sdi,
        width = 5, height = 4, units = "in")
 
-```
-
-```{r}
+#all together
 plot_df <- list(df_mods,clint,nint1,nint2,nint3,nint4)
 lay = rbind(c(1,1,2,3),
              c(1,1,4,5),
@@ -1981,29 +1998,191 @@ ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/
        height = 8, width = 12, units = "in")
 ```
 
+```{r}
+#consider other options for visualizing interactions
+#add rug
+plot_model(clim_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
+                    axis.title = c("Precip","dds"), title = "Precip Normal", show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  xlim(-2.5,7) + ylim(1,10) +
+  geom_rug(data = varmt_df_z, aes(x = z.ppt_pJunSep), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b")
+#color rug by other variable
+library(ggnewscale)
+plot_model(clim_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
+                    axis.title = c("Precip","dds"), title = "c) Precip Normal", show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")")))+ 
+  new_scale_color() + 
+  geom_rug(data = varmt_df_z, aes(x = z.ppt_pJunSep, 
+                                    group = z.n_ppt, color = z.n_ppt),
+           inherit.aes = FALSE,
+           alpha = 0.1, sides = "b") +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(color = "Precip Normal")
+  
+```
 
 ```{r}
-plot_model(n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
-                    axis.title = c("Precip","dds"), legend.title = "Precip Normal", title = "") +
+#add rectangle around 95% confidence interval
+nint1 <- plot_model(clim_n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_ppt"),
+                    axis.title = c("Precip","dds"), title = "Precip Normal", show.legend = F,
+                    colors = c("grey72", "gray47", "gray0")) +
+  theme_bw() + labs(y = expression(paste("dds (i", n^2, ")"))) +
+  xlim(-2.5,7) + ylim(1,10) +
+    geom_rect(
+    aes(xmin = -2, xmax = 2, ymin = -Inf, ymax = Inf),
+    size = .5, fill = "#00000000", color = "black")
+#scatter plot
+ggplot(data = varmt_df_z, aes(x = z.ppt_pJunSep, y = z.n_ppt)) +
+  geom_point() + labs(x = "Precip", y = "Precip Normal") +
   theme_bw()
-plot_model(n_df, type = "pred", terms = c("z.tmax_FebJul","z.n_ppt"),
-                    axis.title = c("Temp","dds"), legend.title = "Precip Normal", title = "")
-plot_model(n_df, type = "pred", terms = c("z.tmax_FebJul","z.n_tmp"),
-                    axis.title = c("Temp","dds"), legend.title = "Temp Normal", title = "")
-plot_model(n_df, type = "pred", terms = c("z.ppt_pJunSep","z.n_tmp"),
-                    axis.title = c("Precip","dds"), legend.title = "Temp Normal", title = "")
+#shows strong correlation
+#consider frequency plot below
+dens1 <- ggplot(data = varmt_df_z, aes(x = z.ppt_pJunSep)) +
+  geom_density() + theme_bw() + xlim(-2.5, 7) + labs(x = "Precip")
+#or histogram
+hist1 <- ggplot(data = varmt_df_z, aes(x = z.ppt_pJunSep)) +
+  geom_histogram() + theme_bw() + #xlim(-2.5, 7) + 
+  labs(x = "Precip")+
+    geom_rect( # HERE IS UR BOX
+    #data = data.frame(),
+    aes(xmin = -2, xmax = 2, ymin = -Inf, ymax = Inf),
+    size = 1, fill = "#00000000", color = "black")
+```
+
+
+```{r}
+#try using the effects package
+library(effects)
+ef_pdf <- effect("z.ppt_pJunSep*z.n_ppt", clim_n_df, KR = T)
+#built in plot
+plot(ef_pdf)
+#make my own plot
+ef.pdf <- as.data.frame(ef_pdf)
+cc <- scales::seq_gradient_pal("red", "blue", "Lab")(seq(0,1,length.out=5))
+ggplot(ef.pdf, aes(x = z.ppt_pJunSep, color = factor(z.n_ppt))) +
+  geom_line(aes(y = fit, group = factor(z.n_ppt)), size = 1.5) +
+  geom_ribbon(aes(ymin=lower, ymax=upper, group = factor(z.n_ppt), fill = factor(z.n_ppt)), 
+              linetype= "dashed", alpha=0.1, size = 0.5,
+              show.legend = F) +
+  labs(x = "Interannual Precipitation", y = "Marginal Effects on dds") +
+  scale_colour_manual(values = cc) +
+  labs(color='Precip Normal') + 
+  theme_bw()
+```
+
+```{r}
+#plot_model relies on ggeffects so use that to make own function
+plot_int <- function(data,term1,term2,model){
+  require(tidyverse) #obvi
+  require(MKmisc) #to get CI
+  require(ggeffects) #to predict interaction effect
+  
+  #find the 95% confidence intervals for 25, 50, 75 percent quantiles
+  t2 <- data[,term2]
+  #ci10_df <- quantileCI(t2, prob = 0.1)
+  ci25_df <- quantileCI(t2, prob = 0.25)
+  ci50_df <- quantileCI(t2, prob = 0.50)
+  ci75_df <- quantileCI(t2, prob = 0.75)
+  #ci90_df <- quantileCI(t2, prob = 0.90)
+  #consider adding more quantiles
+  
+  #make new dataframe
+  df <- data.frame(quant = c(25,50,75),
+                   estimate = c(ci25_df$estimate[1],ci50_df$estimate[1],
+                                ci75_df$estimate[1]),
+                   CIlower = c(min(ci25_df$conf.int),min(ci50_df$conf.int),
+                               min(ci75_df$conf.int)),
+                   CIupper = c(max(ci25_df$conf.int),max(ci50_df$conf.int),
+                               max(ci75_df$conf.int)))
+  
+  #find the values of the first term that are observed between CI above
+  for(i in 1:nrow(df)){
+    df_red <- data %>% filter(between(t2,df$CIlower[i],df$CIupper[i]))
+    t1 <- df_red[,term1]
+    df$xmin[i] <- min(t1, na.rm = T)
+    df$xmax[i] <- max(t1, na.rm = T)
+  }
+  
+  #create string to pass to predict function
+  #first interaction term
+  x_l <- c(df$xmin,df$xmax) #list
+  x_s <- paste0(x_l, collapse=",") #string
+  pred_t1 <- paste0(term1, " [", x_s, "]")
+  #second interaction term
+  estimate <- paste0(df$estimate, collapse=",")
+  pred_t2 <- paste0(term2," [", estimate, "]")
+  
+  #predict interaction
+  int_df <- ggpredict(model, terms = c(pred_t1, pred_t2))
+  
+  #interaction where observations exist
+  df$group <- factor(df$estimate)
+  int_df_red <- int_df %>%
+    full_join(.,df) %>% #join dfs to filter by observations
+    filter(x >= (xmin-0.01) & x <= (xmax+0.01)) #probably should be a better way to do this
+  #for example x == xmin |(OR) x == xmax but that doesn't work
+  #so subtract/add a little to make work
+  
+  plot <- ggplot(int_df_red, aes(x = x, y = predicted, color = group)) +
+    geom_line() +
+    geom_ribbon(aes(ymin = conf.low, ymax = conf.high), linetype = 0, alpha = 0.2) +
+    scale_color_manual(labels = c(25, 50, 75), values = c("grey72", "gray47", "gray0")) +
+    theme_bw()+
+    labs(y = expression(paste("dds (i", n^2, ")")),
+         color = "Quantile")
+  
+  return(plot)
+}
+
+clint_plt <- plot_int(data = varmt_df_z, term1 = "z.ppt_pJunSep", term2 =  "z.tmax_FebJul", model = clim_red_df)
+clint_plt <- clint_plt +
+  labs(x = "Precip", title = "b) Temp") +
+  theme(legend.position = "none")
+
+nint1_plt <- plot_int(data = varmt_df_z, term1 = "z.ppt_pJunSep", term2 = "z.n_ppt", model = clim_n_df)
+nint1_plt <- nint1_plt +
+    labs(x = "Precip",  title = "c) Precip Normal") +
+  theme(legend.position = "none")
+
+nint2_plt <- plot_int(data = varmt_df_z, term1 = "z.tmax_FebJul", term2 = "z.n_ppt", model = clim_n_df) 
+nint2_plt <- nint2_plt +
+    labs(x = "Temp",  title = "d) Precip Normal") +
+  theme(legend.position = "none")
+
+nint3_plt <- plot_int(data = varmt_df_z, term1 = "z.ppt_pJunSep", term2 = "z.SDI", model = clim_nint_df) 
+nint3_plt <- nint3_plt +
+    labs(x = "Precip",  title = "e) SDI") +
+  theme(legend.position = "none")
+
+nint4_plt <- plot_int(data = varmt_df_z, term1 = "z.SDI", term2 = "z.n_ppt", model = clim_nint_df) 
+#need one figure with legend to cut and paste
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/int_leg.png",nint4_plt)
+nint4_plt <- nint4_plt +
+    labs(x = "SDI",  title = "f) Precip Normal") +
+  theme(legend.position = "none")
+
+all_int <- grid.arrange(clint_plt,nint1_plt,nint2_plt,
+                        nint3_plt,nint4_plt,ncol = 2)
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/eff_int_df.png", all_int, scale = .5)
+
+#join interactions with coefficient plot
+plot_df <- list(df_mods,clint_plt,nint1_plt,
+                nint2_plt,nint3_plt,nint4_plt)
+lay = rbind(c(1,1,2,3),
+             c(1,1,4,5),
+             c(1,1,6,7))
+df_plot <- grid.arrange(grobs = plot_df, layout_matrix = lay)
+ggsave(filename = "/home/courtney/Documents/Masters/Research/Utah/UT_FVS/images/df_coef.png", df_plot, 
+       height = 8, width = 12, units = "in")
+
 ```
 
 
 ```{r}
 varmt_df_z$pred <- predict(clim_mod_df)
-# g0 <- ggplot(dataf,aes(mnth,stmass))+
-#     geom_point()+
-#     geom_line(aes(group=subject))+
-#     facet_grid(.~roostsitu)+
-#     zero_margin
-# g0 +   geom_line(colour="gray",aes(y=pred1,group=subject)) +
-#     geom_line(colour="red",aes(y=pred,group=subject))
 ggplot(varmt_df_z,aes(z.DIA_C,dds))+
      geom_line(colour="gray",aes(y=pred,group=TRE_CN))
 ```
