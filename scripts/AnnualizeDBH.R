@@ -3,32 +3,8 @@
 #4-17-19
 #with Jeff Oliver: jcoliver@email.arizona.edu 
 
-
-#load the data, long format with trees stacked
-load(file = "./data/formatted/incr_percov")
-length(unique(incr_percov$TRE_CN)) #603
-#add new data, if any
-#from new_rwl.R
-load(file = "./data/formatted/incr_percov2.Rdata")
-length(unique(incr_percov2$TRE_CN)) #67
-
-incr_1cov <- incr_percov %>%
-  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
-         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
-         DIA_t,CR,TPA_UNADJ)
-
-incr_2cov <- incr_percov2 %>%
-  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
-         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
-         DIA_t,CR,TPA_UNADJ)
-#merge two data sets
-incr_comb <- incr_1cov %>%
-  bind_rows(incr_2cov)
-length(unique(incr_comb$TRE_CN)) #670
-
-save(incr_comb, file = "./data/formatted/incr_comb.Rdata")
-
-#explore
+#load data
+load("./data/formatted/incr_comb.Rdata")
 
 #dataframe of coefficients for bark ratio calculation
 #from Utah variant guide
