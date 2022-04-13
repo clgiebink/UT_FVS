@@ -5,11 +5,22 @@
 #updated by Courtney Giebink
 #clgiebink@gmail.com
 
+#Tree Ring data ----
+######################################################################################################
 library(tidyverse)
 #read in data from Justin
 UT_per <- read.csv("./data/raw/T_Utah_periodic_metadata.csv", header = T, stringsAsFactors = F)
 UT_rw <- read.csv("./data/raw/Q_Utah_Courtney_ringwidth.csv", header = T, stringsAsFactors = F)
+######################################################################################################
+#or
+######################################################################################################
+#if data from the doi
+#do not need UT_per
+#TRE_CN included and can be used to link to FIA tables
+##load UT_rw
+######################################################################################################
 
+#FIA data ----
 #connect to SQLite database to get metadata
 library(dbplyr)
 library(RSQLite)
@@ -44,6 +55,9 @@ PLOTGEOM <- tbl(UT_FIA, sql("SELECT CN, FVS_LOC_CD FROM PLOTGEOM")) %>%
   collect()
 covariates$FVS_LOC_CD <- PLOTGEOM$FVS_LOC_CD[match(covariates$PLT_CN, PLOTGEOM$CN)]
 
+#Merge ----
+################################################################################################
+#with justin's data
 #data for glmm - ring widths
 #merge justin's trees with FIADB metadata
 covariates$TRE_CN <- as.numeric(covariates$TRE_CN)
@@ -54,6 +68,35 @@ per_cov[duplicated(per_cov$TRE_CN),] #are there any dublicated trees?
 
 #merge with ring width data
 incr_percov <- left_join(UT_rw,per_cov) #by CN
+length(unique(incr_percov$TRE_CN)) #603
+
+#add new data, if any
+#from new_rwl.R
+load(file = "./data/formatted/incr_percov2.Rdata")
+length(unique(incr_percov2$TRE_CN)) #67
+
+incr_1cov <- incr_percov %>%
+  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
+         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
+         DIA_t,CR,TPA_UNADJ)
+
+incr_2cov <- incr_percov2 %>%
+  select(Year,RW,PLT_CN,TRE_CN,SPCD,SUBP_t,CONDID,MEASYEAR,
+         ASPECT,SLOPE,SICOND,BALIVE,LAT,LON,ELEV,DESIGNCD,
+         DIA_t,CR,TPA_UNADJ)
+#merge two data sets
+incr_comb <- incr_1cov %>%
+  bind_rows(incr_2cov)
+length(unique(incr_comb$TRE_CN)) #670
+
+save(incr_comb, file = "./data/formatted/incr_comb.Rdata")
+##################################################################################################
+#or
+#################################################################################################
+#with doi data
+incr_comb <- left_join(UT_rw,per_cov) #by TRE_CN
+save(incr_comb, file = "./data/formatted/incr_comb.Rdata")
+#################################################################################################
 
 #check species
 length(per_cov$TRE_CN[per_cov$SPCD == 202]) #166
